@@ -1,0 +1,2 @@
+# montage-data
+Montage Data is a framework that allows Montage applications to easily exchange data with servers. It maps server data to model objects accessible in application code, allowing complex server operations to be performed by reading and writing the properties of model objects obtained with simple queries.  This is similar to Object Relational Mapping (ORM) except that it also works for servers offering REST or other type of non-relational services, so it could be called Object Service Mapping (OSM).
