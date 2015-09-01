@@ -1,0 +1,24 @@
+{
+    "opts": {
+        "destination": "./out/doc",
+        "encoding": "utf8",
+        "readme": "README.md",
+        "recurse": true
+    },
+    "tags": {
+        "allowUnknownTags": true,
+        "dictionaries": ["jsdoc"]
+    },
+    "source": {
+        "include": [".jsdoc.externals.js", "logic"],
+        "includePattern": ".+\\.js(doc)?$",
+        "excludePattern": "(^|\\/|\\\\)_"
+    },
+    "plugins": [
+        "plugins/markdown"
+    ],
+    "templates": {
+        "cleverLinks": true,
+        "monospaceLinks": false
+    }
+}

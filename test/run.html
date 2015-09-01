@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <!-- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+     !                                           !
+     !   TESTS SHOULD BE DEFINED IN RUN.JS       !
+     !   AND THIS FILE SHOULD NOT BE MODIFIED.   !
+     !                                           !
+     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! -->
+
+
+    <meta charset="utf-8">
+    <title>Montage Data Tests</title>
+
+    <link rel="shortcut icon" type="image/png" href="lib/jasmine/jasmine_favicon.png">
+    <link rel="stylesheet" href="lib/jasmine/jasmine.css">
+
+    <!-- Set up Jasmine. -->
+    <script src="lib/jasmine/jasmine.js"></script>
+    <script src="lib/jasmine/jasmine-html.js"></script>
+    <script src="lib/jasmine/boot.js"></script>
+
+    <!-- Adjust Jasmine to work with Montage Require: The lib/jasmine/boot.js
+     !   loaded above sets up jasmine.getEnv().execute() to be called in
+     !   window.onload(), but Montage Require loads tests asynchronously so no
+     !   tests will be defined then. This script suppresses boot.js' default
+     !   window.onload() actions and instead defines a global runJasmine()
+     !   function that can be used to perform those actions when the tests are
+     !   ready. -->
+    <script type="text/javascript">
+        var jasmineOnload = window.onload;
+        window.onload = function () {};
+        window.runJasmine = function (tests) {
+            jasmineOnload.call(window);
+        };
+    </script>
+
+    <!-- Load and run the tests. The run.js loaded here both defines the tests
+     !   and uses the runJasmine() function created above to run them. See
+     !   run.js for more details and to define tests. -->
+    <script src="node_modules/montage/packages/mr/bootstrap.js" data-module="run"></script>
+</head>
+<body>
+</body>
+</html>

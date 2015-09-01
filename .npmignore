@@ -1,0 +1,32 @@
+# Paths within each section are in alphabetical order.
+
+# Operating system generated files that shouldn't be committed.
+._*
+.DS_Store
+.DS_Store?
+.Spotlight-V100
+.Trashes
+
+# Source code configuration files that shouldn't be packaged.
+.editorconfig
+.gitignore
+.jshintignore
+.jshintrc
+.npmignore
+
+# Developer-specific IDE files that shouldn't be packaged.
+*.xcodeproj
+.idea
+atlassian-ide-plugin.xml
+
+# Build, test, and utility files that shouldn't be packaged.
+/builds
+/out
+/spec
+/test
+/tools
+TEST-*.xml
+
+# Run-time generated files that shouldn't be packaged.
+node_modules
+npm-debug.log
