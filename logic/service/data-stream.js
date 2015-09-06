@@ -1,4 +1,7 @@
-var DataProvider = require("logic/service/data-provider").DataProvider;
+// Note: Bluebird promises are used even if ECMAScript 6 promises are available.
+var bootstrap = require("logic/bootstrap/bootstrap.js"),
+    DataProvider = require("logic/service/data-provider").DataProvider,
+    Promise = require("bluebird");
 
 /**
  * An object that represents an operation that may not have completed yet but
