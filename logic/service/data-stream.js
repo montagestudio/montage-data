@@ -121,12 +121,8 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream# */{
      */
     addData: {
         value: function (objects) {
-            var i, n = objects ? objects.length : 0;
-            if (n > 0) {
-                this.data.length += n;
-                for (i = 0; i < n; ++i) {
-                    this.data[this._data.length - n + i] = objects[i];
-                }
+            if (objects && objects.length) {
+                this.data.push.apply(this.data, objects);
             }
         }
     },
