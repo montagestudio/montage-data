@@ -1,4 +1,5 @@
-var DataStream = require("montage-data/logic/service/data-stream").DataStream;
+var DataStream = require("montage-data/logic/service/data-stream").DataStream
+    Montage = require("montage").Montage;
 
 describe("A DataStream", function() {
 
@@ -14,7 +15,7 @@ describe("A DataStream", function() {
     });
 
     it("accepts requests for data", function () {
-        expect(new DataStream().requestData()).toBeUndefined();
+        expect(new DataStream().requestData).toEqual(jasmine.any(Function));
     });
 
     it("is thenable", function () {
@@ -25,20 +26,31 @@ describe("A DataStream", function() {
         expect(new DataStream().catch).toEqual(jasmine.any(Function));
     });
 
-    it("passes data along", function () {
-        var stream = new DataStream();
-        stream.addData([{a: 1, b: 2}, {a: 3, b: 4}]);
-        expect(stream.data).toEqual([{a: 1, b: 2}, {a: 3, b: 4}]);
-    });
-
-    it("does not change its data array", function () {
+    it("doesn't change the array instance it uses for its data", function () {
         var stream = new DataStream(),
             data = stream.data;
         stream.addData([{a: 1, b: 2}, {a: 3, b: 4}]);
         expect(stream.data).toBe(data);
     });
 
-    it("fulfills its promise with the data it receives", function (done) {
+    it("provides the data it receives through its data array", function () {
+        var stream = new DataStream();
+        stream.addData([{a: 1, b: 2}, {a: 3, b: 4}]);
+        expect(stream.data).toEqual([{a: 1, b: 2}, {a: 3, b: 4}]);
+    });
+
+    it("provides the data it receives to objects bound to its data array", function () {
+        var stream = new DataStream(),
+            bound = new (Montage.specialize({}))();
+        bound.stream = stream;
+        bound.defineBinding("data", {"<-": "stream.data"});
+        bound.defineBinding("foos", {"<-": "stream.data.map{foo}"});
+        stream.addData([{foo: 1, bar: 2}, {foo: 3, bar: 4}]);
+        expect(bound.data).toEqual([{foo: 1, bar: 2}, {foo: 3, bar: 4}]);
+        expect(bound.foos).toEqual([1, 3]);
+    });
+
+    it("is a promise that gets fulfilled with the data it receives", function (done) {
         var stream = new DataStream();
         // Set up asynchronous expectations.
         stream.then(function (data) {
@@ -50,7 +62,7 @@ describe("A DataStream", function() {
         stream.dataDone();
     });
 
-    it("fulfills its promise only once", function (done) {
+    it("is a promise that is fulfilled only once", function (done) {
         var stream = new DataStream(),
             thenCount = 0;
         // Set up a promise callback counter.
