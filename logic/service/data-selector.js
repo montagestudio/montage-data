@@ -1,5 +1,4 @@
-var bootstrap = require("logic/bootstrap/bootstrap.js"),
-    Montage = require("montage").Montage;
+var Montage = require("montage").Montage;
 
 /**
  * Defines criteria that objects must satisfy to be included in a data set.

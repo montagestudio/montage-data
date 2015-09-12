@@ -1,5 +1,4 @@
-var bootstrap = require("logic/bootstrap/bootstrap.js"),
-    Montage = require("montage").Montage;
+var Montage = require("montage").Montage;
 
 /**
  * Maps raw data to data objects of a specific type.

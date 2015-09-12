@@ -1,5 +1,4 @@
-var bootstrap = require("logic/bootstrap/bootstrap.js"),
-    Montage = require("montage").Montage,
+var Montage = require("montage").Montage,
     DataMapping = require("logic/service/data-mapping").DataMapping,
     DataStream = require("logic/service/data-stream").DataStream;
 

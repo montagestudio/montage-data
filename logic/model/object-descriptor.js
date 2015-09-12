@@ -1,5 +1,4 @@
-var bootstrap = require("logic/bootstrap/bootstrap.js"),
-    Montage = require("montage").Montage;
+var Montage = require("montage").Montage;
 
 /**
  * Describes a type of object.
