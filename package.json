@@ -16,6 +16,7 @@
     },
     "dependencies": {
         "bluebird": "~2.9.34",
+        "collections": "~1.2.2",
         "montage": "~0.15.0"
     },
     "private": true

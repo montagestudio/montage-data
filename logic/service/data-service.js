@@ -1,4 +1,5 @@
 var Montage = require("montage").Montage,
+    Map = require("collections/map"),
     DataMapping = require("logic/service/data-mapping").DataMapping,
     DataStream = require("logic/service/data-stream").DataStream;
 
