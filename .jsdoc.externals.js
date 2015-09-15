@@ -2,6 +2,15 @@
 // Types
 
 /**
+ * An object that represents an operation that may not have completed yet but
+ * this is expected to complete in the future if it's not already completed, and
+ * that yields a value when it's completed.
+ *
+ * @external Promise
+ * @see {@linkcode https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise}
+ */
+
+/**
  * The basis of all types that use the Montage framework.
  *
  * @external Montage
@@ -36,6 +45,15 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 // Concepts
+
+/**
+ * An expression that can be evaluated relative to an object to return a value.
+ * The syntax of the expression is defined by the FRB (Functional Reactive
+ * Bindings) project.
+ *
+ * @external FrbExpression
+ * @see {@linkplain https://github.com/montagejs/frb}
+ */
 
 /**
  * A well defined set of properties and methods that can be found in objects

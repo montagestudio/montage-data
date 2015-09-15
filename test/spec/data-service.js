@@ -9,10 +9,10 @@ describe("A DataService", function() {
 
 });
 
-describe("A DataService's getData() method", function() {
+describe("A DataService's fetchData() method", function() {
 
     it("is defined", function () {
-        expect(new DataService().getData).toBeDefined();
+        expect(new DataService().fetchData).toBeDefined();
     });
 
     xit("uses the passed in stream when one is specified", function () {
@@ -27,21 +27,21 @@ describe("A DataService's getData() method", function() {
     xit("sets its stream's selector", function () {
     });
 
-    xit("calls getRawData() each time it is called", function () {
+    xit("calls fetchRawData() each time it is called", function () {
     });
 
 });
 
-describe("A DataService's getRawData() method", function() {
+describe("A DataService's fetchRawData() method", function() {
 
     it("is defined", function () {
-        expect(new DataService().getRawData).toBeDefined();
+        expect(new DataService().fetchRawData).toBeDefined();
     });
 
     it("gets an empty set of data by default", function (done) {
-        // Call getRawData() and verify the stream data this generates.
+        // Call fetchRawData() and verify the stream data this generates.
         var stream = new DataStream();
-        new DataService().getRawData(stream);
+        new DataService().fetchRawData(stream);
         expect(stream.data).toEqual([]);
         // Make sure the stream's promise is fulfilled with the same data.
         stream.then(function (data) {

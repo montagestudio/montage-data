@@ -1,7 +1,7 @@
 var Montage = require("montage").Montage;
 
 /**
- * Describes one property of a type of object.
+ * Describes a property of of objects of a certain type.
  *
  * @class
  * @extends external:Montage
@@ -9,13 +9,10 @@ var Montage = require("montage").Montage;
 exports.PropertyDescriptor = Montage.specialize(/** @lends PropertyDescriptor# */{
 
     /**
-     * The type of the values of this property, as they would be returned from
-     * a JavaScript `typeof` call.
-     *
-     * @type {String}
+     * @type {boolean}
      */
-    type: {
-        value: null
+    isRelationship: {
+        value: false
     }
 
 });

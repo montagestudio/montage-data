@@ -3,10 +3,12 @@ var Montage = require("montage").Montage;
 /**
  * Maps raw data to data objects of a specific type.
  *
- * Currently services have to subclass this and override its
- * [mapData()]{@link DataMapping#mapData} method to define their mapping. In the
- * future mappings will be defined declaratively through mapping descriptors
- * read from blueprint files.
+ * Currently services define their mapping by overriding their
+ * [mapRawData()]{@link DataService#mapRawData} method or by using a
+ * {@link DataMapping} subclass that overrides its
+ * [mapRawData()]{@link DataMapping#mapRawData} method. In the future it will be
+ * possible to define mappings declaratively through mapping descriptors read
+ * from blueprint files.
  *
  * @class
  * @extends external:Montage
@@ -14,46 +16,37 @@ var Montage = require("montage").Montage;
 exports.DataMapping = Montage.specialize(/** @lends DataMapping# */{
 
     /**
-     * The type of the data object to map to.
-     *
-     * @type {ObjectDescriptor}
-     */
-    type: {
-        value: undefined
-    },
-
-
-    /**
      * Convert raw data to data objects of an appropriate type.
      *
-     * Subclasses should override this method to create an object of the right
-     * type with values taken from the passed in raw object. The
-     * [specialize()]{@linkcode external:specialize} method of the prototype of
-     * the map's type can be used for this, as in the following:
+     * Subclasses should override this method to map properties of the raw data
+     * to data objects, as in the following:
      *
      *     mapRawData: {
-     *         value: function (rawObject) {
-     *             return this.type.prototype.specialize({
-     *                 firstName: {
-     *                     value: rawObject.GIVEN_NAME
-     *                 }
-     *                 lastName: {
-     *                     value: rawObject.FAMILY_NAME
-     *                 }
-     *             });
+     *         value: function (dataObject, rawData) {
+     *             dataObject.firstName = rawData.GIVEN_NAME;
+     *             dataObject.lastName = rawData.FAMILY_NAME;
      *         }
      *     }
      *
-     * The default implementation of this method returns the raw object
-     * unmodified.
+     * The default implementation of this method copies the properties defined
+     * by the raw data object to the data object.
      *
      * @method
-     * @argument {Object} rawObject - An object whose properties hold the raw
-     *                                data. This object may be modified.
+     * @argument {Object} dataObject - An object whose properties will be
+     *                                 set or modified to represent the data
+     *                                 define in rawData.
+     * @argument {Object} rawData    - An object whose properties hold the raw
+     *                                 data. This object may be modified by this
+     *                                 method.
      */
     mapRawData: {
-        value: function (rawObject) {
-            return rawObject;
+        value: function (dataObject, rawData) {
+            if (rawData) {
+                for (key in rawData) {
+                    dataObject[key] = rawData[key]
+                }
+            }
+            return dataObject;
         }
     }
 

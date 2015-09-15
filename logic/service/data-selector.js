@@ -1,7 +1,8 @@
 var Montage = require("montage").Montage;
 
 /**
- * Defines criteria that objects must satisfy to be included in a data set.
+ * Defines the criteria that objects must satisfy to be included in a data set
+ * as well as other characteristics the data set must possess.
  *
  * @class
  * @extends external:Montage
@@ -9,30 +10,30 @@ var Montage = require("montage").Montage;
 exports.DataSelector = Montage.specialize(/** @lends DataSelector# */{
 
     /**
-     * Eventually selector expressions will be parsed from strings but for now
-     * they can only be defined as literal objects structured like the
-     * following:
+     * The type of the data object to retrieve.
      *
-     *     var selector = new DataSelector();
-     *     selector.expression = {
-     *         property1: {"=": 1},
-     *         property2: {">": 2, "<": 3},
-     *         property3: {">=": 3},
-     *         property4: {"!=": 4}
-     *     };
+     * @type {ObjectDescriptor}
+     */
+    type: {
+        value: undefined
+    },
+
+    /**
+     * A set of named values defining the criteria that must be satisfied by
+     * objects for them to be included in the data set defined by this selector.
      *
-     * This supports a small subset of the selector expressions expected to be
-     * valid in the future. Services are ultimately responsible for interpreting
-     * selector expressions and for determinging which expressions are valid
-     * but for now the operators that are expected to be valid in expression
-     * objects are:
-     *
-     *     "=" || "<" || ">" || "<=" || ">=" || "!="
+     * Properties and corresponding values can be added or removed from the
+     * criteria object but that criteria object itself cannot be replaced.
      *
      * @type {Object}
      */
-    expression: {
-        value: null
+    criteria: {
+        get: function () {
+            if (!this._criteria) {
+                this._criteria = {};
+            }
+            return this._criteria;
+        }
     }
 
 });

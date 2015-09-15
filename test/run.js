@@ -6,5 +6,7 @@ runJasmine([
     require("spec/data-selector"),
     require("spec/data-service"),
     require("spec/data-stream"),
-    require("spec/object-descriptor")
+    require("spec/object-descriptor"),
+    require("spec/property-descriptor"),
+    require("spec/relationship-descriptor")
 ]);

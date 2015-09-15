@@ -6,7 +6,7 @@ describe("A DataProvider", function() {
         expect(new DataProvider()).toBeDefined();
     });
 
-    it("has a an initially empty data array", function () {
+    it("initially has no data", function () {
         var provider = new DataProvider(),
             data = provider.data;
         expect(Array.isArray(data)).toBe(true);

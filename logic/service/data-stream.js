@@ -3,15 +3,6 @@ var DataProvider = require("logic/service/data-provider").DataProvider,
     Promise = require("bluebird");
 
 /**
- * An object that represents an operation that may not have completed yet but
- * this is expected to complete in the future if it's not already completed, and
- * that yields a value when it's completed.
- *
- * @external Promise
- * @see {@linkcode https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise}
- */
-
-/**
  * A [DataProvider]{@link DataProvider} whose data is received sequentially.
  * A DataStreams is also a [Promise]{@linkcode external:Promise} which is
  * fulfilled when all the data it expects has been received.
@@ -71,16 +62,7 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream# */{
     },
 
     /**
-     * The type of the objects making up this stream's data.
-     *
-     * @type {ObjectDescriptor}
-     */
-    type: {
-        value: undefined
-    },
-
-    /**
-     * The selector used to select the data in this stream.
+     * The selector defining the data returned in this stream.
      *
      * @type {DataSelector}
      */
@@ -162,7 +144,7 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream# */{
      *                                       only provides an indication of when
      *                                       the first set of data received by
      *                                       this stream was received.
-     * @argument {OnRejected} onRejected -   DataStreams are never rejected so
+     * @argument {OnRejected} onRejected   - DataStreams are never rejected so
      *                                       rejection callbacks passed in to
      *                                       this method are never called.
      */

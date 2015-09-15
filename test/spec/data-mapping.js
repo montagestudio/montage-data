@@ -7,7 +7,7 @@ describe("A DataMapping", function() {
         expect(new DataMapping()).toBeDefined();
     });
 
-    it("has an initially undefined type", function () {
+    it("initially has no type", function () {
         expect(new DataMapping().type).toBeUndefined();
     });
 
