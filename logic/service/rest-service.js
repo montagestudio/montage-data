@@ -1,6 +1,7 @@
 var DataService = require("logic/service/data-service").DataService,
     DataSelector = require("logic/service/data-selector").DataSelector,
-    Map = require("collections/map");
+    Map = require("collections/map"),
+    Promise = require("bluebird");
 
 /**
  * Provides utility methods for REST services.
@@ -10,16 +11,32 @@ var DataService = require("logic/service/data-service").DataService,
  */
 exports.RestService = DataService.specialize(/** @lends RestService# */{
 
-    getDataPromise: {
-        value: function (cacheName, cacheKey, criteria, preparation) {
+    _propertyDataPromiseCaches: {
+        get: function () {
+            if (!this.__propertyDataPromiseCaches) {
+                this.__propertyDataPromiseCaches = {};
+            }
+            return this.__propertyDataPromiseCaches;
+        }
+    },
+
+    getPropertyDataPromise: {
+        value: function (name, criteria, object, prerequisites) {
             var self = this,
-                promise = this[cacheName] && this[cacheName].get(cacheKey);
-            if (!promise) {
-                promise = new Promise(function (resolve, reject) {
-                    // Call the preparation function if one was provided and
-                    // then defer the fetch until the next event loop to allow
+                caches = this._propertyDataPromiseCaches;
+                promise = caches[name] && caches[name].get(object);
+            if (!caches[name] || !caches[name].get(object)) {
+                caches[name] = caches[name] || new Map();
+                caches[name].set(object, new Promise(function (resolve, reject) {
+                    // Get prerequisite property values if necessary and then
+                    // defer the fetch until the next event loop to allow
                     // fetches for similar data to be combined.
-                    var resolution = preparation ? preparation.call(self) : null;
+                    var resolution = null;
+                    if (prerequisites && arguments.length > 4) {
+                        resolution = DataService.main.getPropertyData(object, Array.prototype.slice.call(arguments, 3));
+                    } else if (prerequisites) {
+                        resolution = DataService.main.getPropertyData(object, prerequisites);
+                    }
                     window.setTimeout(function () { resolve(resolution); }, 0);
                 }).then(function () {
                     // Fetch the data.
@@ -29,22 +46,16 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
                     for (name in criteria) {
                         selector.criteria[name] = criteria[name];
                     }
-                    return self.mainService.fetchData(selector);
-                }).then(function () {
-                    // Ensure the promise callback's argument will be null.
-                    return null;
-                });
-                this[cacheName] = this[cacheName] || new Map();
-                this[cacheName].set(cacheKey, promise);
+                    return DataService.main.fetchData(selector);
+                }));
             }
-            return promise;
+            return caches[name].get(object);
         }
     },
 
-    getFetchPromise: {
+    getDataFetchPromise: {
         value: function (url) {
             return new Promise(function (resolve, reject) {
-                console.log("RestService.getFetchPromise(" + url + ")");
                 // Fetch the requested data.
                 if (url) {
                     request = new XMLHttpRequest();
