@@ -11,32 +11,17 @@ var DataService = require("logic/service/data-service").DataService,
  */
 exports.RestService = DataService.specialize(/** @lends RestService# */{
 
-    _propertyDataPromiseCaches: {
-        get: function () {
-            if (!this.__propertyDataPromiseCaches) {
-                this.__propertyDataPromiseCaches = {};
-            }
-            return this.__propertyDataPromiseCaches;
-        }
-    },
-
     getPropertyDataPromise: {
         value: function (name, criteria, object, prerequisites) {
             var self = this,
-                caches = this._propertyDataPromiseCaches;
-                promise = caches[name] && caches[name].get(object);
-            if (!caches[name] || !caches[name].get(object)) {
-                caches[name] = caches[name] || new Map();
-                caches[name].set(object, new Promise(function (resolve, reject) {
+                promise = this._getPropertyDataPromises(name).get(object);
+            if (!promise) {
+                prerequisites = arguments.length > 4 ? Array.prototype.slice.call(arguments, 3) : prerequisites;
+                this._getPropertyDataPromises(name).set(object, promise = new Promise(function (resolve, reject) {
                     // Get prerequisite property values if necessary and then
                     // defer the fetch until the next event loop to allow
                     // fetches for similar data to be combined.
-                    var resolution = null;
-                    if (prerequisites && arguments.length > 4) {
-                        resolution = DataService.main.getPropertyData(object, Array.prototype.slice.call(arguments, 3));
-                    } else if (prerequisites) {
-                        resolution = DataService.main.getPropertyData(object, prerequisites);
-                    }
+                    var resolution = prerequisites ? DataService.main.getObjectData(object, prerequisites) : null;
                     window.setTimeout(function () { resolve(resolution); }, 0);
                 }).then(function () {
                     // Fetch the data.
@@ -47,9 +32,25 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
                         selector.criteria[name] = criteria[name];
                     }
                     return DataService.main.fetchData(selector);
+                }).then(function (data) {
+                    // Allow subsequent fetches.
+                    self._getPropertyDataPromises(name).delete(object);
+                    return data;
                 }));
+
             }
-            return caches[name].get(object);
+            return promise || DataService.NULL_PROMISE;
+        }
+    },
+
+    _getPropertyDataPromises: {
+        value: function (name) {
+            var promises = this._propertyDataPromises && this._propertyDataPromises[name];
+            if (!promises) {
+                this._propertyDataPromises = this._propertyDataPromises || {};
+                this._propertyDataPromises[name] = promises = new Map();
+            }
+            return promises;
         }
     },
 
@@ -74,16 +75,26 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
                     window.setTimeout(function () { resolve(request); }, 0);
                 });
             }).then(function (request) {
-                // Convert error status responses to exceptions.
-                var error;
-                if (request.status === 0 || request.status >= 300) {
-                    error = new Error(String(request.status));
-                    error.request = request;
-                    throw error;
+                // For now, just return null for error status responses.
+                var response = request.responseText;
+                if (request.status >= 300) {
+                    console.log(new Error("Status " + request.status + " for " + url));
+                    response = null;
                 }
-                return request.responseText;
+                return response;
             });
         }
-    }
+    },
 
+    parseJson: {
+        value: function (json) {
+            var parsed;
+            try {
+                parsed = json && JSON.parse(json);
+            } catch (error) {
+                parsed = null;
+            }
+            return parsed;
+        }
+    }
 });

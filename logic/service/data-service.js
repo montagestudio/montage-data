@@ -403,7 +403,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      * @method
      * @argument {Object} object   - The object whose type is sought.
      * @returns {ObjectDescriptor} - The type of the object, or undefined if no
-     *                               type can be determined.
+     * type can be determined.
      */
     getObjectType: {
         value: function (object) {
@@ -442,8 +442,8 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      */
     getObjectData: {
         value: function (object, propertyNames) {
-            var names, start, promiseArray, promiseSet, promise;
-            // Allow names to be provided as an array or as a list of arguments.
+            var names, start, promiseArray, promiseSet, promise, i, n;
+            // Accept property names as an array or as a list of arguments.
             names = Array.isArray(propertyNames) ? propertyNames : arguments;
             start = names === propertyNames ? 0 : 1;
             // Request each data value separately, collecting unique resulting
@@ -496,7 +496,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      * data is available at the time this method is called.
      */
     getPropertyData: {
-        value: function (object, name) {
+        value: function (object, propertyName) {
             // TODO [Charles]: For now we'll require subclasses to handle this
             // manually but eventually this can be handled automatically using
             // relationship information to generate appropriate queries with
@@ -511,19 +511,40 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
             //    fetch is done and when the returned values has been set.
             var type = DataService.main.getObjectType(object),
                 service = DataService.main.getChildService(type),
-                trigger = service && service._triggers && service._triggers[name],
+                trigger = service && service._triggers && service._triggers[propertyName],
                 promise = trigger && trigger.promises && trigger.promises.get(object);
             if (service !== this && trigger && typeof promise === "undefined") {
                 trigger.promises = trigger.promises || new WeakMap();
                 trigger.promises.set(object, null);
-                trigger.promises.set(object, service.getPropertyData(object, name));
+                trigger.promises.set(object, service.getPropertyData(object, propertyName));
                 promise = trigger.promises.get(object);
             }
-            return (promise || DataService.NULL_PROMISE).then(function (value) {
-                return value;
-            });
+            return promise || DataService.NULL_PROMISE;
         }
     },
+
+// TODO [Charles]: Fix, test, & use.
+//
+//    updateObjectData: {
+//        value: function (object, propertyNames) {
+//            var names, start, type, service, trigger, promise, i, n;
+//            // Accept property names as an array or as a list of arguments.
+//            names = Array.isArray(propertyNames) ? propertyNames : arguments;
+//            start = names === propertyNames ? 0 : 1;
+//            // Clear the "this is fetched" markers for the specified properties.
+//            for (i = start, n = names.length; i < n; ++i) {
+//                type = DataService.main.getObjectType(object),
+//                service = DataService.main.getChildService(type),
+//                trigger = service && service._triggers && service._triggers[names[i]],
+//                promise = trigger && trigger.promises && trigger.promises.get(object);
+//                if (promise === DataService.NULL_PROMISE) {
+//                    trigger.promises.delete(object);
+//                }
+//            }
+//            // Re-fetch any fetchable data.
+//            return DataService.main.getObjectData.apply(this, arguments);
+//        }
+//    },
 
     /***************************************************************************
      * Trigger management methods.
