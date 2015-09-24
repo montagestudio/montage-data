@@ -36,4 +36,20 @@ exports.DataSelector = Montage.specialize(/** @lends DataSelector# */{
         }
     }
 
+}, {
+
+    for: {
+        value: function (type, criteria) {
+            var selector, key;
+            selector = new DataSelector;
+            selector.type = type;
+            if (criteria) {
+                for (key in criteria) {
+                    selector.criteria[key] = criteria[key];
+                }
+            }
+            return selector;
+        }
+    }
+
 });
