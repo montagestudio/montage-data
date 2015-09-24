@@ -38,10 +38,10 @@ exports.DataSelector = Montage.specialize(/** @lends DataSelector# */{
 
 }, {
 
-    for: {
+    withTypeAndCriteria: {
         value: function (type, criteria) {
             var selector, key;
-            selector = new DataSelector;
+            selector = new this();
             selector.type = type;
             if (criteria) {
                 for (key in criteria) {
