@@ -7,14 +7,13 @@ describe("A DataProvider", function() {
     });
 
     it("initially has no data", function () {
-        var provider = new DataProvider(),
-            data = provider.data;
-        expect(Array.isArray(data)).toBe(true);
-        expect(data.length).toEqual(0);
+        var provider = new DataProvider();
+        expect(Array.isArray(provider.data)).toBe(true);
+        expect(provider.data.length).toEqual(0);
     });
 
     it("accepts requests for data", function () {
-        expect(new DataProvider().requestData()).toBeUndefined();
+        expect(new DataProvider().requestData).toEqual(jasmine.any(Function));
     });
 
 });

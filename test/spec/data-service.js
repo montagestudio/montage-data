@@ -7,39 +7,37 @@ describe("A DataService", function() {
         expect(new DataService()).toBeDefined();
     });
 
-});
-
-describe("A DataService's fetchData() method", function() {
-
-    it("is defined", function () {
-        expect(new DataService().fetchData).toBeDefined();
+    it("has a fetchData() method", function () {
+        expect(new DataService().fetchData).toEqual(jasmine.any(Function));
     });
 
-    xit("uses the passed in stream when one is specified", function () {
+    xit("has a fetchData() method that uses the passed in stream when one is specified", function () {
     });
 
-    xit("creates and return a new stream when none is passed in", function () {
+    xit("has a fetchData() method that creates and return a new stream when none is passed in", function () {
     });
 
-    xit("sets its stream's type", function () {
+    xit("has a fetchData() method that sets its stream's selector", function () {
     });
 
-    xit("sets its stream's selector", function () {
+    xit("has a fetchData() method that calls the service's fetchRawData() when appropriate", function () {
     });
 
-    xit("calls fetchRawData() each time it is called", function () {
+    xit("has a fetchData() xmethod that calls a child service's fetchRawData() when appropraite", function () {
     });
 
-});
-
-describe("A DataService's fetchRawData() method", function() {
-
-    it("is defined", function () {
-        expect(new DataService().fetchRawData).toBeDefined();
+    it("has a saveDataChanges() method", function () {
+        expect(new DataService().saveDataChanges).toEqual(jasmine.any(Function));
     });
 
-    it("gets an empty set of data by default", function (done) {
-        // Call fetchRawData() and verify the stream data this generates.
+    xit("has a saveDataChanges() method that needs to be further tested", function () {});
+
+    it("has a fetchRawData() method", function () {
+        expect(new DataService().fetchRawData).toEqual(jasmine.any(Function));
+    });
+
+    it("has a fetchRawData() method that fetches empty data by default", function (done) {
+        // Call fetchRawData() and verify the resulting stream's initial data.
         var stream = new DataStream();
         new DataService().fetchRawData(stream);
         expect(stream.data).toEqual([]);
@@ -51,29 +49,33 @@ describe("A DataService's fetchRawData() method", function() {
         });
     });
 
-});
-
-describe("A DataService's addRawData() method", function() {
-
-    it("is defined", function () {
-        expect(new DataService().addRawData).toBeDefined();
+    it("has a addRawData() method", function () {
+        expect(new DataService().addRawData).toEqual(jasmine.any(Function));
     });
 
-    xit("maps the data it receives", function () {
+    xit("has a addRawData() method that maps the data it receives", function () {
     });
 
-    xit("calls the specified stream's addData() with the mapped data", function () {
+    xit("has a addRawData() method that calls the specified stream's addData() with the mapped data", function () {
     });
 
-});
+    xit("has a addRawData() method that needs to be further tested", function () {});
 
-describe("A DataService's rawDataDone() method", function() {
-
-    it("is defined", function () {
-        expect(new DataService().rawDataDone).toBeDefined();
+    it("has a mapRawData() method", function () {
+        expect(new DataService().mapRawData).toEqual(jasmine.any(Function));
     });
 
-    xit("calls the specified stream's dataDone()", function () {
+    xit("has a mapRawData() method that needs to be further tested", function () {});
+
+    it("has a rawDataDone() method", function () {
+        expect(new DataService().rawDataDone).toEqual(jasmine.any(Function));
     });
+
+    xit("has a rawDataDone() method that calls the specified stream's dataDone()", function () {
+    });
+
+    xit("has a registerService() method that needs to be further tested", function () {});
+
+    xit("has a mainService class variable that needs to be further tested", function () {});
 
 });

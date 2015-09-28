@@ -3,24 +3,31 @@ var DataMapping = require("montage-data/logic/service/data-mapping").DataMapping
 
 describe("A DataMapping", function() {
 
+   function ClassA(a, b, c, d) {
+        this.a = a;
+        this.b = b;
+        this.c = c;
+        this.d = d;
+    }
+
+    function ClassB(a, b, c, d) {
+        this.a = a;
+        this.b = b;
+        this.c = c;
+        this.d = d;
+    }
+
     it("can be created", function () {
         expect(new DataMapping()).toBeDefined();
     });
 
-    it("initially has no type", function () {
-        expect(new DataMapping().type).toBeUndefined();
-    });
-
-    it("records its type", function () {
-        var object = {a: 1, b: 2},
-            mapping = new DataMapping();
-        mapping.type = object;
-        expect(mapping.type).toBe(object);
-    });
-
-    it("leaves raw data unmapped by default", function () {
-        var object = {a: 1, b: 2};
-        expect(new DataMapping().mapRawData(object)).toBe(object);
+    it("copies raw data properties by default", function () {
+        var object = {x: 42},
+            random = Math.random(),
+            raw = new ClassA(1, 2, object, random),
+            mapped = new ClassB();
+        expect(new DataMapping().mapRawData(mapped, raw)).toBe(mapped);
+        expect(mapped).toEqual(new ClassB(1, 2, object, random));
     });
 
 });

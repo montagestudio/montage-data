@@ -36,8 +36,7 @@ exports.DataMapping = Montage.specialize(/** @lends DataMapping# */{
      *                                 set or modified to represent the data
      *                                 define in rawData.
      * @argument {Object} rawData    - An object whose properties hold the raw
-     *                                 data. This object may be modified by this
-     *                                 method.
+     *                                 data.
      * @argument {?} context         - A value that was passed in to the
      *                                 [DataService mapRawData()]{@link DataService#mapRawData}
      *                                 call that invoked this method.

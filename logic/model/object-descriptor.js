@@ -72,7 +72,6 @@ var ObjectDescriptor = exports.ObjectDescriptor = Montage.specialize(/** @lends 
     addProperty: {
         value: function (name, descriptor) {
             this.properties[name] = descriptor;
-            this._didChange();
         }
     },
 
@@ -84,13 +83,13 @@ var ObjectDescriptor = exports.ObjectDescriptor = Montage.specialize(/** @lends 
     removeProperty: {
         value: function (name) {
             delete this.properties[name];
-            this._didChange();
         }
     },
 
     /**
-     * Convenience method to define relationships without having to manually
-     * create [RelationshipDescriptors]{@link RelationshipDescriptor} for them.
+     * Convenience method to define multiple relationships without having to
+     * manually create [RelationshipDescriptors]{@link RelationshipDescriptor}
+     * for them.
      *
      * @private
      * @method
@@ -119,8 +118,8 @@ var ObjectDescriptor = exports.ObjectDescriptor = Montage.specialize(/** @lends 
     },
 
     /**
-     * Convenience method to define a relationship without having to manually
-     * create a {@link RelationshipDescriptor} for it.
+     * Convenience method to define a single relationship without having to
+     * manually create a {@link RelationshipDescriptor} for it.
      *
      * @private
      * @method
@@ -158,49 +157,6 @@ var ObjectDescriptor = exports.ObjectDescriptor = Montage.specialize(/** @lends 
             var i, n;
             for (i = 0, n = names ? names.length : 0; i < n; ++i) {
                 this.addProperty(names, new PropertyDescriptor());
-            }
-        }
-    },
-
-    /***************************************************************************
-     * Change listener methods.
-     */
-
-    addChangeListener: {
-        value: function (listener) {
-            // Since we will often have a single listener, avoid creating a
-            // listener array unless absolutely necessary.
-            if (this._changeListeners && this._changeListeners.indexOf(listener) < 0) {
-                this._changeListeners.push(listener);
-            } else if (this._changeListener && listener !== this._changeListener) {
-                this._changeListeners = [this._changeListener, listener]
-                delete this._changeListener;
-            } else {
-                this._changeListener = listener;
-            }
-        }
-    },
-
-    removeChangeListener: {
-        value: function (listener) {
-            var index = this._changeListeners ? this._changeListeners.indexOf(listener) : -1;
-            if (index >= 0) {
-                this._changeListeners.splice(index, 1);
-            } else if (this._changeListener && listener === this._changeListener) {
-                delete this._changeListener;
-            }
-        }
-    },
-
-    _didChange: {
-        value: function () {
-            var i, n;
-            if (this._changeListener) {
-                this._changeListener.objectDescriptorDidChange(this);
-            } else if (this._changeListeners) {
-                for (i = 0, n = this._changeListeners.length; i < n; ++i) {
-                    this._changeListeners[i].objectDescriptorDidChange(this);
-                }
             }
         }
     }

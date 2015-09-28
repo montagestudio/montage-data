@@ -2,6 +2,7 @@ var Montage = require("montage").Montage,
     DataMapping = require("logic/service/data-mapping").DataMapping,
     DataSelector = require("logic/service/data-selector").DataSelector,
     DataStream = require("logic/service/data-stream").DataStream,
+    DataTrigger = require("logic/service/data-trigger").DataTrigger,
     Map = require("collections/map"),
     ObjectDescriptor = require("logic/model/object-descriptor").ObjectDescriptor,
     Promise = require("bluebird"),
@@ -17,36 +18,36 @@ var Montage = require("montage").Montage,
  * @class
  * @extends external:Montage
  */
-var DataService = exports.DataService = Montage.specialize(/** @lends DataService# */{
+exports.DataService = Montage.specialize(/** @lends DataService# */{
 
     /***************************************************************************
-     * Initialization.
+     * Initialization
      */
 
     constructor: {
         value: function () {
-            if (!DataService.main) {
-                DataService.register(this);
+            if (!exports.DataService.mainService) {
+                exports.DataService.registerService(this);
             }
         }
     },
 
     /***************************************************************************
-     * Public prototype properties (instance variables).
+     * Instance variables
      *
-     * Private properties are defined and/or documented where they are used.
+     * Private instance variables are defined where they are used.
      */
 
     /**
      * The type of data managed by this service if this service manages only one
      * type of data, `undefined` otherwise.
      *
-     * An application typically includes one service for each of its data types
-     * and one [main service]{@link DataService.main} which has no data type of
-     * its own and instead has child services for each of the application's data
-     * types. That main service delegates management of data of each of the
-     * application's data type to its child service that has the corresponding
-     * type.
+     * An application typically includes one service for each of its data
+     * types and one [main service]{@link DataService.mainService} which has
+     * no data type of its own and instead has child services for each of the
+     * application's data types. That main service delegates data management
+     * for each of the application's data type to its child service with the
+     * corresponding type.
      *
      * A service's type cannot be changed after it is set, and it must be set
      * before the service is added as a child of another service.
@@ -61,18 +62,15 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
             if (type && !this._type) {
                 this._type = type;
                 this._prototype = Object.create(type.prototype);
-                this._addTriggers();
-                this._type.addChangeListener(this);
+                this._triggers = DataTrigger.addTriggers(this, this._prototype);
             }
         }
     },
 
     /**
-     * Maps the raw data on which this service is based to the data objects
-     * returned by this service.
-     *
-     * If no mapping is defined the properties defined in the raw data will
-     * simply be copied to the data object.
+     * If defined, used by [mapRawData()]{@link DataService#mapRawData} to map
+     * the raw data on which this service is based to the data objects returned
+     * by this service.
      *
      * @type {Object}
      */
@@ -80,20 +78,47 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
         value: undefined
     },
 
+    /**
+     * A reference to DataService.NULL_PROMISE.
+     *
+     * @type {external:Promise}
+     */
+    nullPromise: {
+        get: function () {
+            return exports.DataService.NULL_PROMISE;
+        }
+    },
+
     /***************************************************************************
-     * Service tree management methods.
+     * Service tree management
      */
 
     /**
-     * Parent of this service: Every service other than the
-     * [main service]{@link DataService.main} must have a parent and the main
-     * service's parent will be null.
+     * Parent of this service: Every service other than a
+     * [root service]{@link DataService#rootService} must have a parent.
      *
      * @private
      * @type {DataService}
      */
     _parentService: {
         value: undefined
+    },
+
+    /**
+     * The ancestor of this child service that has no parent
+     * service. For most applications this will be the
+     * [main service]{@link DataService.mainService}.
+     *
+     * @type {DataService}
+     */
+    rootService: {
+        get: function () {
+            var service = this;
+            while (service._parentService) {
+                service = service._parentService;
+            }
+            return service;
+        }
     },
 
     /**
@@ -156,15 +181,15 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      */
     removeChildService: {
         value: function (service) {
+            service._parentService = undefined;
             this._childServices.delete(service.type);
         }
     },
 
     /***************************************************************************
-     * Data fetching methods.
+     * Fetching
      *
-     * These are the methods to be called by object using services. These
-     * methods should not be overridden.
+     * These methods should not be overridden.
      */
 
     /**
@@ -172,8 +197,8 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      * objects using this service.
      *
      * This method fetches raw data from a server or other source using the
-     * [fetchRawData()]{@link DataService#fetchRawData} method, creates and
-     * registers corresponding data objects using the
+     * [fetchRawData()]{@link DataService#fetchRawData} method, gets or creates
+     * and registers corresponding data objects using the
      * [getDataObject()]{@link DataService#getDataObject} method, maps the raw
      * data to those data objects using the
      * [mapRawData()]{@link DataService#mapRawData} method, and then returns
@@ -181,8 +206,9 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      * purpose.
      *
      * The data may be fetched asynchronously, in which case the data stream
-     * will be returned immediately but the data objects will be created,
-     * registered, filled with data, and added to the stream at a later time.
+     * will be returned immediately but the data objects will be gotten and
+     * created or registered, filled with data, and added to the stream at a
+     * later time.
      *
      * Subclasses should not override this method, they should instead override
      * their [fetchRawData()]{@link DataService#fetchRawData} method and their
@@ -199,39 +225,142 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      */
     fetchData: {
         value: function (selector, stream) {
-            var type, service;
-            // Accept a type in lieu of a selector.
-            if (!(selector instanceof DataSelector) && selector instanceof ObjectDescriptor) {
-                type = selector;
-                selector = new DataSelector();
-                selector.type = type;
-            }
-            // Set up the stream.
+            var type = selector instanceof DataSelector ? selector.type : selector,
+                service = this.getChildService(type);
+            // Set up the stream, accepting a type in lieu of a selector.
             if (!stream) {
                 stream = new DataStream();
             }
             if (!stream.service) {
                 stream.service = this;
             }
-            stream.selector = selector;
-            // Get the data from a child service or from raw data.
-            service = this.getChildService(selector.type);
-            if (service !== this) {
-                service.fetchData(selector, stream);
+            if (selector !== type) {
+                stream.selector = selector;
             } else {
+                stream.selector = DataSelector.withTypeAndCriteria(type);
+            }
+            // Get the data from raw date or from a child service.
+            if (service === this) {
                 this.fetchRawData(stream);
+            } else {
+                stream = service.fetchData(stream.selector, stream);
             }
             // Return the passed in or created stream.
-            stream._which = selector;
             return stream;
         }
     },
 
     /***************************************************************************
-     * Raw data management methods.
+     * Saving
+     */
+
+    /**
+     * Save all the changes that were made to any of the objects managed by this
+     * service since those objects were fetched. Note that objects fetched by a
+     * child service will be managed by that service's root service, not by the
+     * child service itself.
      *
-     * These are the methods that may be overridded when implementing services.
-     * These methods should only be called by the service itself.
+     * @method
+     */
+    saveDataChanges: {
+        value: function () {
+            // TODO.
+        }
+    },
+
+    /***************************************************************************
+     * Data objects
+     */
+
+    /**
+     * Create a new data object of a specified type.
+     *
+     * @method
+     * @argument {ObjectDescriptor} type - The type of object to create.
+     * @returns {Object}                 - The created object.
+     */
+    createDataObject: {
+        value: function (type) {
+            // TODO [Charles]: Object uniquing.
+            // Use the appropriate service to create the object.
+            var service = this.getChildService(type),
+                object = service === this ? Object.create(this._prototype) :
+                         service ?          service.createDataObject(type) :
+                                            Object.create(type.prototype);
+            // Return the created object after registering its type.
+            this._registerObjectType(object, type);
+            return object;
+        }
+    },
+
+    /**
+     * Find an existing object corresponding to the specified raw data, or if no
+     * such object exists, create one.
+     *
+     * @method
+     * @argument {ObjectDescriptor} type - The type of object to get or create.
+     * @argument {Object} rawData        - An object whose property values hold
+     *                                     the raw data.
+     * @returns {Object} - The object corresponding to the specified raw data,
+     * or if no such object exists a newly created object for that data.
+     */
+    getDataObject: {
+        value: function (type, rawData) {
+            // TODO [Charles]: Object uniquing.
+            return this.createDataObject(type);
+        }
+    },
+
+    /**
+     * Register the type of the specified data object if necessary.
+     *
+     * @private
+     * @method
+     * @argument {Object} object         - The object whose type is sought.
+     * @argument {ObjectDescriptor} type - The type to register for that object.
+     */
+    _registerObjectType: {
+        value: function (object, type) {
+            var prototype, root;
+            // Check if the type can be determined from a constructor.
+            prototype = object;
+            while (prototype && (prototype.constructor.TYPE instanceof ObjectDescriptor)) {
+                prototype = Object.getPrototypeOf(prototype);
+            }
+            // If not, record the type.
+            if (!prototype) {
+                root = this.rootService;
+                root._typeRegistry = root._typeRegistry || new WeakMap();
+                root._typeRegistry.set(object, type);
+            }
+        }
+    },
+
+    /**
+     * Get the type of the specified data object.
+     *
+     * @method
+     * @argument {Object} object   - The object whose type is sought.
+     * @returns {ObjectDescriptor} - The type of the object, or undefined if no
+     * type can be determined.
+     */
+    getObjectType: {
+        value: function (object) {
+            var registry = this.rootService._typeRegistry,
+                type = registry && registry.get(object);
+            while (object && !(type instanceof ObjectDescriptor)) {
+                type = object.constructor.TYPE;
+                object = Object.getPrototypeOf(object);
+            }
+            return object && type;
+        }
+    },
+
+    /***************************************************************************
+     * Raw data
+     *
+     * These methods should only be called by the service itself. They are
+     * typically overridden by subclasses to implement a service.
      */
 
     /**
@@ -325,7 +454,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      *     }
      *
      * Alternatively, subclasses can define a
-     * [mapping]{@link DataService#mapping} that does this mapping.
+     * [mapping]{@link DataService#mapping} to do this mapping.
      *
      * The default implementation of this method copies the properties defined
      * by the raw data object to the data object.
@@ -374,48 +503,8 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
     },
 
     /***************************************************************************
-     * Data object management methods.
+     * Data object data
      */
-
-    /**
-     * Get or create a data object corresponding to the specified raw data.
-     *
-     * @method
-     * @argument {ObjectDescriptor} type - The type of object to get or create.
-     * @argument {?Object} rawData       - An object whose properties' values
-     *                                     hold the raw data. If this is omitted
-     *                                     a new data object will be created
-     *                                     with no property values.
-     */
-    getDataObject: {
-        value: function (type, rawData) {
-            // TODO [Charles]: Object uniquing.
-            var service = this.getChildService(type);
-            return service === this ? Object.create(this._prototype) :
-                   service ?          service.getDataObject(type, rawData) :
-                                      Object.create(type.prototype);
-        }
-    },
-
-    /**
-     * Get the type of the specified data object.
-     *
-     * @method
-     * @argument {Object} object   - The object whose type is sought.
-     * @returns {ObjectDescriptor} - The type of the object, or undefined if no
-     * type can be determined.
-     */
-    getObjectType: {
-        value: function (object) {
-            var type = DataService.main._typeRegistry && DataService.main._typeRegistry.get(object);
-            if (!type) {
-                while (object && !(object.constructor.TYPE instanceof ObjectDescriptor)) {
-                    object = Object.getPrototypeOf(prototype);
-                }
-            }
-            return type || object && object.constructor.TYPE;
-        }
-    },
 
     /**
      * Request possibly asynchronous values from a data object.
@@ -451,7 +540,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
             // array and that set unless absolutely necessary.
             for (i = start, n = names.length; i < n; ++i) {
                 promise = this.getPropertyData(object, names[i]);
-                if (promise !== DataService.NULL_PROMISE) {
+                if (promise !== this.nullPromise) {
                     if (!promiseArray) {
                         promiseArray = [promise];
                     } else if (promiseArray.length === 1 && promiseArray[0] !== promise) {
@@ -467,7 +556,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
             }
             // Return a promise that will be fulfilled only when all of the
             // requested data has been set on the object.
-            return !promiseArray ?             DataService.NULL_PROMISE :
+            return !promiseArray ?             this.nullPromise :
                    promiseArray.length === 1 ? promiseArray[0] :
                                                Promise.all(promiseArray).then(function (values) {
                                                    return null;
@@ -509,19 +598,18 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
             // 5) If not, schedule the fetch to be done at the next tick of the
             //    event loop and return a promise that is fulfilled when the
             //    fetch is done and when the returned values has been set.
-            var type = DataService.main.getObjectType(object),
-                service = DataService.main.getChildService(type),
+            var type = this.rootService.getObjectType(object),
+                service = this.rootService.getChildService(type),
                 trigger = service && service._triggers && service._triggers[propertyName],
-                promise = trigger && trigger.promises && trigger.promises.get(object);
+                promise = trigger && trigger.promises.get(object);
             if (service !== this && trigger && typeof promise === "undefined") {
-                trigger.promises = trigger.promises || new WeakMap();
-                trigger.promises.set(object, null);
-                trigger.promises.set(object, service.getPropertyData(object, propertyName));
-                promise = trigger.promises.get(object);
+                trigger.promises.set(object, null); // Avoid any possibility of stack overflow in the next line.
+                promise = service.getPropertyData(object, propertyName);
+                trigger.promises.set(object, promise);
             }
-            return promise || DataService.NULL_PROMISE;
+            return promise || this.nullPromise;
         }
-    },
+    }
 
 // TODO [Charles]: Fix, test, & use.
 //
@@ -533,8 +621,8 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
 //            start = names === propertyNames ? 0 : 1;
 //            // Clear the "this is fetched" markers for the specified properties.
 //            for (i = start, n = names.length; i < n; ++i) {
-//                type = DataService.main.getObjectType(object),
-//                service = DataService.main.getChildService(type),
+//                type = DataService.mainService.getObjectType(object),
+//                service = DataService.mainService.getChildService(type),
 //                trigger = service && service._triggers && service._triggers[names[i]],
 //                promise = trigger && trigger.promises && trigger.promises.get(object);
 //                if (promise === DataService.NULL_PROMISE) {
@@ -542,127 +630,14 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
 //                }
 //            }
 //            // Re-fetch any fetchable data.
-//            return DataService.main.getObjectData.apply(this, arguments);
+//            return DataService.mainService.getObjectData.apply(this, arguments);
 //        }
 //    },
-
-    /***************************************************************************
-     * Trigger management methods.
-     */
-
-    /**
-     * @private
-     * @method
-     * @argument {ObjectDescriptor} descriptor
-     */
-     _addTriggers: {
-        value: function () {
-            var name;
-            if (this.type) {
-                for (name in this.type.properties) {
-                    this._addTrigger(name);
-                }
-            }
-        }
-     },
-
-    /**
-     * @private
-     * @method
-     * @argument {string} name
-     */
-     _addTrigger: {
-        value: function (name) {
-            var self = this,
-                isRelationship = this.type && this.type.properties[name] && this.type.properties[name].isRelationship,
-                trigger = isRelationship && {};
-            if (isRelationship) {
-                trigger.get = function () { return self._triggerGet.call(self, this, name); };
-                trigger.set = function (value) { self._triggerSet.call(self, this, name, value); };
-                Montage.defineProperty(this._prototype, name, trigger);
-                this._triggers = this._triggers || {};
-                this._triggers[name] = trigger;
-            }
-        }
-     },
-
-    /**
-     * @private
-     * @method
-     */
-     _removeTriggers: {
-        value: function () {
-            var name;
-            if (this._triggers) {
-                for (name in this._triggers) {
-                    this._removeTrigger(name);
-                }
-            }
-        }
-     },
-
-    /**
-     * @private
-     * @method
-     * @argument {string} name
-     */
-     _removeTrigger: {
-        value: function (name) {
-            var trigger = this._triggers && this._triggers[name];
-            if (trigger) {
-                delete this._prototype[name];
-                delete this._triggers[name];
-            }
-        }
-     },
-
-    /**
-     * @private
-     * @method
-     * @argument {Object} object
-     * @argument {string} name
-     */
-     _triggerGet: {
-        value: function (object, name) {
-            var data = this._data && this._data.get(object);
-            // Start an asynchronous fetch of the property's value if necessary,
-            DataService.main.getPropertyData(object, name);
-            // Set up the data if necessary to get a prototype chain.
-            data = data || Object.create(this.type.prototype);
-            this._data = this._data || new WeakMap();
-            this._data.set(object, data);
-            // Return the property's current value.
-            return data[name];
-        }
-     },
-
-    /**
-     * @private
-     * @method
-     * @argument {Object} object
-     * @argument {string} name
-     * @argument {} value
-     */
-     _triggerSet: {
-        value: function (object, name, value) {
-            var trigger = this._triggers && this._triggers[name],
-                data = trigger && this._data && this._data.get(object);
-            // Mark this value as fetched.
-            trigger.promises = trigger.promises || new WeakMap();
-            trigger.promises.set(object, DataService.NULL_PROMISE);
-            // Store the value in the a data object.
-            data = data || Object.create(this.type.prototype);
-            data[name] = value;
-            this._data = this._data || new WeakMap();
-            this._data.set(object, data);
-        }
-     }
 
 }, {
 
     /***************************************************************************
-     * Constructor properties and methods (class constants, class variables, and
-     * class methods).
+     * Class constants, variables, and methods
      */
 
     /**
@@ -671,6 +646,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      * [getPropertyData()]{@link DataService#getPropertyData} when the requested
      * data is already there.
      *
+     * @memberof DataService
      * @type {Promise}
      */
      NULL_PROMISE: {
@@ -690,43 +666,42 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      * of different types of data to child services specialized for each type.
      *
      * For this property to be correctly set
-     * [register()]{@link DataService.register] must be called at least once
-     * with a service that is either the main service or a descendent of the
-     * main service.
+     * [registerService()]{@link DataService.registerService] must be called at
+     * least once with a service that is either the main service or a descendent
+     * of the main service.
      *
      * @memberof DataService
      * @type {DataService}
      */
-    main: {
+    mainService: {
         get: function () {
-            while (this._main && this._main._parentService) {
-                this._main = this._main._parentService;
-            }
-            return this._main;
+            this._mainService = this._mainService && this._mainService.rootService;
+            return this._mainService;
         }
     },
 
     /**
      * Register the main service or one of its descendants.
      *
-     * For the [main]{@link DataService.main] property to be set correctly this
-     * method must be called at least once with a service that is either the
-     * main service or a descendent of the main service. It can be called
-     * multiple times with the main service or a descendent of the main service,
-     * but it cannot be called with a service that will not be the main service
-     * or a descendent of the main service.
+     * For the [mainService]{@link DataService.mainService] property to be set
+     * correctly this method must be called at least once with a service that is
+     * either the main service or a descendent of the main service. It can be
+     * called multiple times with the main service or a descendent of the main
+     * service, but it cannot be called with a service that will not be the main
+     * service or a descendent of the main service.
      *
      * The {@link DataService} constructor calls this method by default for the
-     * first created services, so [main]{@link DataService.main] will be set
-     * correctly if the first created service is either the main service or a
-     * descendant of the main service.
+     * first created services, so [mainService]{@link DataService.mainService]
+     * will be set correctly if the first created service is either the main
+     * service or a descendant of the main service.
      *
      * @memberof DataService
+     * @method
      * @type {DataService}
      */
-    register: {
+    registerService: {
         value: function (service) {
-            this._main = service;
+            this._mainService = service;
         }
     }
 

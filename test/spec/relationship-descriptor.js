@@ -51,4 +51,6 @@ describe("A RelationshipDescriptor", function() {
         expect(descriptor.criteriaExpressions.bar).toEqual(expression);
     });
 
+    xit("needs to be further tested", function () {});
+
 });

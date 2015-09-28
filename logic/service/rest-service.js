@@ -21,7 +21,7 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
                     // Get prerequisite property values if necessary and then
                     // defer the fetch until the next event loop to allow
                     // fetches for similar data to be combined.
-                    var resolution = prerequisites ? DataService.main.getObjectData(object, prerequisites) : null;
+                    var resolution = prerequisites ? DataService.mainService.getObjectData(object, prerequisites) : null;
                     window.setTimeout(function () { resolve(resolution); }, 0);
                 }).then(function () {
                     // Fetch the data.
@@ -31,7 +31,7 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
                     for (name in criteria) {
                         selector.criteria[name] = criteria[name];
                     }
-                    return DataService.main.fetchData(selector);
+                    return DataService.mainService.fetchData(selector);
                 }).then(function (data) {
                     // Allow subsequent fetches.
                     self._getPropertyDataPromises(name).delete(object);
