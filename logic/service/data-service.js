@@ -261,10 +261,13 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      * child service itself.
      *
      * @method
+     * @returns {external:Promise} - A promise fulfilled when all of the
+     * changed data has been saved.
      */
     saveDataChanges: {
         value: function () {
             // TODO.
+            return this.nullPromise;
         }
     },
 
