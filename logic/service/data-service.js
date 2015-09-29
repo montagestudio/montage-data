@@ -242,8 +242,11 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
             // Get the data from raw date or from a child service.
             if (service === this) {
                 this.fetchRawData(stream);
-            } else {
+            } else if (service) {
                 stream = service.fetchData(stream.selector, stream);
+            } else {
+                console.warn("Can't fetch data of unknown type -", type.name + "/" + type.uuid);
+                stream.dataDone();
             }
             // Return the passed in or created stream.
             return stream;
@@ -285,13 +288,23 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
     createDataObject: {
         value: function (type) {
             // TODO [Charles]: Object uniquing.
+            var service, object;
             // Use the appropriate service to create the object.
-            var service = this.getChildService(type),
-                object = service === this ? Object.create(this._prototype) :
-                         service ?          service.createDataObject(type) :
-                                            Object.create(type.prototype);
-            // Return the created object after registering its type.
-            this._registerObjectType(object, type);
+            service = this.getChildService(type);
+            if (service === this) {
+                object = Object.create(this._prototype);
+                object.constructor.call(object);
+            } else if (service) {
+                object = service.createDataObject(type);
+            } else {
+                object = Object.create(type.prototype);
+                object.constructor.call(object);
+            }
+            // Registering the created object's type.
+            if (object) {
+                this._registerObjectType(object, type);
+            }
+            // Return the created object.
             return object;
         }
     },

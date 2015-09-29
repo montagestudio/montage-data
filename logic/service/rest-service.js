@@ -11,53 +11,66 @@ var DataService = require("logic/service/data-service").DataService,
  */
 exports.RestService = DataService.specialize(/** @lends RestService# */{
 
-    getPropertyDataPromise: {
-        value: function (name, criteria, object, prerequisites) {
-            var self = this,
-                promise = this._getPropertyDataPromises(name).get(object);
-            if (!promise) {
-                prerequisites = arguments.length > 4 ? Array.prototype.slice.call(arguments, 3) : prerequisites;
-                this._getPropertyDataPromises(name).set(object, promise = new Promise(function (resolve, reject) {
-                    // Get prerequisite property values if necessary and then
-                    // defer the fetch until the next event loop to allow
-                    // fetches for similar data to be combined.
-                    var resolution = prerequisites ? DataService.mainService.getObjectData(object, prerequisites) : null;
-                    window.setTimeout(function () { resolve(resolution); }, 0);
+    getDataFetchPromise: {
+        value: function (type, object, name, prerequisites, criteria) {
+            var self = this;
+            // Create and cache a new fetch promise if necessary.
+            if (!this._getCachedFetchPromise(object, name)) {
+                // Parse arguments.
+                if (arguments.length > 5) {
+                    prerequisites = Array.prototype.slice.call(arguments, 3, -1);
+                    criteria = arguments[arguments.length - 1];
+                }
+                // Create and cache a new fetch promise
+                this._setCachedFetchPromise(object, name, new Promise(function (resolve, reject) {
+                    // First get prerequisite data if necessary...
+                    var isEmpty = !prerequisites || Array.isArray(prerequisites) && !prerequisites.length;
+                    resolve(!isEmpty ? self.rootService.getObjectData(object, prerequisites) : null);
                 }).then(function () {
-                    // Fetch the data.
-                    var selector, name;
-                    selector = new DataSelector();
-                    selector.type = self.type;
-                    for (name in criteria) {
-                        selector.criteria[name] = criteria[name];
-                    }
-                    return DataService.mainService.fetchData(selector);
+                    // Then fetch the requested data...
+                    return self.rootService.fetchData(DataSelector.withTypeAndCriteria(type || self.type, criteria));
                 }).then(function (data) {
-                    // Allow subsequent fetches.
-                    self._getPropertyDataPromises(name).delete(object);
+                    // Then waits until the next event loop to ensure only one
+                    // fetch is dispatched per event loop (caching ensures all
+                    // subsequent requests for the same fetch promise within the
+                    // same event loop will return the same promise)...
+                    return self._makeEventLoopPromise(data);
+                }).then(function (data) {
+                    // Then removes the promise from the cache so subsequent
+                    // requests for this fetch promise generate new fetches.
+                    self._setCachedFetchPromise(object, name, null);
                     return data;
                 }));
 
             }
-            return promise || DataService.NULL_PROMISE;
+            // Return the created or cached fetch promise.
+            var p = this._getCachedFetchPromise(object, name);
+            return p;
         }
     },
 
-    _getPropertyDataPromises: {
-        value: function (name) {
-            var promises = this._propertyDataPromises && this._propertyDataPromises[name];
-            if (!promises) {
-                this._propertyDataPromises = this._propertyDataPromises || {};
-                this._propertyDataPromises[name] = promises = new Map();
-            }
-            return promises;
+    _getCachedFetchPromise: {
+        value: function (object, name) {
+            this._cachedFetchPromises = this._cachedFetchPromises || {};
+            this._cachedFetchPromises[name] = this._cachedFetchPromises[name] || new Map();
+            return this._cachedFetchPromises[name].get(object);
         }
     },
 
-    getDataFetchPromise: {
+    _setCachedFetchPromise: {
+        value: function (object, name, promise) {
+            this._cachedFetchPromises = this._cachedFetchPromises || {};
+            this._cachedFetchPromises[name] = this._cachedFetchPromises[name] || new Map();
+            this._cachedFetchPromises[name].set(object, promise);
+        }
+    },
+
+    getRawDataFetchPromise: {
         value: function (url) {
+            var self = this;
             return new Promise(function (resolve, reject) {
-                // Fetch the requested data.
+                var request;
+                // Fetch the requested raw data.
                 if (url) {
                     request = new XMLHttpRequest();
                     request.onload = function () { resolve(request); };
@@ -70,18 +83,26 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
             }).then(function (request) {
                 // The response status can be 0 initially even for successful
                 // requests, so defer the processing of this response until the
-                // next event loop so the status has time to be set correctly.
-                return new Promise(function (resolve, reject) {
-                    window.setTimeout(function () { resolve(request); }, 0);
-                });
+                // next event loop to give the status time to be set correctly.
+                return self._makeEventLoopPromise(request);
             }).then(function (request) {
-                // For now, just return null for error status responses.
+                // Log a warning and return null for error status responses.
                 var response = request.responseText;
                 if (request.status >= 300) {
-                    console.log(new Error("Status " + request.status + " for " + url));
+                    console.warn(new Error("Status " + request.status + " for " + url));
                     response = null;
                 }
                 return response;
+            });
+        }
+    },
+
+    _makeEventLoopPromise: {
+        value: function (value) {
+            return new Promise(function (resolve, reject) {
+                window.setTimeout(function () {
+                    resolve(value);
+                }, 0);
             });
         }
     },
@@ -97,4 +118,5 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
             return parsed;
         }
     }
+
 });
