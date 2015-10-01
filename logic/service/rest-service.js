@@ -12,23 +12,24 @@ var DataService = require("logic/service/data-service").DataService,
 exports.RestService = DataService.specialize(/** @lends RestService# */{
 
     getDataFetchPromise: {
-        value: function (type, object, name, prerequisites, criteria) {
+        value: function (type, object, propertyName, prerequisitePropertyNames, criteria) {
             var self = this;
             // Create and cache a new fetch promise if necessary.
-            if (!this._getCachedFetchPromise(object, name)) {
+            if (!this._getCachedFetchPromise(object, propertyName)) {
                 // Parse arguments.
-                if (arguments.length > 5) {
-                    prerequisites = Array.prototype.slice.call(arguments, 3, -1);
-                    criteria = arguments[arguments.length - 1];
+                criteria = arguments[arguments.length - 1];
+                if (arguments.length < 5 || !prerequisitePropertyNames) {
+                    prerequisitePropertyNames = [];
+                } else if (!Array.isArray(prerequisitePropertyNames)) {
+                    prerequisitePropertyNames = Array.prototype.slice.call(arguments, 3, -1);
                 }
                 // Create and cache a new fetch promise
-                this._setCachedFetchPromise(object, name, new Promise(function (resolve, reject) {
+                this._setCachedFetchPromise(object, propertyName, this.nullPromise.then(function () {
                     // First get prerequisite data if necessary...
-                    var isEmpty = !prerequisites || Array.isArray(prerequisites) && !prerequisites.length;
-                    resolve(!isEmpty ? self.rootService.getObjectData(object, prerequisites) : null);
+                    return self.rootService.getObjectData(object, prerequisitePropertyNames);
                 }).then(function () {
                     // Then fetch the requested data...
-                    return self.rootService.fetchData(DataSelector.withTypeAndCriteria(type || self.type, criteria));
+                    return self.rootService.fetchData(DataSelector.withTypeAndCriteria(type, criteria));
                 }).then(function (data) {
                     // Then waits until the next event loop to ensure only one
                     // fetch is dispatched per event loop (caching ensures all
@@ -38,14 +39,13 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
                 }).then(function (data) {
                     // Then removes the promise from the cache so subsequent
                     // requests for this fetch promise generate new fetches.
-                    self._setCachedFetchPromise(object, name, null);
+                    self._setCachedFetchPromise(object, propertyName, null);
                     return data;
                 }));
 
             }
             // Return the created or cached fetch promise.
-            var p = this._getCachedFetchPromise(object, name);
-            return p;
+            return this._getCachedFetchPromise(object, propertyName);
         }
     },
 
@@ -92,7 +92,7 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
                     console.warn(new Error("Status " + request.status + " for " + url));
                     response = null;
                 }
-                return response;
+                return self.parseJson(response);
             });
         }
     },
@@ -113,7 +113,7 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
             try {
                 parsed = json && JSON.parse(json);
             } catch (error) {
-                parsed = null;
+                console.trace("Can't parse JSON -", json);
             }
             return parsed;
         }

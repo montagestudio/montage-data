@@ -625,7 +625,7 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
             }
             return promise || this.nullPromise;
         }
-    }
+    },
 
 // TODO [Charles]: Fix, test, & use.
 //
@@ -649,6 +649,31 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
 //            return DataService.mainService.getObjectData.apply(this, arguments);
 //        }
 //    },
+
+    /***************************************************************************
+     * Utilities
+     */
+
+    /**
+     * Splice an array into another array.
+     *
+     * @method
+     * @argument {Array} array   - The array to modify.
+     * @argument {Array} insert  - The items to splice into that array.
+     * @argument {number} index  - The index at which to splice those items, by
+     *                             default `0`.
+     * @argument {number} length - The number of items of the original array to
+     *                             replace with items from the spliced array, by
+     *                             default `array.length`.
+     */
+    spliceWithArray: {
+        value: function (array, insert, index, length) {
+            index = index || 0,
+            length = length || length === 0 ? length : array.length;
+            return insert ? array.splice.apply(array, [index, length].concat(insert)) :
+                            array.splice(index, length);
+        }
+    }
 
 }, {
 
