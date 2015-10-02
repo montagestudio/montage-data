@@ -675,7 +675,7 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
         }
     }
 
-}, {
+}, /** @lends DataService */{
 
     /***************************************************************************
      * Class constants, variables, and methods
@@ -687,7 +687,6 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      * [getPropertyData()]{@link DataService#getPropertyData} when the requested
      * data is already there.
      *
-     * @memberof DataService
      * @type {Promise}
      */
      NULL_PROMISE: {
@@ -711,7 +710,6 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      * least once with a service that is either the main service or a descendent
      * of the main service.
      *
-     * @memberof DataService
      * @type {DataService}
      */
     mainService: {
@@ -732,17 +730,34 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      * service or a descendent of the main service.
      *
      * The {@link DataService} constructor calls this method by default for the
-     * first created services, so [mainService]{@link DataService.mainService]
+     * first created services, so [mainService]{@link DataService.mainService}
      * will be set correctly if the first created service is either the main
      * service or a descendant of the main service.
      *
-     * @memberof DataService
      * @method
-     * @type {DataService}
      */
     registerService: {
         value: function (service) {
             this._mainService = service;
+        }
+    },
+
+    /**
+     * Create a service of the specified type.
+     *
+     * This method will typically be called in this way:
+     * ```
+     * var myService = DataService.withType.call(MyService, My.TYPE);
+     * ```
+     *
+     * @method
+     * @returns {DataService}
+     */
+    withType: {
+        value: function (type) {
+            var service = new this();
+            service.type = type;
+            return service;
         }
     }
 
