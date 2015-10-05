@@ -154,7 +154,7 @@ describe("An Enumeration", function() {
         // Define Side through a getter.
         Coin = Montage.specialize({}, {
             Side: {
-                get: Enumeration.getterForSpecialization("_Side", "id", "name", {
+                get: Enumeration.getterFor("_Side", "id", "name", {
                     reverse: {
                         get: function () {
                             return Coin.Side.SIDES[1 - Coin.Side.SIDES.indexOf(this)];
@@ -191,7 +191,7 @@ describe("An Enumeration", function() {
         // Define Side through a getter with one arguments missing.
         Coin = Montage.specialize({}, {
             Side: {
-                get: Enumeration.getterForSpecialization("_Side", "id", "name", {
+                get: Enumeration.getterFor("_Side", "id", "name", {
                     reverse: {
                         get: function () {
                             return this === Coin.Side.HEADS ? Coin.Side.TAILS : Coin.Side.HEADS;
@@ -203,7 +203,7 @@ describe("An Enumeration", function() {
                 })
             }
         });
-        // Test Sides.
+        // Verify Sides.
         heads = Coin.Side.HEADS;
         expect(Coin.Side.HEADS).toBe(heads);
         expect(Coin.Side.HEADS.id).toEqual("H");
@@ -217,13 +217,13 @@ describe("An Enumeration", function() {
         // Define Side through a getter with two arguments missing.
         Coin = Montage.specialize({}, {
             Side: {
-                get: Enumeration.getterForSpecialization("_Side", "id", "name", {
+                get: Enumeration.getterFor("_Side", "id", "name", {
                     HEADS: ["H", "Heads"],
                     TAILS: ["T", "Tails"]
                 })
             }
         });
-        // Test Sides.
+        // Verify Sides.
         heads = Coin.Side.HEADS;
         expect(Coin.Side.HEADS).toBe(heads);
         expect(Coin.Side.HEADS.id).toEqual("H");
@@ -235,13 +235,12 @@ describe("An Enumeration", function() {
     });
 
     it("allows types to be created with a method call", function () {
-        var Side;
         // Define Side.
-        Side = Enumeration.specialize("id", "name", {}, {}, {
+        var Side = Enumeration.specialize("id", "name", {}, {}, {
             HEADS: ["H", "Heads"],
             TAILS: ["T", "Tails"]
         });
-        // Test Sides.
+        // Verify Sides.
         expect(Side.HEADS.id).toEqual("H");
         expect(Side.HEADS.name).toEqual("Heads");
         expect(Side.TAILS.id).toEqual("T");
@@ -252,10 +251,26 @@ describe("An Enumeration", function() {
         expect(Side.EDGE.name).toEqual("Edge");
     });
 
+    it("allows types without unique properties to be defined", function () {
+        var side
+        // Test with a number of possible no-unique-properties values.
+        [[], "", null, undefined].forEach(function (uniqueProperties) {
+            // Define Sides.
+            Side = Enumeration.specialize(uniqueProperties, "id", "name", {
+                HEADS: ["H", "Heads"],
+                TAILS: ["T", "Tails"]
+            });
+            // Verify Sides.
+            expect(Side.HEADS.id).toEqual("H");
+            expect(Side.HEADS.name).toEqual("Heads");
+            expect(Side.TAILS.id).toEqual("T");
+            expect(Side.TAILS.name).toEqual("Tails");
+        });
+    });
+
     it("allows types to be looked up by unique property value", function () {
-        var Side;
         // Define Side with a single unique property.
-        Side = Enumeration.specialize("initial", "name", {
+        var Side = Enumeration.specialize("initial", "name", {
             HEADS: ["H", "Heads"],
             TAILS: ["T", "Tails"]
         });

@@ -16,8 +16,7 @@ var Montage = require("montage").Montage;
  *     myCard = {value: 12, suit: Suit.HEARTS};
  *
  * Enumerated types can also be defined as class properties using the
- * [getterForSpecialization()]{@link #Enumeration.getterForSpecialization}, as
- * in the following:
+ * [getterFor()]{@link #Enumeration.getterFor}, as in the following:
  *
  *     exports.Card = Montage.specialize({
  *         value: {
@@ -28,7 +27,7 @@ var Montage = require("montage").Montage;
  *         }
  *     }, {
  *         Suit: {
- *             get: Enumeration.getterForSpecialization("_Suit", "id", "name", {
+ *             get: Enumeration.getterFor("_Suit", "id", "name", {
  *                 SPADES: [1, "Spade"],
  *                 HEARTS: [2, "Heart"],
  *                 DIAMONDS: [3, "Diamond"],
@@ -99,7 +98,7 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
      *
      * @method
      */
-    getterForSpecialization: {
+    getterFor: {
         value: function (key, uniquePropertyNames, otherPropertyNames,
                          prototypeDescriptor, constructorDescriptor, constants) {
             var self = this;
@@ -131,7 +130,7 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
             for (i = start, n = end; names === undefined; ++i) {
                 if (i === start && i < n && Array.isArray(arguments[i])) {
                     names = arguments[i];
-                } else if (i === n || typeof arguments[i] !== "string") {
+                } else if (i === n || !arguments[i] || typeof arguments[i] !== "string") {
                     names = Array.prototype.slice.call(arguments, start, i);
                 }
             }
@@ -150,7 +149,7 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
             // descriptor), then the 2nd (constructor descriptor).
             var index, remaining, i, n;
             for (i = start, n = arguments.length; index === undefined; ++i) {
-                if (i === start && i < n && Array.isArray(arguments[i])) {
+                if (i === start && i < n && Array.isArray(arguments[i]) || !arguments[i]) {
                     index = i + 1;
                     remaining = n - i - 1;
                 } else if (i === n || typeof arguments[i] !== "string") {
