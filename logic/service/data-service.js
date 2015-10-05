@@ -218,10 +218,18 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      *
      * @method
      * @argument {DataSelector} selector - Defines what data should be returned.
+     *                                     A [type]{@link ObjectDescriptor} can
+     *                                     be provided instead of a
+     *                                     {@link DataSelector}, in which
+     *                                     case a DataSelector with no
+     *                                     [criteria]{@link DataSelector#criteria}
+     *                                     will be created and used for the
+     *                                     fetch.
      * @argument {DataStream} stream     - The stream to which the provided data
      *                                     should be added. If not stream is
      *                                     provided a stream will be created and
      *                                     returned by this method.
+     * @returns {DataStream} - The stream provided to or created by this method.
      */
     fetchData: {
         value: function (selector, stream) {

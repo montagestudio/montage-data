@@ -1,4 +1,4 @@
-var DataStream = require("montage-data/logic/service/data-stream").DataStream
+var DataStream = require("montage-data/logic/service/data-stream").DataStream,
     Montage = require("montage").Montage;
 
 describe("A DataStream", function() {
