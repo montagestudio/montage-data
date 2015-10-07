@@ -111,7 +111,7 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
             constants = this._getObjectArgument(arguments, 2, 3);
             // Return a function that will create the desired enumeration.
             return function () {
-                if (!this[key]) {
+                if (!this.hasOwnProperty(key)) {
                     this[key] = self.specialize(uniquePropertyNames, otherPropertyNames,
                                                 prototypeDescriptor, constructorDescriptor, constants);
                 }
