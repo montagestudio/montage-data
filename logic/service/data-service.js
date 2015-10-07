@@ -79,7 +79,7 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
     },
 
     /**
-     * A reference to DataService.NULL_PROMISE.
+     * A convenience cover for DataService.NULL_PROMISE.
      *
      * @type {external:Promise}
      */
@@ -527,7 +527,7 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
     },
 
     /***************************************************************************
-     * Data object data
+     * Object data
      */
 
     /**
@@ -555,7 +555,7 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      */
     getObjectData: {
         value: function (object, propertyNames) {
-            var names, start, promiseArray, promiseSet, promise, i, n;
+            var names, start, promises, promise, i, n;
             // Accept property names as an array or as a list of arguments.
             names = Array.isArray(propertyNames) ? propertyNames : arguments;
             start = names === propertyNames ? 0 : 1;
@@ -565,26 +565,24 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
             for (i = start, n = names.length; i < n; ++i) {
                 promise = this.getPropertyData(object, names[i]);
                 if (promise !== this.nullPromise) {
-                    if (!promiseArray) {
-                        promiseArray = [promise];
-                    } else if (promiseArray.length === 1 && promiseArray[0] !== promise) {
-                        promiseSet = new Set();
-                        promiseSet.add(promiseArray[0]);
-                        promiseSet.add(promise);
-                        promiseArray.push(promise);
-                    } else if (promiseSet && !promiseSet.has(promise)) {
-                        promiseSet.add(promise);
-                        promiseArray.push(promise);
+                    if (!promises) {
+                        promises = {array: [promise]};
+                    } else if (!promises.set && promises.array[0] !== promise) {
+                        promises.set = new Set();
+                        promises.set.add(promises.array[0]);
+                        promises.set.add(promise);
+                        promises.array.push(promise);
+                    } else if (promises.set && !promises.set.has(promise)) {
+                        promises.set.add(promise);
+                        promises.array.push(promise);
                     }
                 }
             }
             // Return a promise that will be fulfilled only when all of the
             // requested data has been set on the object.
-            return !promiseArray ?             this.nullPromise :
-                   promiseArray.length === 1 ? promiseArray[0] :
-                                               Promise.all(promiseArray).then(function (values) {
-                                                   return null;
-                                               });
+            return !promises ?     this.nullPromise :
+                   !promises.set ? promises.array[0] :
+                                   Promise.all(promises.array).then(this.nullFunction);
         }
     },
 
@@ -661,6 +659,15 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
     /***************************************************************************
      * Utilities
      */
+
+    /**
+     * Does nothing but returns null.
+     */
+    nullFunction: {
+        value: function () {
+            return null;
+        }
+    },
 
     /**
      * Splice an array into another array.
