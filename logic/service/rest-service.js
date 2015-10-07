@@ -66,7 +66,7 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
     },
 
     getRawDataFetchPromise: {
-        value: function (url) {
+        value: function (url, credentials) {
             var self = this;
             return new Promise(function (resolve, reject) {
                 var request;
@@ -75,7 +75,7 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
                     request = new XMLHttpRequest();
                     request.onload = function () { resolve(request); };
                     request.open("GET", url, true);
-                    request.withCredentials = true;
+                    request.withCredentials = credentials || credentials === undefined;
                     request.send();
                 } else {
                     reject(new Error("Undefined URL"));
