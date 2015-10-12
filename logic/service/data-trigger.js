@@ -18,10 +18,29 @@ exports.DataTrigger = function () {};
 
 exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger# */{
 
+    /**
+     * Defined in the DataTrigger prototype, not in DataTrigger instances.
+     *
+     * @type {Function}
+     */
     constructor: {
         configurable: true,
         writable: true,
         value: exports.DataTrigger
+    },
+
+    /**
+     * Defined in one DataTrigger instance per service (see
+     * [_getTriggerPrototype()]{@link DataTrigger._getTriggerPrototype}),
+     * not in each DataTrigger instance.
+     *
+     * @type {Service}
+     */
+    service: {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
     },
 
     /**
@@ -162,8 +181,7 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */{
         value: function (service, prototype, name) {
             var trigger;
             if (service.type.properties[name] && service.type.properties[name].isRelationship) {
-                trigger = Object.create(this._getTriggerPrototype(service));
-                trigger.prototype = prototype;
+                trigger = Object.create(this._getTriggerPrototype(service, prototype));
                 trigger.name = name;
                 Montage.defineProperty(prototype, name, {
                     get: function () {
@@ -179,24 +197,25 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */{
     },
 
     /**
-     * To avoid having each trigger contain a reference to the service it's
-     * working for, we make all triggers working for a particular service share
-     * a prototype that contains that reference. This reduces the memory
-     * footprint of triggers.
+     * To avoid having each trigger contain a reference to the service and
+     * prototype it's working for, we make all triggers of a service share a
+     * prototype that contains those references.
      *
      * @private
      * @method
      * @argument {DataService} service
      */
     _getTriggerPrototype: {
-        value: function (service) {
-            var prototype = this._triggerPrototypes && this._triggerPrototypes.get(service);
-            if (!prototype) {
-                prototype = Object.create(this.prototype, {service: {value: service}});
+        value: function (service, prototype) {
+            var trigger = this._triggerPrototypes && this._triggerPrototypes.get(service);
+            if (!trigger) {
+                trigger = new this();
+                trigger.service = service;
+                trigger.prototype = prototype;
                 this._triggerPrototypes = this._triggerPrototypes || new WeakMap();
-                this._triggerPrototypes.set(service, prototype);
+                this._triggerPrototypes.set(service, trigger);
             }
-            return prototype;
+            return trigger;
         }
     },
 

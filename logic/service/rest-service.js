@@ -66,7 +66,19 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
     },
 
     getRawDataFetchPromise: {
-        value: function (url, credentials) {
+        value: function (url, data, type) {
+            return this._getRawDataFetchPromise(url, data, type, true);
+        }
+    },
+
+    getRawDataFetchPromiseWithoutUsingCredentials: {
+        value: function (url, data, type) {
+            return this._getRawDataFetchPromise(url, data, type, false);
+        }
+    },
+
+    _getRawDataFetchPromise: {
+        value: function (url, data, type, useCredentials) {
             var self = this;
             return new Promise(function (resolve, reject) {
                 var request;
@@ -74,9 +86,16 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
                 if (url) {
                     request = new XMLHttpRequest();
                     request.onload = function () { resolve(request); };
-                    request.open("GET", url, true);
-                    request.withCredentials = credentials || credentials === undefined;
-                    request.send();
+                    if (data) {
+                        request.open("POST", url, true);
+                        request.setRequestHeader("Content-type", type || "application/x-www-form-urlencoded");
+                        request.withCredentials = useCredentials;
+                        request.send(data);
+                    } else {
+                        request.open("GET", url, true);
+                        request.withCredentials = useCredentials;
+                        request.send();
+                    }
                 } else {
                     reject(new Error("Undefined URL"));
                 }

@@ -199,7 +199,10 @@ var ObjectDescriptor = exports.ObjectDescriptor = Montage.specialize(/** @lends 
     getterFor: {
         value: function (exports, name, relationships) {
             return function () {
-                if (!this._type) {
+                // Note: We have to check this.hasOwnProperty("_type"), not just
+                // this._type, because if this is a subclass of another class
+                // this._type will return the parent class' type.
+                if (!this.hasOwnProperty("_type")) {
                     this._type = new ObjectDescriptor();
                     this._type.name = name;
                     this._type.prototype = exports[name].prototype;
