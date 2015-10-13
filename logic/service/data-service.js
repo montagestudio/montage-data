@@ -313,6 +313,23 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      */
     createDataObject: {
         value: function (type) {
+            var object = this._createDataObject(type);
+            if (object) {
+                this.createdDataObjects.add(object);
+            }
+            return object;
+        }
+    },
+
+    /**
+     * Create a data object without registering it as a new object.
+     *
+     * @method
+     * @argument {ObjectDescriptor} type - The type of object to create.
+     * @returns {Object}                 - The created object.
+     */
+    _createDataObject: {
+        value: function (type) {
             // TODO [Charles]: Object uniquing.
             var service, object;
             // Use the appropriate service to create the object.
@@ -326,9 +343,8 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
                 object = Object.create(type.prototype);
                 object.constructor.call(object);
             }
-            // Registering the created object and its type.
+            // Registering the created object's type.
             if (object) {
-                this.createdDataObjects.add(object);
                 this._registerObjectType(object, type);
             }
             // Return the created object.
@@ -350,7 +366,7 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
     getDataObject: {
         value: function (type, rawData) {
             // TODO [Charles]: Object uniquing.
-            return this.createDataObject(type);
+            return this._createDataObject(type);
         }
     },
 
