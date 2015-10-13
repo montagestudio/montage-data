@@ -6,6 +6,7 @@ var Montage = require("montage").Montage,
     Map = require("collections/map"),
     ObjectDescriptor = require("logic/model/object-descriptor").ObjectDescriptor,
     Promise = require("bluebird"),
+    Set = require("collections/set"),
     WeakMap = require("collections/weak-map");
 
 /**
@@ -262,29 +263,46 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
     },
 
     /***************************************************************************
-     * Saving
+     * Data objects
      */
 
     /**
-     * Save all the changes that were made to any of the objects managed by this
-     * service since those objects were fetched. Note that objects fetched by a
-     * child service will be managed by that service's root service, not by the
-     * child service itself.
+     * A set of the data objects managed by this service or any other descendent
+     * of this service's [root service]@{link DataService.rootService} that have
+     * been changed since [saveDataChanges()]@{link DataService.saveDataChanges}
+     * was last called, or since the root service was created if
+     * saveDataChanges() hasn't been called yet.
      *
-     * @method
-     * @returns {external:Promise} - A promise fulfilled when all of the
-     * changed data has been saved.
+     * @type {Set<Object>}
      */
-    saveDataChanges: {
-        value: function () {
-            // TODO.
-            return this.nullPromise;
+    changedDataObjects: {
+        get: function () {
+            var root = this.rootService
+            if (!root._changedDataObjects) {
+                root._changedDataObjects = new Set();
+            }
+            return root._changedDataObjects;
         }
     },
 
-    /***************************************************************************
-     * Data objects
+    /**
+     * A set of the data objects created by this service or any other descendent
+     * of this service's [root service]@{link DataService.rootService} since
+     * [saveDataChanges()]@{link DataService.saveDataChanges} was last called,
+     * or since the root service was created if saveDataChanges() hasn't been
+     * called yet.
+     *
+     * @type {Set<Object>}
      */
+    createdDataObjects: {
+        get: function () {
+            var root = this.rootService
+            if (!root._createdDataObjects) {
+                root._createdDataObjects = new Set();
+            }
+            return root._createdDataObjects;
+        }
+    },
 
     /**
      * Create a new data object of a specified type.
@@ -308,8 +326,9 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
                 object = Object.create(type.prototype);
                 object.constructor.call(object);
             }
-            // Registering the created object's type.
+            // Registering the created object and its type.
             if (object) {
+                this.createdDataObjects.add(object);
                 this._registerObjectType(object, type);
             }
             // Return the created object.
@@ -332,6 +351,26 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
         value: function (type, rawData) {
             // TODO [Charles]: Object uniquing.
             return this.createDataObject(type);
+        }
+    },
+
+    /**
+     * Get the type of the specified data object.
+     *
+     * @method
+     * @argument {Object} object   - The object whose type is sought.
+     * @returns {ObjectDescriptor} - The type of the object, or undefined if no
+     * type can be determined.
+     */
+    getObjectType: {
+        value: function (object) {
+            var registry = this.rootService._typeRegistry,
+                type = registry && registry.get(object);
+            while (object && !(type instanceof ObjectDescriptor)) {
+                type = object.constructor.TYPE;
+                object = Object.getPrototypeOf(object);
+            }
+            return object && type;
         }
     },
 
@@ -360,23 +399,24 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
         }
     },
 
+    /***************************************************************************
+     * Saving
+     */
+
     /**
-     * Get the type of the specified data object.
+     * Save all the changes that were made to any of the objects managed by this
+     * service since those objects were fetched. Note that objects fetched by a
+     * child service will be managed by that service's root service, not by the
+     * child service itself.
      *
      * @method
-     * @argument {Object} object   - The object whose type is sought.
-     * @returns {ObjectDescriptor} - The type of the object, or undefined if no
-     * type can be determined.
+     * @returns {external:Promise} - A promise fulfilled when all of the
+     * changed data has been saved.
      */
-    getObjectType: {
-        value: function (object) {
-            var registry = this.rootService._typeRegistry,
-                type = registry && registry.get(object);
-            while (object && !(type instanceof ObjectDescriptor)) {
-                type = object.constructor.TYPE;
-                object = Object.getPrototypeOf(object);
-            }
-            return object && type;
+    saveDataChanges: {
+        value: function () {
+            // TODO.
+            return this.nullPromise;
         }
     },
 
