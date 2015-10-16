@@ -11,7 +11,11 @@ var DataService = require("logic/service/data-service").DataService,
  */
 exports.RestService = DataService.specialize(/** @lends RestService# */{
 
-    getDataFetchPromise: {
+    FORM_URL_ENCODED_CONTENT_TYPE_HEADER: {
+        value: {"Content-type": "application/x-www-form-urlencoded"}
+    },
+
+    fetchPropertyData: {
         value: function (type, object, propertyName, prerequisitePropertyNames, criteria) {
             var self = this;
             // Create and cache a new fetch promise if necessary.
@@ -65,37 +69,35 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
         }
     },
 
-    getRawDataFetchPromise: {
-        value: function (url, data, type) {
-            return this._getRawDataFetchPromise(url, data, type, true);
+    fetchJsonData: {
+        value: function (url, headers, body) {
+            return this._fetchJsonData(url, headers, body, true);
         }
     },
 
-    getRawDataFetchPromiseWithoutUsingCredentials: {
-        value: function (url, data, type) {
-            return this._getRawDataFetchPromise(url, data, type, false);
+    fetchJsonDataWithoutCredentials: {
+        value: function (url, headers, body) {
+            return this._fetchJsonData(url, headers, body, false);
         }
     },
 
-    _getRawDataFetchPromise: {
-        value: function (url, data, type, useCredentials) {
+    _fetchJsonData: {
+        value: function (url, headers, body, useCredentials) {
             var self = this;
             return new Promise(function (resolve, reject) {
-                var request;
+                var request, name;
                 // Fetch the requested raw data.
                 if (url) {
                     request = new XMLHttpRequest();
                     request.onload = function () { resolve(request); };
-                    if (data) {
-                        request.open("POST", url, true);
-                        request.setRequestHeader("Content-type", type || "application/x-www-form-urlencoded");
-                        request.withCredentials = useCredentials;
-                        request.send(data);
-                    } else {
-                        request.open("GET", url, true);
-                        request.withCredentials = useCredentials;
-                        request.send();
+                    request.open(body ? "POST" : "GET", url, true);
+                    if (headers) {
+                        for (name in headers) {
+                            request.setRequestHeader(name, headers[name]);
+                        }
                     }
+                    request.withCredentials = useCredentials;
+                    request.send(body);
                 } else {
                     reject(new Error("Undefined URL"));
                 }
@@ -128,13 +130,13 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
 
     parseJson: {
         value: function (json) {
-            var parsed;
+            var data;
             try {
-                parsed = json && JSON.parse(json);
+                data = json && JSON.parse(json);
             } catch (error) {
                 console.trace("Can't parse JSON -", json);
             }
-            return parsed;
+            return data;
         }
     }
 
