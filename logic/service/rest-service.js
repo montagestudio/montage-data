@@ -129,12 +129,13 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
     },
 
     parseJson: {
-        value: function (json) {
+        value: function (response) {
             var data;
             try {
-                data = json && JSON.parse(json);
+                data = response && JSON.parse(response);
             } catch (error) {
-                console.trace("Can't parse JSON -", json);
+                console.trace("Can't parse JSON -", response);
+                data = response;
             }
             return data;
         }
