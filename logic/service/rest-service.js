@@ -1,5 +1,6 @@
 var DataService = require("logic/service/data-service").DataService,
     DataSelector = require("logic/service/data-selector").DataSelector,
+    Enumeration = require("logic/model/enumeration").Enumeration,
     Map = require("collections/map"),
     Promise = require("bluebird");
 
@@ -9,33 +10,43 @@ var DataService = require("logic/service/data-service").DataService,
  * @class
  * @extends external:DataService
  */
-exports.RestService = DataService.specialize(/** @lends RestService# */{
+exports.RestService = DataService.specialize(/** @lends RestService.prototype */ {
+
+    /***************************************************************************
+     * Constants
+     */
 
     FORM_URL_ENCODED_CONTENT_TYPE_HEADER: {
         value: {"Content-type": "application/x-www-form-urlencoded"}
     },
 
+    /***************************************************************************
+     * Fetching property data
+     */
+
     fetchPropertyData: {
         value: function (type, object, propertyName, prerequisitePropertyNames, criteria) {
-            var self = this;
+            var self, selector, prerequisites;
             // Create and cache a new fetch promise if necessary.
             if (!this._getCachedFetchPromise(object, propertyName)) {
                 // Parse arguments.
-                criteria = arguments[arguments.length - 1];
-                if (arguments.length < 5 || !prerequisitePropertyNames) {
-                    prerequisitePropertyNames = [];
-                } else if (!Array.isArray(prerequisitePropertyNames)) {
-                    prerequisitePropertyNames = Array.prototype.slice.call(arguments, 3, -1);
+                selector = DataSelector.withTypeAndCriteria(type, arguments[arguments.length - 1]);
+                prerequisites = prerequisitePropertyNames;
+                if (arguments.length < 5 || !prerequisites) {
+                    prerequisites = [];
+                } else if (!Array.isArray(prerequisites)) {
+                    prerequisites = Array.prototype.slice.call(arguments, 3, -1);
                 }
                 // Create and cache a new fetch promise
+                self = this;
                 this._setCachedFetchPromise(object, propertyName, this.nullPromise.then(function () {
                     // First get prerequisite data if necessary...
-                    return self.rootService.getObjectData(object, prerequisitePropertyNames);
+                    return self.rootService.getObjectData(object, prerequisites);
                 }).then(function () {
                     // Then fetch the requested data...
-                    return self.rootService.fetchData(DataSelector.withTypeAndCriteria(type, criteria));
+                    return self.rootService.fetchData(selector);
                 }).then(function (data) {
-                    // Then waits until the next event loop to ensure only one
+                    // Then wait until the next event loop to ensure only one
                     // fetch is dispatched per event loop (caching ensures all
                     // subsequent requests for the same fetch promise within the
                     // same event loop will return the same promise)...
@@ -69,37 +80,45 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
         }
     },
 
-    fetchJsonData: {
-        value: function (url, headers, body) {
-            return this._fetchJsonData(url, headers, body, true);
+    /***************************************************************************
+     * Fetching by URL
+     */
+
+    fetchRestData: {
+        value: function (types, url, headers, body) {
+            return this._fetchRestData(this._parseFetchRestDataArguments(arguments), true);
         }
     },
 
-    fetchJsonDataWithoutCredentials: {
-        value: function (url, headers, body) {
-            return this._fetchJsonData(url, headers, body, false);
+    fetchRestDataWithoutCredentials: {
+        value: function (types, url, headers, body) {
+            return this._fetchRestData(this._parseFetchRestDataArguments(arguments), false);
         }
     },
 
-    _fetchJsonData: {
-        value: function (url, headers, body, useCredentials) {
-            var self = this;
+    _fetchRestData: {
+        value: function (arguments, useCredentials) {
+            var self = this,
+                types = arguments.types,
+                url = arguments.url,
+                headers = arguments.headers,
+                body = arguments.body;
             return new Promise(function (resolve, reject) {
                 var request, name;
                 // Fetch the requested raw data.
+                // TODO: Reject the promise instead of returning null on error.
                 if (url) {
                     request = new XMLHttpRequest();
                     request.onload = function () { resolve(request); };
                     request.open(body ? "POST" : "GET", url, true);
-                    if (headers) {
-                        for (name in headers) {
-                            request.setRequestHeader(name, headers[name]);
-                        }
+                    for (name in headers) {
+                        request.setRequestHeader(name, headers[name]);
                     }
                     request.withCredentials = useCredentials;
                     request.send(body);
                 } else {
-                    reject(new Error("Undefined URL"));
+                    console.trace(new Error("Undefined REST URL"));
+                    resolve(null);
                 }
             }).then(function (request) {
                 // The response status can be 0 initially even for successful
@@ -108,13 +127,40 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
                 return self._makeEventLoopPromise(request);
             }).then(function (request) {
                 // Log a warning and return null for error status responses.
-                var response = request.responseText;
-                if (request.status >= 300) {
-                    console.warn(new Error("Status " + request.status + " for " + url));
-                    response = null;
+                // TODO: Return a rejected promise instead of null on error.
+                if (request && request.status >= 300) {
+                    console.trace(new Error("Status " + request.status + " received for REST URL " + url));
+                    request = null;
                 }
-                return self.parseJson(response);
+                return request;
+            }).then(function (request) {
+                // Parse the request response according to the requested type.
+                // TODO: Support multiple alternate types.
+                return request && types[0].parseResponse(request, url);
             });
+        }
+    },
+
+    _parseFetchRestDataArguments: {
+        value: function (arguments) {
+            var types, offset, i, n;
+            // The type array is the first argument if that's an array, or an
+            // array containing the first argument and all following ones that
+            // are RestService DataTypes if there are any, or an empty array.
+            types = Array.isArray(arguments[0]) && arguments[0];
+            for (i = 0, n = arguments.length; !types; i += 1) {
+                if (i === n || !arguments[i] || !(arguments[i] instanceof exports.RestService.DataType)) {
+                    types = Array.prototype.slice.call(arguments, 0, i);
+                    start = i - 1;
+                }
+            }
+            // The remaining argument values come from the remaining arguments.
+            return {
+                types: types.length ? types : [this.constructor.DataType.JSON],
+                url: arguments[offset + 1 || 0],
+                headers: arguments[offset + 2 || 1] || {},
+                body: arguments[offset + 3 || 2]
+            };
         }
     },
 
@@ -126,19 +172,72 @@ exports.RestService = DataService.specialize(/** @lends RestService# */{
                 }, 0);
             });
         }
-    },
+    }
 
-    parseJson: {
-        value: function (response) {
-            var data;
-            try {
-                data = response && JSON.parse(response);
-            } catch (error) {
-                console.trace("Can't parse JSON -", response);
-                data = response;
-            }
-            return data;
-        }
+}, /** @lends RestService */ {
+
+    /***************************************************************************
+     * Types
+     */
+
+    DataType: {
+        get: Enumeration.getterFor("_DataType", {
+
+            BINARY: [{
+                // TO DO.
+            }],
+
+            JSON: [{
+                parseResponse: {
+                    value: function (request, url) {
+                        var text = request && request.responseText,
+                            data = null;
+                        if (text) {
+                            try {
+                                data = text && JSON.parse(text);
+                            } catch (error) {
+                                console.trace(new Error("Can't parse JSON received for REST URL " + url + " -", text));
+                            }
+                        } else if (request) {
+                            console.trace(new Error("No JSON received for REST URL " + url));
+                        }
+                        return data;
+                    }
+                }
+            }],
+
+            JSONP: [{
+                parseResponse: {
+                    value: function (request, url) {
+                        var text = request && request.responseText,
+                            start = text && text.indexOf("(") + 1;
+                            end = text && text.length && text.charAt(text.length - 1) === ")" && text.length - 1;
+                            data = null;
+                        if (start && end) {
+                            try {
+                                data = text && JSON.parse(text.slice(start, end));
+                            } catch (error) {
+                                console.trace(new Error("Can't parse JSONP received for REST URL " + url + " -", text));
+                            }
+                        } else if (text) {
+                            console.trace(new Error("Can't parse JSONP received for REST URL " + url + " -", text));
+                        } else if (request) {
+                            console.trace(new Error("No JSONP received for REST URL " + url));
+                        }
+                        return data;
+                    }
+                }
+            }],
+
+            TEXT: [{
+                // TO DO.
+            }],
+
+            XML: [{
+                // TO DO.
+            }]
+
+        })
     }
 
 });
