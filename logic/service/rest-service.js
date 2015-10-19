@@ -117,7 +117,7 @@ exports.RestService = DataService.specialize(/** @lends RestService.prototype */
                     request.withCredentials = useCredentials;
                     request.send(body);
                 } else {
-                    console.trace(new Error("Undefined REST URL"));
+                    console.warn(new Error("Undefined REST URL"));
                     resolve(null);
                 }
             }).then(function (request) {
@@ -129,7 +129,7 @@ exports.RestService = DataService.specialize(/** @lends RestService.prototype */
                 // Log a warning and return null for error status responses.
                 // TODO: Return a rejected promise instead of null on error.
                 if (request && request.status >= 300) {
-                    console.trace(new Error("Status " + request.status + " received for REST URL " + url));
+                    console.warn(new Error("Status " + request.status + " received for REST URL " + url));
                     request = null;
                 }
                 return request;
@@ -143,7 +143,7 @@ exports.RestService = DataService.specialize(/** @lends RestService.prototype */
 
     _parseFetchRestDataArguments: {
         value: function (arguments) {
-            var types, offset, i, n;
+            var types, start, i, n;
             // The type array is the first argument if that's an array, or an
             // array containing the first argument and all following ones that
             // are RestService DataTypes if there are any, or an empty array.
@@ -157,9 +157,9 @@ exports.RestService = DataService.specialize(/** @lends RestService.prototype */
             // The remaining argument values come from the remaining arguments.
             return {
                 types: types.length ? types : [this.constructor.DataType.JSON],
-                url: arguments[offset + 1 || 0],
-                headers: arguments[offset + 2 || 1] || {},
-                body: arguments[offset + 3 || 2]
+                url: arguments[start + 1 || 0],
+                headers: arguments[start + 2 || 1] || {},
+                body: arguments[start + 3 || 2]
             };
         }
     },
@@ -196,10 +196,11 @@ exports.RestService = DataService.specialize(/** @lends RestService.prototype */
                             try {
                                 data = text && JSON.parse(text);
                             } catch (error) {
-                                console.trace(new Error("Can't parse JSON received for REST URL " + url + " -", text));
+                                console.warn(new Error("Can't parse JSON received for REST URL " + url));
+                                console.warn("Response text:", text);
                             }
                         } else if (request) {
-                            console.trace(new Error("No JSON received for REST URL " + url));
+                            console.warn(new Error("No JSON received for REST URL " + url));
                         }
                         return data;
                     }
@@ -217,12 +218,14 @@ exports.RestService = DataService.specialize(/** @lends RestService.prototype */
                             try {
                                 data = text && JSON.parse(text.slice(start, end));
                             } catch (error) {
-                                console.trace(new Error("Can't parse JSONP received for REST URL " + url + " -", text));
+                                console.warn(new Error("Can't parse JSONP received for REST URL " + url));
+                                console.warn("Response text:", text);
                             }
                         } else if (text) {
-                            console.trace(new Error("Can't parse JSONP received for REST URL " + url + " -", text));
+                            console.warn(new Error("Can't parse JSONP received for REST URL " + url));
+                            console.warn("Response text:", text);
                         } else if (request) {
-                            console.trace(new Error("No JSONP received for REST URL " + url));
+                            console.warn(new Error("No JSONP received for REST URL " + url));
                         }
                         return data;
                     }
