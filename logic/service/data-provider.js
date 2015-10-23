@@ -11,7 +11,7 @@ var Montage = require("montage").Montage;
  * @extends external:Montage
  *
  */
-exports.DataProvider = Montage.specialize(/** @lends DataProvider# */{
+exports.DataProvider = Montage.specialize(/** @lends DataProvider.prototype */{
 
     /**
      * At any point in time a data provider’s [data]{@link DataProvider#data}

@@ -1,6 +1,5 @@
 var ObjectDescriptor = require("montage-data/logic/model/object-descriptor").ObjectDescriptor,
     Montage = require("montage-data/montage").Montage,
-    RelationshipDescriptor = require("montage-data/logic/model/relationship-descriptor").RelationshipDescriptor,
     PropertyDescriptor = require("montage-data/logic/model/property-descriptor").PropertyDescriptor;
 
 describe("An ObjectDescriptor", function() {
@@ -20,13 +19,13 @@ describe("An ObjectDescriptor", function() {
         expect(descriptor.name).toEqual(name);
     });
 
-    it("has a Montage instance as the initial prototype value", function () {
-        expect(new ObjectDescriptor().prototype).toEqual(jasmine.any(Montage));
+    it("has Montage.prototype as its initial prototype value", function () {
+        expect(new ObjectDescriptor().prototype).toEqual(Montage.prototype);
     });
 
     it("preserves its prototype value", function () {
         var descriptor = new ObjectDescriptor(),
-            prototype = {};
+            prototype = Object.create({});
         descriptor.prototype = prototype;
         expect(descriptor.prototype).toBe(prototype);
     });
@@ -38,14 +37,41 @@ describe("An ObjectDescriptor", function() {
     it("preserves its properties", function () {
         var descriptor = new ObjectDescriptor(),
             properties = {},
-            name;
-        properties["String" + Math.random()] = new PropertyDescriptor();
-        properties["String" + Math.random()] = new PropertyDescriptor();
-        properties["String" + Math.random()] = new PropertyDescriptor();
-        for (name in properties) {
-            descriptor.addProperty(name, properties[name]);
+            i;
+        properties["property" + Math.random()] = new PropertyDescriptor();
+        properties["property" + Math.random()] = new PropertyDescriptor();
+        properties["property" + Math.random()] = new PropertyDescriptor();
+        for (i in properties) {
+            descriptor.setProperty(i, properties[i]);
         }
         expect(descriptor.properties).toEqual(properties);
+    });
+
+    it("can be created with a getter", function () {
+        var className1 = "Class" + Math.random(),
+            className2 = "Class" + Math.random(),
+            propertyName1 = "property" + Math.random(),
+            propertyName2 = "property" + Math.random(),
+            propertyName3 = "property" + Math.random(),
+            propertyName4 = "property" + Math.random(),
+            exports = {},
+            descriptors1 = {},
+            descriptors2 = {},
+            descriptor1,
+            descriptor2;
+        descriptors1[propertyName1] = {value: Math.random()};
+        descriptors1[propertyName2] = {value: Math.random()};
+        descriptors2[propertyName3] = {value: Math.random()};
+        descriptors2[propertyName4] = {value: Math.random()};
+        exports[className1] = Montage.specialize(descriptors1);
+        exports[className2] = Montage.specialize(descriptors2);
+        descriptor1 = ObjectDescriptor.getterFor(exports, className1).call({});
+        descriptor2 = ObjectDescriptor.getterFor(exports, className2).call({});
+        expect(descriptor1).not.toEqual(descriptor2);
+        expect(descriptor1.name).toEqual(className1);
+        expect(descriptor2.name).toEqual(className2);
+        expect(Object.keys(descriptor1.properties).sort()).toEqual([propertyName1, propertyName2].sort());
+        expect(Object.keys(descriptor2.properties).sort()).toEqual([propertyName3, propertyName4].sort());
     });
 
     // TODO [Charles]: Update this for API changes.

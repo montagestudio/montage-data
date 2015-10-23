@@ -1,27 +1,13 @@
 var Montage = require("montage").Montage,
-    PropertyDescriptor = require("logic/model/property-descriptor").PropertyDescriptor,
-    RelationshipDescriptor = require("logic/model/relationship-descriptor").RelationshipDescriptor;
+    PropertyDescriptor = require("logic/model/property-descriptor").PropertyDescriptor;
 
 /**
  * Describes a type of object.
  *
- * Because of
- * [an issue with JSDoc]{@linkplain https://github.com/jsdoc3/jsdoc/issues/1049}
- * the `prototype` property of this class may not appear in the JSDoc generated
- * documentation for this class. This property does exist, however. It is of
- * type `Object` and is a reference to the prototype to use for objects
- * described by instances of this class.
- *
  * @class
  * @extends external:Montage
  */
-var ObjectDescriptor = exports.ObjectDescriptor = Montage.specialize(/** @lends ObjectDescriptor# */{
-
-    /***************************************************************************
-     * Public prototype properties (instance variables).
-     *
-     * Private properties are defined and/or documented where they are used.
-     */
+exports.ObjectDescriptor = Montage.specialize(/** @lends ObjectDescriptor.prototype */ {
 
     /**
      * The name of the type of object described by this descriptor.
@@ -33,20 +19,20 @@ var ObjectDescriptor = exports.ObjectDescriptor = Montage.specialize(/** @lends 
     },
 
     /**
-     * The prototype to use for objects of this type.
+     * The prototype of objects of this type.
      *
-     * @type {Object}
+     * @type {function}
      */
     prototype: {
-        value: new Montage()
+        value: Montage.prototype
     },
 
     /**
      * Descriptors of the properties of objects of this type, by property name.
      *
      * The returned object should not be modified and
-     * [addProperty]{@link ObjectDescriptor#addProperty} or
-     * [removeProperty]{@link ObjectDescriptor#removeProperty} should be used
+     * [setProperty()]{@link ObjectDescriptor#setProperty} or
+     * [deleteProperty()]{@link ObjectDescriptor#deleteProperty} should be used
      * instead to modify the properties.
      *
      * @type {Object.<string, PropertyDescriptor>}
@@ -60,155 +46,107 @@ var ObjectDescriptor = exports.ObjectDescriptor = Montage.specialize(/** @lends 
         }
     },
 
-    /***************************************************************************
-     * Property management methods.
-     */
-
     /**
-     * Add or replace a property descriptor of this object descriptor.
+     * Add or replace a property descriptor.
      *
      * @method
+     * @argument {string} name                   - The name of the property.
+     * @argument {PropertyDescriptor} descriptor - Describes the property.
      */
-    addProperty: {
+    setProperty: {
         value: function (name, descriptor) {
             this.properties[name] = descriptor;
         }
     },
 
     /**
-     * Remove a property descriptor of this object descriptor.
+     * Remove a property descriptor.
      *
      * @method
+     * @argument {string} name - The name of the property whose descriptor
+     *                           should be removed.
      */
-    removeProperty: {
+    deleteProperty: {
         value: function (name) {
             delete this.properties[name];
         }
     },
 
-    /**
-     * Convenience method to define multiple relationships without having to
-     * manually create [RelationshipDescriptors]{@link RelationshipDescriptor}
-     * for them.
-     *
-     * @private
-     * @method
-     * @argument {Object} definitions - An object whose property names are the
-     *                                  names of the relationships to add and
-     *                                  whose property values are objects with
-     *                                  values for the
-     *                                  [destinationType]{@link RelationshipDescriptor#destinationType},
-     *                                  [targetProperties]{@link RelationshipDescriptor#targetProperties},
-     *                                  and
-     *                                  [criteriaExpressions]{@link RelationshipDescriptor#criteriaExpressions}
-     *                                  properties of the
-     *                                  [RelationshipDescriptors]{@link RelationshipDescriptor}
-     *                                  to create for each relationship.
-     *                                  If any destinationType is null the
-     *                                  corresponding relationship will be
-     *                                  created from this type to itself.
-     */
-    _addRelationships: {
-        value: function (definitions) {
-            var name;
-            for (name in (definitions || {})) {
-                this._addRelationship(name, definitions[name]);
+    _setPropertiesFromTypes: {
+        value: function (types) {
+            var i;
+            for (i in types) {
+                descriptor = this.makePropertyDescriptor();
+                this.setProperty(i, descriptor);
             }
         }
     },
 
-    /**
-     * Convenience method to define a single relationship without having to
-     * manually create a {@link RelationshipDescriptor} for it.
-     *
-     * @private
-     * @method
-     * @argument {string} name       - The name of the relationship
-     * @argument {Object} definition - An object with values for the
-     *                                 [destinationType]{@link RelationshipDescriptor#destinationType},
-     *                                 [targetProperties]{@link RelationshipDescriptor#targetProperties},
-     *                                 and
-     *                                 [criteriaExpressions]{@link RelationshipDescriptor#criteriaExpressions}
-     *                                 properties of the
-     *                                 {@link RelationshipDescriptor} to create.
-     *                                 If destinationType is null a relationship
-     *                                 will be created from this type to itself.
-     */
-    _addRelationship: {
-        value: function (name, definition) {
-            var relationship = new RelationshipDescriptor();
-            relationship.destinationType = definition.destinationType || this;
-            relationship.targetProperties = definition.targetProperties || [];
-            relationship.criteriaExpressions = definition.criteriaExpressions || {};
-            this.addProperty(name, relationship);
+    _setPropertiesFromPrototype: {
+        value: function (prototype) {
+            var names, descriptor, i, n;
+            for (; prototype !== Montage.prototype; prototype = Object.getPrototypeOf(prototype)) {
+                names = Object.getOwnPropertyNames(prototype);
+                for (i = 0, n = names.length; i < n; i += 1) {
+                    if (!this.properties[names[i]]) {
+                        descriptor = this.makePropertyDescriptor();
+                        this.setProperty(names[i], descriptor);
+                    }
+                }
+            }
         }
     },
 
-    /**
-     * Convenience method to define non-relationship properties without having
-     * to manually create [PropertyDescriptors]{@link PropertyDescriptor} for
-     * each of them.
-     *
-     * @private
-     * @method
-     */
-    _addNonRelationshipProperties: {
-        value: function (names) {
-            var i, n;
-            for (i = 0, n = names ? names.length : 0; i < n; ++i) {
-                this.addProperty(names, new PropertyDescriptor());
-            }
+    makePropertyDescriptor: {
+        value: function () {
+            return new PropertyDescriptor();
         }
     }
 
-}, {
-
-    /***************************************************************************
-     * Constructor methods (class methods).
-     */
+}, /** @lends ObjectDescriptor */ {
 
     /**
      * Convenience method to generate a getter function that will create and
-     * then cache the object descriptor corresponding to a constructor. The
-     * object descriptors will be created with non-relationship properties taken
-     * from the properties of the constructor's prototype and with the
-     * relationships specified.
+     * cache an object descriptor.
      *
      * @memberof ObjectDescriptor
      * @method
-     * @argument {Object} exports       - A Montage Require exports object
-     *                                    defining the constructor. Typically
-     *                                    this is `exports`.
-     * @argument {string} name          - The name with which the constructor is
-     *                                    defined in the exports, which will be
-     *                                    used as the name of the type.
-     * @argument {Object} relationships - An object whose property names are the
-     *                                    names of the relationships to add and
-     *                                    whose property values are objects with
-     *                                    values for the
-     *                                    [destinationType]{@link RelationshipDescriptor#destinationType},
-     *                                    [targetProperties]{@link RelationshipDescriptor#targetProperties},
-     *                                    and
-     *                                    [criteriaExpressions]{@link RelationshipDescriptor#criteriaExpressions}
-     *                                    properties of the
-     *                                    [RelationshipDescriptors]{@link RelationshipDescriptor}
-     *                                    to create for each relationship.
-     *                                    If any destinationType is null the
-     *                                    corresponding relationship will be
-     *                                    created from this type to itself.
+     * @argument {Object} exports                - A Montage Require exports
+     *                                             object defining the
+     *                                             constructor for the described
+     *                                             object. Usually this is
+     *                                             `exports`.
+     * @argument {string} name                   - The name with which the
+     *                                             constructor can be looked up
+     *                                             in the exports. This will
+     *                                             also be used as the name of
+     *                                             the type defined by this
+     *                                             object descriptor.
+     * @argument {?Object<string, string>} types - The types of each of the
+     *                                             object's propertie. If
+     *                                             omitted the property
+     *                                             information will be derived
+     *                                             from the properties of the
+     *                                             construtor's prototype.
      */
     getterFor: {
-        value: function (exports, name, relationships) {
+        value: function (exports, name, types) {
+            // Note: The returned getter function has to check
+            // this.hasOwnProperty("_type"), not just this._type, because if
+            // the class using the getter is a subclass of another class using
+            // a similar getter this._type will return the value of the the
+            // parent class type even in the child class' getter.
+            var self = this;
             return function () {
-                // Note: We have to check this.hasOwnProperty("_type"), not just
-                // this._type, because if this is a subclass of another class
-                // this._type will return the parent class' type.
                 if (!this.hasOwnProperty("_type")) {
-                    this._type = new ObjectDescriptor();
+                    this._type = new self();
                     this._type.name = name;
                     this._type.prototype = exports[name].prototype;
-                    this._type._addNonRelationshipProperties(Object.keys(exports[name]));
-                    this._type._addRelationships(relationships);
+                    if (types) {
+                        this._type._setPropertiesFromTypes(types);
+                    } else {
+                        this._type._setPropertiesFromPrototype(this._type.prototype);
+                    }
                 }
                 return this._type;
             }

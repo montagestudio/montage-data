@@ -1,27 +1,27 @@
-var PropertyDescriptor = require("montage-data/logic/model/property-descriptor").PropertyDescriptor;
+var DataPropertyDescriptor = require("montage-data/logic/model/data-property-descriptor").DataPropertyDescriptor;
 
-describe("A PropertyDescriptor", function() {
+describe("A DataPropertyDescriptor", function() {
 
     it("can be created", function () {
-        expect(new PropertyDescriptor()).toBeDefined();
+        expect(new DataPropertyDescriptor()).toBeDefined();
     });
 
     it("initially is not a relationship", function () {
-        expect(new PropertyDescriptor().isRelationship).toEqual(false);
+        expect(new DataPropertyDescriptor().isRelationship).toEqual(false);
     });
 
     it("preserves its relationship status", function () {
-        var descriptor = new PropertyDescriptor();
+        var descriptor = new DataPropertyDescriptor();
         descriptor.isRelationship = true;
         expect(descriptor.isRelationship).toEqual(true);
     });
 
     it("initially is not optional", function () {
-        expect(new PropertyDescriptor().isOptional).toEqual(false);
+        expect(new DataPropertyDescriptor().isOptional).toEqual(false);
     });
 
     it("preserves its optional status", function () {
-        var descriptor = new PropertyDescriptor();
+        var descriptor = new DataPropertyDescriptor();
         descriptor.isOptional = true;
         expect(descriptor.isOptional).toEqual(true);
     });

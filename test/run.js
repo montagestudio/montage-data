@@ -2,6 +2,8 @@
 // For maintainability please keep these in alphabetical order.
 runJasmine([
     require("spec/data-mapping"),
+    require("spec/data-object-descriptor"),
+    require("spec/data-property-descriptor"),
     require("spec/data-provider"),
     require("spec/data-selector"),
     require("spec/data-service"),
@@ -9,5 +11,4 @@ runJasmine([
     require("spec/enumeration"),
     require("spec/object-descriptor"),
     require("spec/property-descriptor"),
-    require("spec/relationship-descriptor")
 ]);

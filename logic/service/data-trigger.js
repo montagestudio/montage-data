@@ -16,7 +16,7 @@ var Montage = require("montage").Montage,
  */
 exports.DataTrigger = function () {};
 
-exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger# */{
+exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototype */{
 
     /**
      * Defined in the DataTrigger prototype, not in DataTrigger instances.
@@ -80,14 +80,14 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger# */{
     /**
      * @type {Object<string, external:Promise>}
      */
-    promises: {
+    _promises: {
         enumerable: true,
         configurable: true,
         get: function () {
-            if (!this._promises) {
-                this._promises = new WeakMap();
+            if (!this.__promises) {
+                this.__promises = new WeakMap();
             }
-            return this._promises;
+            return this.__promises;
         }
     },
 
@@ -101,7 +101,7 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger# */{
         value: function (object) {
             var prototype, descriptor, getter;
             // Start an asynchronous fetch of the property's value if necessary.
-            this.service.rootService.getPropertyData(object, this.name);
+            this.getPropertyData(object);
             // Search the prototype chain for a getter for this property,
             // starting just after the prototype that called this method.
             prototype = Object.getPrototypeOf(this.prototype);
@@ -126,7 +126,7 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger# */{
         value: function (object, value) {
             var prototype, descriptor, getter, setter, writable;
             // Mark this value as fetched.
-            this.promises.set(object, this.service.nullPromise);
+            this._promises.set(object, this.service.nullPromise);
             // Search the prototype chain for a setter for this property,
             // starting just after the prototype that called this method.
             prototype = Object.getPrototypeOf(this.prototype);
@@ -144,7 +144,36 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger# */{
                 object[this._prefixedName] = value;
             }
         }
-     }
+     },
+
+    getPropertyData: {
+        value: function (object) {
+            return this._promises.get(object) || this._getServicePropertyData(object);
+        }
+    },
+
+    _getServicePropertyData: {
+        // To ensure getPropertyData() is re-entrant this method creates and
+        // records a placeholder promise locally before doing anything else.
+        // Then if the service.getPropertyData() external call made in this
+        // method causes getPropertyData() to be called again that method will
+        // immediately find the previously created placeholder promise are
+        // return it without calling this method, avoiding any risk of an
+        // infinite call loop.
+        value: function (object) {
+            var self = this,
+                placeholder = {};
+            placeholder.promise = new Promise(function (resolve) {
+                placeholder.resolve = resolve;
+            });
+            this._promises.set(object, placeholder.promise);
+            return this.service.getPropertyData(object, this.name).then(function () {
+                self._promises.set(object, self.service.nullPromise);
+                placeholder.resolve(null);
+                return null;
+            });
+        }
+    }
 
 });
 

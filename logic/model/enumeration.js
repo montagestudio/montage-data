@@ -64,7 +64,7 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
      *
      * @method
      * @argument {?Array.<string>|?string} uniquePropertyNames
-     * @argument {?Array.<string>|?...string} otherPropertyNames
+     * @argument {?Array.<string>|...string} otherPropertyNames
      * @argument {?Object} prototypeDescriptor
      * @argument {?Object} constructorDescriptor
      * @argument {?Object} constants
@@ -86,13 +86,13 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
             start = start || 0;
             if (Array.isArray(arguments[start])) {
                 unique = arguments[start];
-            } else if (typeof arguments[start] !== "string") {
-                unique = [];
-                start -= 1;
-            } else if (arguments[start].length) {
+            } else if (typeof arguments[start] === "string" && arguments[start].length > 0) {
                 unique = [arguments[start]];
+            } else if (arguments[start] === null || arguments[start] === undefined || arguments[start] === "") {
+                unique = [];
             } else {
                 unique = [];
+                start -= 1;
             }
             // The other property names array is the next argument if that's an
             // array, or an array containing the next argument and all following
@@ -148,8 +148,8 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
      *
      * @method
      * @argument {string} key
-     * @argument {?Array.<string>|?string} uniquePropertyNames
-     * @argument {?Array.<string>|?...string} otherPropertyNames
+     * @argument {?Array.<string>|string} uniquePropertyNames
+     * @argument {?Array.<string>|...string} otherPropertyNames
      * @argument {?Object} prototypeDescriptor
      * @argument {?Object} constructorDescriptor
      * @argument {?Object} constants

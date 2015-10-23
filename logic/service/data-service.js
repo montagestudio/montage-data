@@ -19,7 +19,7 @@ var Montage = require("montage").Montage,
  * @class
  * @extends external:Montage
  */
-exports.DataService = Montage.specialize(/** @lends DataService# */{
+exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
 
     /***************************************************************************
      * Initialization
@@ -67,9 +67,9 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
     },
 
     /**
-     * If defined, used by [mapRawData()]{@link DataService#mapRawData} to map
-     * the raw data on which this service is based to the data objects returned
-     * by this service.
+     * If defined, used by [mapFromRawData()]{@link DataService#mapFromRawData}
+     * to map the raw data on which this service is based to the data objects
+     * returned by this service.
      *
      * @type {Object}
      */
@@ -189,9 +189,9 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      * and registers corresponding data objects using the
      * [getDataObject()]{@link DataService#getDataObject} method, maps the raw
      * data to those data objects using the
-     * [mapRawData()]{@link DataService#mapRawData} method, and then returns
-     * those objects in the specified stream or in a new stream created for this
-     * purpose.
+     * [mapFromRawData()]{@link DataService#mapFromRawData} method, and then
+     * returns those objects in the specified stream or in a new stream created
+     * for this purpose.
      *
      * The data may be fetched asynchronously, in which case the data stream
      * will be returned immediately but the data objects will be gotten and
@@ -200,9 +200,9 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      *
      * Subclasses should not override this method, they should instead override
      * their [fetchRawData()]{@link DataService#fetchRawData} method and their
-     * [mapRawData()]{@link DataService#mapRawData} method or their
+     * [mapFromRawData()]{@link DataService#mapFromRawData} method or their
      * [mapping's]{@link DataService#mapping}
-     * [mapRawData()]{@link DataMapping#mapRawData} method.
+     * [mapFromRawData()]{@link DataMapping#mapFromRawData} method.
      *
      * @method
      * @argument {DataSelector} selector - Defines what data should be returned.
@@ -237,7 +237,7 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
             }
             // Get the data from raw date or from a child service.
             if (service === this) {
-                this.fetchRawData(stream);
+                service.fetchRawData(stream);
             } else if (service) {
                 stream = service.fetchData(stream.selector, stream);
             } else {
@@ -246,6 +246,52 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
             }
             // Return the passed in or created stream.
             return stream;
+        }
+    },
+
+    /***************************************************************************
+     * Saving
+     */
+
+    /**
+     * Save changes made to one data object managed by this service.
+     *
+     * @method
+     * @argument {Object} object   - The object whose data should be saved.
+     * @returns {external:Promise} - A promise fulfilled when all of the data in
+     * the changed object has been saved.
+     */
+    saveDataObject: {
+        value: function (object) {
+            var type = this.rootService.getObjectType(object),
+                service = this.rootService.getChildService(type);
+            return service !== this ? service.saveDataObject(object) :
+                                      this._mapAndSaveDataObject(object);
+        }
+    },
+
+    _mapAndSaveDataObject: {
+        value: function (object) {
+            var data = {};
+            this.mapToRawData(object, data);
+            return this.saveRawData(data, object);
+        }
+    },
+
+    /**
+     * Save all the changes that were made to any of the objects managed by this
+     * service since those objects were fetched. Note that objects fetched by a
+     * child service will be managed by that service's root service, not by the
+     * child service itself.
+     *
+     * @method
+     * @returns {external:Promise} - A promise fulfilled when all of the changed
+     * data has been saved.
+     */
+    saveDataChanges: {
+        value: function () {
+            // TODO.
+            return this.nullPromise;
         }
     },
 
@@ -416,27 +462,6 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
     },
 
     /***************************************************************************
-     * Saving
-     */
-
-    /**
-     * Save all the changes that were made to any of the objects managed by this
-     * service since those objects were fetched. Note that objects fetched by a
-     * child service will be managed by that service's root service, not by the
-     * child service itself.
-     *
-     * @method
-     * @returns {external:Promise} - A promise fulfilled when all of the
-     * changed data has been saved.
-     */
-    saveDataChanges: {
-        value: function () {
-            // TODO.
-            return this.nullPromise;
-        }
-    },
-
-    /***************************************************************************
      * Raw data
      *
      * These methods should only be called by the service itself. They are
@@ -476,6 +501,14 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
         }
     },
 
+    // TODO: Document.
+    saveRawData: {
+        value: function (data, context) {
+            // Subclasses must override this.
+            return this.nullPromise;
+        }
+    },
+
     /**
      * To be called by [fetchRawData()]{@link DataService#fetchRawData} when raw
      * data is received. This method should never be called directly by users of
@@ -485,15 +518,15 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      * will represent the raw data with repeated calls to
      * [getDataObject()]{@link DataService#getDataObject}, maps
      * the raw data to those objects with repeated calls to
-     * [mapRawData()]{@link DataService#mapRawData}, and then adds those objects
-     * to the specified stream.
+     * [mapFromRawData()]{@link DataService#mapFromRawData}, and then adds those
+     * objects to the specified stream.
      *
      * Subclasses will probably never need to override
      * this method, and they can instead override their
      * [getDataObject()]{@link DataService#getDataObject} method if necessary,
-     * and their [mapRawData()]{@link DataService#mapRawData} method
+     * and their [mapFromRawData()]{@link DataService#mapFromRawData} method
      * or their [mapping]{@link DataService#mapping}'s
-     * [mapRawData()]{@link DataMapping#mapRawData} method if necessary.
+     * [mapFromRawData()]{@link DataMapping#mapFromRawData} method if necessary.
      *
      * @method
      * @argument {DataStream} stream   - The stream to which the data objects
@@ -505,7 +538,7 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      * @argument {?} context           - A value that will be passed to
      *                                   [getDataObject()]{@link DataMapping#getDataObject}
      *                                   and
-     *                                   [mapRawData()]{@link DataMapping#mapRawData}
+     *                                   [mapFromRawData()]{@link DataMapping#mapFromRawData}
      *                                   if it is provided.
      */
     addRawData: {
@@ -515,7 +548,7 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
             var i, n, object;
             for (i = 0, n = rawData ? rawData.length : 0; i < n; ++i) {
                 object = this.getDataObject(this.type, rawData[i], context);
-                this.mapRawData(object, rawData[i], context);
+                this.mapFromRawData(object, rawData[i], context);
                 rawData[i] = object;
             }
             stream.addData(rawData);
@@ -528,7 +561,7 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      * Subclasses should override this method to map properties of the raw data
      * to data objects, as in the following:
      *
-     *     mapRawData: {
+     *     mapFromRawData: {
      *         value: function (object, data) {
      *             object.firstName = data.GIVEN_NAME;
      *             object.lastName = data.FAMILY_NAME;
@@ -550,16 +583,24 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      *                             [addRawData()]{@link DataService#addRawData}
      *                             call that invoked this method.
      */
-    mapRawData: {
+    mapFromRawData: {
         value: function (object, data, context) {
             var i;
             if (this.mapping) {
-                this.mapping.mapRawData(object, data, context);
+                this.mapping.mapFromRawData(object, data, context);
             } else if (data) {
                 for (i in data) {
                     object[i] = data[i];
                 }
             }
+        }
+    },
+
+    // TODO: Document.
+    mapToRawData: {
+        value: function (object, data) {
+            // TO DO: Provide a default mapping based on object.TYPE.
+            // For now, subclasses must override this.
         }
     },
 
@@ -711,14 +752,8 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
             //    fetch is done and when the returned values has been set.
             var type = this.rootService.getObjectType(object),
                 service = this.rootService.getChildService(type),
-                trigger = service && service._triggers && service._triggers[propertyName],
-                promise = trigger && trigger.promises.get(object);
-            if (service !== this && trigger && promise === undefined) {
-                trigger.promises.set(object, null); // Avoid any possibility of stack overflow in the next line.
-                promise = service.getPropertyData(object, propertyName);
-                trigger.promises.set(object, promise);
-            }
-            return promise || this.nullPromise;
+                trigger = service !== this && service._triggers && service._triggers[propertyName];
+            return trigger ? trigger.getPropertyData(object) : this.nullPromise;
         }
     },
 

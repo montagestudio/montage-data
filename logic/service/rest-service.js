@@ -143,23 +143,23 @@ exports.RestService = DataService.specialize(/** @lends RestService.prototype */
 
     _parseFetchRestDataArguments: {
         value: function (arguments) {
-            var types, start, i, n;
+            var types, offset, i, n;
             // The type array is the first argument if that's an array, or an
             // array containing the first argument and all following ones that
             // are RestService DataTypes if there are any, or an empty array.
             types = Array.isArray(arguments[0]) && arguments[0];
             for (i = 0, n = arguments.length; !types; i += 1) {
-                if (i === n || !arguments[i] || !(arguments[i] instanceof exports.RestService.DataType)) {
+                if (i === n || !(arguments[i] instanceof exports.RestService.DataType)) {
                     types = Array.prototype.slice.call(arguments, 0, i);
-                    start = i - 1;
+                    offset = i - 1;
                 }
             }
             // The remaining argument values come from the remaining arguments.
             return {
-                types: types.length ? types : [this.constructor.DataType.JSON],
-                url: arguments[start + 1 || 0],
-                headers: arguments[start + 2 || 1] || {},
-                body: arguments[start + 3 || 2]
+                types:   types.length ? types : [this.constructor.DataType.JSON],
+                url:     arguments[1 + offset || 0],
+                headers: arguments[2 + offset || 1] || {},
+                body:    arguments[3 + offset || 2]
             };
         }
     },
