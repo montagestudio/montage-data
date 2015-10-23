@@ -177,7 +177,8 @@ var ObjectDescriptor = exports.ObjectDescriptor = Montage.specialize(/** @lends 
      * @memberof ObjectDescriptor
      * @method
      * @argument {Object} exports       - A Montage Require exports object
-     *                                    defining the constructor.
+     *                                    defining the constructor. Typically
+     *                                    this is `exports`.
      * @argument {string} name          - The name with which the constructor is
      *                                    defined in the exports, which will be
      *                                    used as the name of the type.

@@ -357,11 +357,14 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      * @argument {ObjectDescriptor} type - The type of object to get or create.
      * @argument {Object} data           - An object whose property values hold
      *                                     the raw data.
+     * @argument {?} context             - A value that was passed in to the
+     *                                     [addRawData()]{@link DataService#addRawData}
+     *                                     call that invoked this method.
      * @returns {Object} - The object corresponding to the specified raw data,
      * or if no such object exists a newly created object for that data.
      */
     getDataObject: {
-        value: function (type, data) {
+        value: function (type, data, context) {
             // TODO [Charles]: Object uniquing.
             return this._createDataObject(type);
         }
@@ -500,6 +503,8 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      *                                   values hold the raw data. This array
      *                                   will be modified by this method.
      * @argument {?} context           - A value that will be passed to
+     *                                   [getDataObject()]{@link DataMapping#getDataObject}
+     *                                   and
      *                                   [mapRawData()]{@link DataMapping#mapRawData}
      *                                   if it is provided.
      */
@@ -509,7 +514,7 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
             // will be done in place to avoid creating an extra array.
             var i, n, object;
             for (i = 0, n = rawData ? rawData.length : 0; i < n; ++i) {
-                object = this.getDataObject(this.type, rawData[i]);
+                object = this.getDataObject(this.type, rawData[i], context);
                 this.mapRawData(object, rawData[i], context);
                 rawData[i] = object;
             }
@@ -541,7 +546,7 @@ exports.DataService = Montage.specialize(/** @lends DataService# */{
      *                             modified to represent the raw data.
      * @argument {Object} data   - An object whose properties' values hold
      *                             the raw data.
-     * @argument {?} context     - A value that was passed in to
+     * @argument {?} context     - A value that was passed in to the
      *                             [addRawData()]{@link DataService#addRawData}
      *                             call that invoked this method.
      */
