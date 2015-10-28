@@ -24,9 +24,9 @@ describe("A DataMapping", function() {
     it("copies raw data properties by default", function () {
         var object = {x: 42},
             random = Math.random(),
-            raw = new ClassA(1, 2, object, random),
+            data = new ClassA(1, 2, object, random),
             mapped = new ClassB();
-        expect(new DataMapping().mapRawData(mapped, raw)).toBe(mapped);
+        new DataMapping().mapFromRawData(mapped, data);
         expect(mapped).toEqual(new ClassB(1, 2, object, random));
     });
 

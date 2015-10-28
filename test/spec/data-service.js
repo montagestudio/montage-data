@@ -61,11 +61,11 @@ describe("A DataService", function() {
 
     xit("has a addRawData() method that needs to be further tested", function () {});
 
-    it("has a mapRawData() method", function () {
-        expect(new DataService().mapRawData).toEqual(jasmine.any(Function));
+    it("has a mapFromRawData() method", function () {
+        expect(new DataService().mapFromRawData).toEqual(jasmine.any(Function));
     });
 
-    xit("has a mapRawData() method that needs to be further tested", function () {});
+    xit("has a mapFromRawData() method that needs to be further tested", function () {});
 
     it("has a rawDataDone() method", function () {
         expect(new DataService().rawDataDone).toEqual(jasmine.any(Function));
