@@ -148,11 +148,11 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
 
     getPropertyData: {
         value: function (object) {
-            return this._promises.get(object) || this._getServicePropertyData(object);
+            return this._promises.get(object) || this.updatePropertyData(object);
         }
     },
 
-    _getServicePropertyData: {
+    updatePropertyData: {
         // To ensure getPropertyData() is re-entrant this method creates and
         // records a placeholder promise locally before doing anything else.
         // Then if the service.getPropertyData() external call made in this

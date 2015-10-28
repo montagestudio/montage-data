@@ -17,7 +17,7 @@ exports.RestService = DataService.specialize(/** @lends RestService.prototype */
      */
 
     FORM_URL_ENCODED_CONTENT_TYPE_HEADER: {
-        value: {"Content-type": "application/x-www-form-urlencoded"}
+        value: {"Content-Type": "application/x-www-form-urlencoded"}
     },
 
     /***************************************************************************

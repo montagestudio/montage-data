@@ -690,6 +690,43 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
         }
     },
 
+    // TODO: Document.
+    // TODO: Share code with getObjectData.
+    updateObjectData: {
+        value: function (object, propertyNames) {
+            var names, start, promises, promise, i, n;
+            // Accept property names as an array or as a list of arguments, but
+            // avoid creating a new array to hold those property names.
+            names = Array.isArray(propertyNames) ? propertyNames : arguments;
+            start = names === propertyNames ? 0 : 1;
+            // Request each data value separately, collecting unique resulting
+            // promises into an array and a set, but avoid creating that array
+            // and that set until that is necessary.
+            for (i = start, n = names.length; i < n; ++i) {
+                promise = this.updatePropertyData(object, names[i]);
+                if (promise !== this.nullPromise) {
+                    if (!promises) {
+                        promises = {array: [promise]};
+                    } else if (!promises.set && promises.array[0] !== promise) {
+                        promises.set = new Set();
+                        promises.set.add(promises.array[0]);
+                        promises.set.add(promise);
+                        promises.array.push(promise);
+                    } else if (promises.set && !promises.set.has(promise)) {
+                        promises.set.add(promise);
+                        promises.array.push(promise);
+                    }
+                }
+            }
+            // Return a promise that will be fulfilled only when all of the
+            // requested data has been set on the object, and if possible avoid
+            // creating an additional promise for this.
+            return !promises ?     this.nullPromise :
+                   !promises.set ? promises.array[0] :
+                                   Promise.all(promises.array).then(this.nullFunction);
+        }
+    },
+
     /**
      * Request the possibly asynchronous value of a single property of a data
      * object.
@@ -757,28 +794,28 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
         }
     },
 
-// TODO [Charles]: Fix, test, & use.
-//
-//    updateObjectData: {
-//        value: function (object, propertyNames) {
-//            var names, start, type, service, trigger, promise, i, n;
-//            // Accept property names as an array or as a list of arguments.
-//            names = Array.isArray(propertyNames) ? propertyNames : arguments;
-//            start = names === propertyNames ? 0 : 1;
-//            // Clear the "this is fetched" markers for the specified properties.
-//            for (i = start, n = names.length; i < n; ++i) {
-//                type = DataService.mainService.getObjectType(object),
-//                service = DataService.mainService.getChildService(type),
-//                trigger = service && service._triggers && service._triggers[names[i]],
-//                promise = trigger && trigger.promises && trigger.promises.get(object);
-//                if (promise === DataService.NULL_PROMISE) {
-//                    trigger.promises.delete(object);
-//                }
-//            }
-//            // Re-fetch any fetchable data.
-//            return DataService.mainService.getObjectData.apply(this, arguments);
-//        }
-//    },
+    // TODO: Document.
+    // TODO: Share code with getPropertyData.
+    updatePropertyData: {
+        value: function (object, propertyName) {
+            // TODO [Charles]: For now we'll require subclasses to handle this
+            // manually but eventually this can be handled automatically using
+            // relationship information to generate appropriate queries with
+            // logic like the following:
+            // 1) Looking at the object, find out if this value has been set.
+            // 2) If so, return the null promise.
+            // 3) If not, look for the corresponding relationship in the model
+            //    and check if this relationships is already being fetched.
+            // 4) If so, return the promise for that fetch.
+            // 5) If not, schedule the fetch to be done at the next tick of the
+            //    event loop and return a promise that is fulfilled when the
+            //    fetch is done and when the returned values has been set.
+            var type = this.rootService.getObjectType(object),
+                service = this.rootService.getChildService(type),
+                trigger = service !== this && service._triggers && service._triggers[propertyName];
+            return trigger ? trigger.updatePropertyData(object) : this.nullPromise;
+        }
+    },
 
     /***************************************************************************
      * Utilities
