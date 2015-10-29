@@ -357,6 +357,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     /**
      * Create a data object without registering it as a new object.
      *
+     * @private
      * @method
      * @argument {ObjectDescriptor} type - The type of object to create.
      * @returns {Object}                 - The created object.

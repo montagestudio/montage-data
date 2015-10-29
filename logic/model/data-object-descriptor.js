@@ -96,8 +96,8 @@ exports.DataObjectDescriptor = ObjectDescriptor.specialize(/** @lends DataObject
         value: function (arguments) {
             var types, identifiers, offset, i, n;
             // The type object is the third argument if it's a non-array
-            // non-string object.
-            types = this._isObject(arguments[2]) && arguments[2];
+            // non-string object and if it's not the last argument.
+            types = arguments.length > 3 && this._isObject(arguments[2]) && arguments[2];
             offset = types ? 0 : -1;
             // The identifiers array is the fourth argument if that's an array,
             // or an array containing the fourth argument and all following ones
