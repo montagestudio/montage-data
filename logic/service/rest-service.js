@@ -194,7 +194,7 @@ exports.RestService = DataService.specialize(/** @lends RestService.prototype */
                             data = null;
                         if (text) {
                             try {
-                                data = text && JSON.parse(text);
+                                data = JSON.parse(text);
                             } catch (error) {
                                 console.warn(new Error("Can't parse JSON received for REST URL " + url));
                                 console.warn("Response text:", text);
