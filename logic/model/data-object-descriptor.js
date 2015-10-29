@@ -33,7 +33,7 @@ exports.DataObjectDescriptor = ObjectDescriptor.specialize(/** @lends DataObject
      */
     setProperty: {
         value: function (name, descriptor) {
-            ObjectDescriptor.setProperty.call(this, name, descriptor);
+            ObjectDescriptor.prototype.setProperty.call(this, name, descriptor);
         }
     },
 
