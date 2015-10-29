@@ -10,7 +10,7 @@ var DataService = require("logic/service/data-service").DataService,
  * @class
  * @extends external:DataService
  */
-exports.RestService = DataService.specialize(/** @lends RestService.prototype */ {
+exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */ {
 
     /***************************************************************************
      * Constants
@@ -21,10 +21,10 @@ exports.RestService = DataService.specialize(/** @lends RestService.prototype */
     },
 
     /***************************************************************************
-     * Fetching property data
+     * Getting property data
      */
 
-    fetchPropertyData: {
+    getHttpPropertyData: {
         value: function (type, object, propertyName, prerequisitePropertyNames, criteria) {
             var self, selector, prerequisites;
             // Create and cache a new fetch promise if necessary.
@@ -81,22 +81,22 @@ exports.RestService = DataService.specialize(/** @lends RestService.prototype */
     },
 
     /***************************************************************************
-     * Fetching by URL
+     * Sending requests
      */
 
-    fetchRestData: {
+    sendHttpRequest: {
         value: function (types, url, headers, body) {
-            return this._fetchRestData(this._parseFetchRestDataArguments(arguments), true);
+            return this._sendHttpRequest(this._parseSendHttpRequestArguments(arguments), true);
         }
     },
 
-    fetchRestDataWithoutCredentials: {
+    sendHttpRequestWithoutCredentials: {
         value: function (types, url, headers, body) {
-            return this._fetchRestData(this._parseFetchRestDataArguments(arguments), false);
+            return this._sendHttpRequest(this._parseSendHttpRequestArguments(arguments), false);
         }
     },
 
-    _fetchRestData: {
+    _sendHttpRequest: {
         value: function (arguments, useCredentials) {
             var self = this,
                 types = arguments.types,
@@ -141,15 +141,15 @@ exports.RestService = DataService.specialize(/** @lends RestService.prototype */
         }
     },
 
-    _parseFetchRestDataArguments: {
+    _parseSendHttpRequestArguments: {
         value: function (arguments) {
             var types, offset, i, n;
             // The type array is the first argument if that's an array, or an
             // array containing the first argument and all following ones that
-            // are RestService DataTypes if there are any, or an empty array.
+            // are HttpService DataTypes if there are any, or an empty array.
             types = Array.isArray(arguments[0]) && arguments[0];
             for (i = 0, n = arguments.length; !types; i += 1) {
-                if (i === n || !(arguments[i] instanceof exports.RestService.DataType)) {
+                if (i === n || !(arguments[i] instanceof exports.HttpService.DataType)) {
                     types = Array.prototype.slice.call(arguments, 0, i);
                     offset = i - 1;
                 }
@@ -174,7 +174,7 @@ exports.RestService = DataService.specialize(/** @lends RestService.prototype */
         }
     }
 
-}, /** @lends RestService */ {
+}, /** @lends HttpService */ {
 
     /***************************************************************************
      * Types
