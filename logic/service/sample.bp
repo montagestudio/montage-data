@@ -46,7 +46,7 @@
                 ratings: {"*": "review"}, /* Same fetch as review. */
                 averageRating: {"<-": "ratings"}, /* Derived from ratings. */
                 realProfit: {"<-": ["expenses", "income"]}, /* Derived from both expenses and income. */
-                contractualProfit: {"<-": ["expenses", "¸"income"]} /* Also derived from both expenses and income. */
+                contractualProfit: {"<-": ["expenses", "income"]} /* Also derived from both expenses and income. */
             }
         }
     }
