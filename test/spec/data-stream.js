@@ -56,6 +56,7 @@ describe("A DataStream", function() {
         stream.then(function (data) {
             expect(data).toEqual([{a: 1, b: 2}, {a: 3, b: 4}]);
             done();
+            return null;
         });
         // Cause the promise above to be fulfilled.
         stream.addData([{a: 1, b: 2}, {a: 3, b: 4}]);
@@ -68,6 +69,7 @@ describe("A DataStream", function() {
         // Set up a promise callback counter.
         stream.then(function (data) {
             ++thenCount;
+            return null;
         });
         // Cause the promise above to be fulfilled.
         stream.addData([{a: 1, b: 2}, {a: 3, b: 4}]);
