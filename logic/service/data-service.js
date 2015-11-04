@@ -250,35 +250,44 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     },
 
     /***************************************************************************
-     * Saving
+     * Tracking changes
      */
 
     /**
-     * Save changes made to one data object managed by this service.
+     * A set of the data objects created by this service or any other descendent
+     * of this service's [root service]@{link DataService.rootService} since
+     * [saveDataChanges()]@{link DataService.saveDataChanges} was last called,
+     * or since the root service was created if saveDataChanges() hasn't been
+     * called yet.
      *
-     * @method
-     * @argument {Object} object   - The object whose data should be saved.
-     * @returns {external:Promise} - A promise fulfilled when all of the data in
-     * the changed object has been saved.
+     * @type {Set<Object>}
      */
-    saveDataObject: {
-        value: function (object) {
-            var type = this.rootService.getObjectType(object),
-                service = this.rootService.getChildService(type);
-            return service !== this ? service.saveDataObject(object) :
-                                      this._mapAndSaveDataObject(object);
+    createdDataObjects: {
+        get: function () {
+            var root = this.rootService
+            if (!root._createdDataObjects) {
+                root._createdDataObjects = new Set();
+            }
+            return root._createdDataObjects;
         }
     },
 
     /**
-     * @private
-     * @method
+     * A set of the data objects managed by this service or any other descendent
+     * of this service's [root service]@{link DataService.rootService} that have
+     * been changed since [saveDataChanges()]@{link DataService.saveDataChanges}
+     * was last called, or since the root service was created if
+     * saveDataChanges() hasn't been called yet.
+     *
+     * @type {Set<Object>}
      */
-    _mapAndSaveDataObject: {
-        value: function (object) {
-            var data = {};
-            this.mapToRawData(object, data);
-            return this.saveRawData(data, object);
+    changedDataObjects: {
+        get: function () {
+            var root = this.rootService
+            if (!root._changedDataObjects) {
+                root._changedDataObjects = new Set();
+            }
+            return root._changedDataObjects;
         }
     },
 
@@ -302,44 +311,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     /***************************************************************************
      * Data objects
      */
-
-    /**
-     * A set of the data objects managed by this service or any other descendent
-     * of this service's [root service]@{link DataService.rootService} that have
-     * been changed since [saveDataChanges()]@{link DataService.saveDataChanges}
-     * was last called, or since the root service was created if
-     * saveDataChanges() hasn't been called yet.
-     *
-     * @type {Set<Object>}
-     */
-    changedDataObjects: {
-        get: function () {
-            var root = this.rootService
-            if (!root._changedDataObjects) {
-                root._changedDataObjects = new Set();
-            }
-            return root._changedDataObjects;
-        }
-    },
-
-    /**
-     * A set of the data objects created by this service or any other descendent
-     * of this service's [root service]@{link DataService.rootService} since
-     * [saveDataChanges()]@{link DataService.saveDataChanges} was last called,
-     * or since the root service was created if saveDataChanges() hasn't been
-     * called yet.
-     *
-     * @type {Set<Object>}
-     */
-    createdDataObjects: {
-        get: function () {
-            var root = this.rootService
-            if (!root._createdDataObjects) {
-                root._createdDataObjects = new Set();
-            }
-            return root._createdDataObjects;
-        }
-    },
 
     /**
      * Create a new data object of a specified type.
@@ -418,6 +389,57 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
         value: function (type, data, context) {
             // TODO [Charles]: Object uniquing.
             return this._createDataObject(type);
+        }
+    },
+
+    /**
+     * Save changes made to one data object managed by this service.
+     *
+     * @method
+     * @argument {Object} object   - The object whose data should be saved.
+     * @returns {external:Promise} - A promise fulfilled when all of the data in
+     * the changed object has been saved.
+     */
+    saveDataObject: {
+        value: function (object) {
+            var type = this.rootService.getObjectType(object),
+                service = this.rootService.getChildService(type);
+            return service !== this ? service.saveDataObject(object) :
+                                      this._mapAndSaveDataObject(object);
+        }
+    },
+
+    /**
+     * @private
+     * @method
+     */
+    _mapAndSaveDataObject: {
+        value: function (object) {
+            var data = {};
+            this.mapToRawData(object, data);
+            return this.saveRawData(data, object);
+        }
+    },
+
+    // TODO: Document.
+    deleteDataObject: {
+        value: function (object) {
+            var type = this.rootService.getObjectType(object),
+                service = this.rootService.getChildService(type);
+            return service !== this ? service.deleteDataObject(object) :
+                                      this._mapAndDeleteDataObject(object);
+        }
+    },
+
+    /**
+     * @private
+     * @method
+     */
+    _mapAndDeleteDataObject: {
+        value: function (object) {
+            var data = {};
+            this.mapToRawData(object, data);
+            return this.deleteRawData(data, object);
         }
     },
 
@@ -508,6 +530,14 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
 
     // TODO: Document.
     saveRawData: {
+        value: function (data, context) {
+            // Subclasses must override this.
+            return this.nullPromise;
+        }
+    },
+
+    // TODO: Document.
+    deleteRawData: {
         value: function (data, context) {
             // Subclasses must override this.
             return this.nullPromise;
