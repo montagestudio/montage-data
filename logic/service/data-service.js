@@ -270,6 +270,10 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
         }
     },
 
+    /**
+     * @private
+     * @method
+     */
     _mapAndSaveDataObject: {
         value: function (object) {
             var data = {};
