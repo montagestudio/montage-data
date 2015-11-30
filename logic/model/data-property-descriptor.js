@@ -12,4 +12,11 @@ exports.DataPropertyDescriptor = PropertyDescriptor.specialize(/** @lends DataPr
     // TODO: Add support for derived properties, relationship criteria,
     // relationship targets, and shared fetches.
 
+    /**
+     * @type {boolean}
+     */
+    isGlobal: {
+        value: false
+    }
+
 });

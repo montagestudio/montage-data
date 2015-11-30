@@ -24,7 +24,7 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
      * Getting property data
      */
 
-    getHttpPropertyData: {
+    fetchHttpObjectProperty: {
         value: function (type, object, propertyName, prerequisitePropertyNames, criteria) {
             var self, selector, prerequisites;
             // Create and cache a new fetch promise if necessary.
@@ -41,7 +41,7 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
                 self = this;
                 this._setCachedFetchPromise(object, propertyName, this.nullPromise.then(function () {
                     // First get prerequisite data if necessary...
-                    return self.rootService.getObjectData(object, prerequisites);
+                    return self.rootService.getObjectProperties(object, prerequisites);
                 }).then(function () {
                     // Then fetch the requested data...
                     return self.rootService.fetchData(selector);
@@ -65,18 +65,18 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
     },
 
     _getCachedFetchPromise: {
-        value: function (object, name) {
+        value: function (object, propertyName) {
             this._cachedFetchPromises = this._cachedFetchPromises || {};
-            this._cachedFetchPromises[name] = this._cachedFetchPromises[name] || new Map();
-            return this._cachedFetchPromises[name].get(object);
+            this._cachedFetchPromises[propertyName] = this._cachedFetchPromises[propertyName] || new Map();
+            return this._cachedFetchPromises[propertyName].get(object);
         }
     },
 
     _setCachedFetchPromise: {
-        value: function (object, name, promise) {
+        value: function (object, propertyName, promise) {
             this._cachedFetchPromises = this._cachedFetchPromises || {};
-            this._cachedFetchPromises[name] = this._cachedFetchPromises[name] || new Map();
-            this._cachedFetchPromises[name].set(object, promise);
+            this._cachedFetchPromises[propertyName] = this._cachedFetchPromises[propertyName] || new Map();
+            this._cachedFetchPromises[propertyName].set(object, promise);
         }
     },
 
@@ -84,19 +84,19 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
      * Sending requests
      */
 
-    sendHttpRequest: {
+    fetchHttpRawData: {
         value: function (types, url, headers, body) {
-            return this._sendHttpRequest(this._parseSendHttpRequestArguments(arguments), true);
+            return this._fetchHttpRawData(this._parseSendHttpRequestArguments(arguments), true);
         }
     },
 
-    sendHttpRequestWithoutCredentials: {
+    fetchHttpRawDataWithoutCredentials: {
         value: function (types, url, headers, body) {
-            return this._sendHttpRequest(this._parseSendHttpRequestArguments(arguments), false);
+            return this._fetchHttpRawData(this._parseSendHttpRequestArguments(arguments), false);
         }
     },
 
-    _sendHttpRequest: {
+    _fetchHttpRawData: {
         value: function (arguments, useCredentials) {
             var self = this,
                 types = arguments.types,

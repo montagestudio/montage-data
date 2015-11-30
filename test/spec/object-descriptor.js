@@ -8,33 +8,33 @@ describe("An ObjectDescriptor", function() {
         expect(new ObjectDescriptor()).toBeDefined();
     });
 
-    it("initially has no name", function () {
-        expect(new ObjectDescriptor().name).toBeUndefined();
+    it("initially has no type name", function () {
+        expect(new ObjectDescriptor().typeName).toBeUndefined();
     });
 
-    it("preserves its name", function () {
+    it("preserves its type name", function () {
         var descriptor = new ObjectDescriptor(),
             name = "String" + Math.random();
-        descriptor.name = name;
-        expect(descriptor.name).toEqual(name);
+        descriptor.typeName = name;
+        expect(descriptor.typeName).toEqual(name);
     });
 
-    it("has Montage.prototype as its initial prototype value", function () {
-        expect(new ObjectDescriptor().prototype).toEqual(Montage.prototype);
+    it("has Montage.prototype as its initial object prototype value", function () {
+        expect(new ObjectDescriptor().objectPrototype).toEqual(Montage.prototype);
     });
 
-    it("preserves its prototype value", function () {
+    it("preserves its object prototype value", function () {
         var descriptor = new ObjectDescriptor(),
             prototype = Object.create({});
-        descriptor.prototype = prototype;
-        expect(descriptor.prototype).toBe(prototype);
+        descriptor.objectPrototype = prototype;
+        expect(descriptor.objectPrototype).toBe(prototype);
     });
 
-    it("initially has no properties", function () {
-        expect(new ObjectDescriptor().properties).toEqual({});
+    it("initially has no property descriptors", function () {
+        expect(new ObjectDescriptor().propertyDescriptors).toEqual({});
     });
 
-    it("preserves its properties", function () {
+    it("preserves its property descriptors", function () {
         var descriptor = new ObjectDescriptor(),
             properties = {},
             i;
@@ -42,9 +42,9 @@ describe("An ObjectDescriptor", function() {
         properties["property" + Math.random()] = new PropertyDescriptor();
         properties["property" + Math.random()] = new PropertyDescriptor();
         for (i in properties) {
-            descriptor.setProperty(i, properties[i]);
+            descriptor.setPropertyDescriptor(i, properties[i]);
         }
-        expect(descriptor.properties).toEqual(properties);
+        expect(descriptor.propertyDescriptors).toEqual(properties);
     });
 
     it("can be created with a getter", function () {
@@ -68,10 +68,10 @@ describe("An ObjectDescriptor", function() {
         descriptor1 = ObjectDescriptor.getterFor(exports, className1).call({});
         descriptor2 = ObjectDescriptor.getterFor(exports, className2).call({});
         expect(descriptor1).not.toEqual(descriptor2);
-        expect(descriptor1.name).toEqual(className1);
-        expect(descriptor2.name).toEqual(className2);
-        expect(Object.keys(descriptor1.properties).sort()).toEqual([propertyName1, propertyName2].sort());
-        expect(Object.keys(descriptor2.properties).sort()).toEqual([propertyName3, propertyName4].sort());
+        expect(descriptor1.typeName).toEqual(className1);
+        expect(descriptor2.typeName).toEqual(className2);
+        expect(Object.keys(descriptor1.propertyDescriptors).sort()).toEqual([propertyName1, propertyName2].sort());
+        expect(Object.keys(descriptor2.propertyDescriptors).sort()).toEqual([propertyName3, propertyName4].sort());
     });
 
     // TODO [Charles]: Update this for API changes.

@@ -32,7 +32,8 @@
                 expenses: "?number",
                 income: "?number",
                 realProfit: "?number",
-                contractualProfit: "?number"
+                contractualProfit: "?number",
+                flag: "number"
             }
         }
     },
@@ -47,6 +48,7 @@
                 averageRating: {"<-": "ratings"}, /* Derived from ratings. */
                 realProfit: {"<-": ["expenses", "income"]}, /* Derived from both expenses and income. */
                 contractualProfit: {"<-": ["expenses", "income"]} /* Also derived from both expenses and income. */
+                flag: {"isGlobal": true, criteria: "..."} /* Fetching one instances fetches values for all instances. */
             }
         }
     }

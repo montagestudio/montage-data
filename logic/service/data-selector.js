@@ -12,7 +12,7 @@ exports.DataSelector = Montage.specialize(/** @lends DataSelector.prototype */{
     /**
      * The type of the data object to retrieve.
      *
-     * @type {ObjectDescriptor}
+     * @type {DataObjectDescriptor}
      */
     type: {
         value: undefined
