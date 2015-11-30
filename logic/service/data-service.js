@@ -903,7 +903,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     spliceWithArray: {
         value: function (array, insert, index, length) {
             index = index || 0,
-            length = length || length === 0 ? length : array.length;
+            length = length || length === 0 ? length : Infinity;
             return insert ? array.splice.apply(array, [index, length].concat(insert)) :
                             array.splice(index, length);
         }
