@@ -10,39 +10,40 @@ var Montage = require("montage").Montage,
 exports.ObjectDescriptor = Montage.specialize(/** @lends ObjectDescriptor.prototype */ {
 
     /**
-     * The name of the type of object described by this descriptor.
+     * Name of the type of object described by this descriptor.
      *
      * @type {string}
      */
-    name: {
+    typeName: {
         value: undefined
     },
 
     /**
-     * The prototype of objects of this type.
+     * Prototype of objects of this type.
      *
      * @type {function}
      */
-    prototype: {
+    objectPrototype: {
         value: Montage.prototype
     },
 
     /**
      * Descriptors of the properties of objects of this type, by property name.
      *
-     * The returned object should not be modified and
-     * [setProperty()]{@link ObjectDescriptor#setProperty} or
-     * [deleteProperty()]{@link ObjectDescriptor#deleteProperty} should be used
-     * instead to modify the properties.
+     * The returned map should not be modified.
+     * [setPropertyDescriptor()]{@link ObjectDescriptor#setPropertyDescriptor}
+     * and
+     * [deletePropertyDescriptor()]{@link ObjectDescriptor#deletePropertyDescriptor}
+     * should be used instead to modify the property descriptors.
      *
      * @type {Object.<string, PropertyDescriptor>}
      */
-    properties: {
+    propertyDescriptors: {
         get: function () {
-            if (!this._properties) {
-                this._properties = {};
+            if (!this._propertyDescriptors) {
+                this._propertyDescriptors = {};
             }
-            return this._properties;
+            return this._propertyDescriptors;
         }
     },
 
@@ -53,9 +54,9 @@ exports.ObjectDescriptor = Montage.specialize(/** @lends ObjectDescriptor.protot
      * @argument {string} name                   - The name of the property.
      * @argument {PropertyDescriptor} descriptor - Describes the property.
      */
-    setProperty: {
+    setPropertyDescriptor: {
         value: function (name, descriptor) {
-            this.properties[name] = descriptor;
+            this.propertyDescriptors[name] = descriptor;
         }
     },
 
@@ -66,89 +67,118 @@ exports.ObjectDescriptor = Montage.specialize(/** @lends ObjectDescriptor.protot
      * @argument {string} name - The name of the property whose descriptor
      *                           should be removed.
      */
-    deleteProperty: {
+    deletePropertyDescriptor: {
         value: function (name) {
-            delete this.properties[name];
+            delete this.propertyDescriptors[name];
         }
     },
 
-    _setPropertiesFromTypes: {
+    /**
+     * Create a property descriptor.
+     *
+     * This implementation creates a plain {@link PropertyDescriptor} instance.
+     * Subclasses can override this to create property descriptors of a
+     * type more appropriate for the subclass. Any such type should be a
+     * subclass of {@link PropertyDescriptor}.
+     *
+     * @method
+     * @returns {PropertyDescriptor} - The created property descriptor.
+     */
+    makePropertyDescriptor: {
+        value: function () {
+            return new PropertyDescriptor();
+        }
+    },
+
+    /**
+     * @private
+     * @method
+     * @argument {Object<string, string>} types
+     */
+    _setPropertyDescriptorsFromTypes: {
         value: function (types) {
             var i;
             for (i in types) {
                 descriptor = this.makePropertyDescriptor();
-                this.setProperty(i, descriptor);
+                this.setPropertyDescriptor(i, descriptor);
             }
         }
     },
 
-    _setPropertiesFromPrototype: {
+    /**
+     * @private
+     * @method
+     * @argument {Object} prototype
+     */
+    _setPropertyDescriptorsFromPrototype: {
         value: function (prototype) {
             var names, descriptor, i, n;
             for (; prototype !== Montage.prototype; prototype = Object.getPrototypeOf(prototype)) {
                 names = Object.getOwnPropertyNames(prototype);
                 for (i = 0, n = names.length; i < n; i += 1) {
-                    if (!this.properties[names[i]]) {
+                    if (!this.propertyDescriptors[names[i]]) {
                         descriptor = this.makePropertyDescriptor();
-                        this.setProperty(names[i], descriptor);
+                        this.setPropertyDescriptor(names[i], descriptor);
                     }
                 }
             }
-        }
-    },
-
-    makePropertyDescriptor: {
-        value: function () {
-            return new PropertyDescriptor();
         }
     }
 
 }, /** @lends ObjectDescriptor */ {
 
     /**
-     * Convenience method to generate a getter function that will create and
-     * cache an object descriptor.
+     * Generates a getter function that will create and cache an object
+     * descriptor.
      *
-     * @memberof ObjectDescriptor
      * @method
-     * @argument {Object} exports                - A Montage Require exports
-     *                                             object defining the
-     *                                             constructor for the described
-     *                                             object. Usually this is
-     *                                             `exports`.
-     * @argument {string} name                   - The name with which the
-     *                                             constructor can be looked up
-     *                                             in the exports. This will
-     *                                             also be used as the name of
-     *                                             the type defined by this
-     *                                             object descriptor.
-     * @argument {?Object<string, string>} types - The types of each of the
-     *                                             object's propertie. If
-     *                                             omitted the property
-     *                                             information will be derived
-     *                                             from the properties of the
-     *                                             construtor's prototype.
+     * @argument {Object} exports                        - A Montage Require
+     *                                                     exports object
+     *                                                     defining the
+     *                                                     constructor for the
+     *                                                     object to describe.
+     *                                                     Usually this is
+     *                                                     `exports`.
+     * @argument {string} constructorName                - The name with which
+     *                                                     that constructor can
+     *                                                     be looked up in the
+     *                                                     exports. This will
+     *                                                     also be used as the
+     *                                                     name of the type
+     *                                                     defined by the
+     *                                                     created object
+     *                                                     descriptor.
+     * @argument {?Object<string, string>} propertyTypes - The types of each of
+     *                                                     the object's
+     *                                                     properties, by
+     *                                                     property name. If
+     *                                                     this is omitted the
+     *                                                     property information
+     *                                                     will be derived from
+     *                                                     the properties of the
+     *                                                     prototype of the
+     *                                                     described object.
      */
     getterFor: {
-        value: function (exports, name, types) {
-            // Note: The returned getter function has to check
-            // this.hasOwnProperty("_type"), not just this._type, because if
-            // the class using the getter is a subclass of another class using
-            // a similar getter this._type will return the value of the the
-            // parent class type even in the child class' getter.
+        value: function (exports, constructorName, propertyTypes) {
+            // The returned getter function has to check
+            // `this.hasOwnProperty("_type")`, not just `this._type`, because if
+            // the class using the getter is a subclass of another class using a
+            // similar getter `this._type` will return the value of the the
+            // superclass type instead of the desired subclass type.
             var self = this;
             return function () {
-                if (!this.hasOwnProperty("_type")) {
-                    this._type = new self();
-                    this._type.name = name;
-                    this._type.prototype = exports[name].prototype;
-                    if (types) {
-                        this._type._setPropertiesFromTypes(types);
+                if (!this.hasOwnProperty("_TYPE")) {
+                    this._TYPE = new self();
+                    this._TYPE.typeName = constructorName;
+                    this._TYPE.prototype = exports[constructorName].prototype;
+                    if (propertyTypes) {
+                        this._TYPE._setPropertyDescriptorsFromTypes(propertyTypes);
                     } else {
-                        this._type._setPropertiesFromPrototype(this._type.prototype);
+                        this._TYPE._setPropertyDescriptorsFromPrototype(this._TYPE.prototype);
                     }
                 }
-                return this._type;
+                return this._TYPE;
             }
         }
     }

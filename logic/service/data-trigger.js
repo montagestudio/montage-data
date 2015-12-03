@@ -2,14 +2,15 @@ var Montage = require("montage").Montage,
     WeakMap = require("collections/weak-map");
 
 /**
- * Intercepts property getter and setter calls to trigger appropriate Montage
- * Data actions.
+ * Intercepts all calls to get and set an object's property and triggers any
+ * Montage Data action warranted by these calls.
  *
- * DataTriggers are simple JavaScript Objects subclasses rather than Montage
- * subclasses to be as lightweight as possible: It's useful for them to be
- * lightweight because one trigger will be created for each property of each
- * model class, and on the other hand it's no loss for them to not be Montage
- * subclasses because they would not use any of the Montage class functionality.
+ * DataTrigger is a JavaScript Objects subclass rather than a Montage subclass
+ * so data triggers can be as lightweight as possible: They need to be
+ * lightweight because many will be created (one for each relationship or
+ * lazily loaded property of each model class) and there's no benefit for them
+ * to be derived from the Montage prototype because they don't use any of the
+ * Montage class functionality.
  *
  * @private
  * @class
@@ -22,7 +23,7 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
     /**
      * The constructor function for all trigger instances.
      *
-     * @type {Function}
+     * @type {function}
      */
     constructor: {
         configurable: true,
@@ -31,15 +32,14 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
     },
 
     /**
-     * The service whose actions will be triggerred by this trigger.
+     * The service used by this trigger to perform Montage Data actions.
      *
-     * Typically a number of triggers share the same service, so to save memory
-     * this property is defined in a single DataTrigger instance for each
-     * service and all triggers that share that service then share that instance
-     * as their prototype. This avoids the need for each of those triggers to
-     * define this property themselves.
-     *
-     * See [_getTriggerPrototype()]{@link DataTrigger._getTriggerPrototype} for
+     * Typically a number of triggers use the same service so this property
+     * is defined in a single DataTrigger instance for each service and all
+     * triggers that share that service are then derived from that instance.
+     * This avoids the need for each trigger to have a reference to the service
+     * it uses and saves memory. See
+     * [_getTriggerPrototype()]{@link DataTrigger._getTriggerPrototype} for
      * the implementation of this behavior.
      *
      * @private
@@ -47,25 +47,18 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
      */
     _service: {
         configurable: true,
-        enumerable: true,
         writable: true,
         value: undefined
     },
 
     /**
-     * The prototype of the objects whose property is managed by this trigger.
-     *
-     * Like [_service]{@link DataTrigger._service}, to save memory this property
-     * is shared by all triggers that share the same service. All triggers
-     * that share the same service must therefore also share the same object
-     * prototype.
+     * The prototype of objects whose property is managed by this trigger.
      *
      * @private
      * @type {Object}
      */
     _objectPrototype: {
         configurable: true,
-        enumerable: true,
         writable: true,
         value: undefined
     },
@@ -78,7 +71,6 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
      */
     _propertyName: {
         configurable: true,
-        enumerable: true,
         writable: true,
         value: undefined
     },
@@ -88,10 +80,10 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
      * managed by this trigger.
      *
      * The private property name is the
-     * [public property name]{@link DataTrigger#_propertyName} prefixed with an
-     * underscore. It is generated lazilly the first time it is needed and then
-     * cached to minimize the time and memory allocations involved in the
-     * intercepts of property getter and setter calls.
+     * [_propertyName]{@link DataTrigger#_propertyName} value prefixed with an
+     * underscore. To minimize the time and memory used by a trigger's call
+     * intercepts this private property name is generated lazilly the first time
+     * it is needed and then cached.
      *
      * @private
      * @type {string}
@@ -107,49 +99,96 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
     },
 
     /**
-     * For each object whose property is managed by this trigger, this map holds
-     * a promise that will be resolved when the property's value is obtained (if
-     * the value is currently being obtained), or a resolved promise (if the
-     * property's value was previously obtained or set), or nothing (if the
-     * property's value hasn't been requested or set yet).
+     * Whether this trigger is for a global property or not.
      *
-     * This allows this trigger's getter call intercepts to return immmediately
-     * when an object's managed property value is already known or is in the
-     * process of being obtained. It also allows those intercepts to return a
-     * single promise for multiple requests for the same value.
+     * When a trigger is global and the value of the trigger's property is
+     * obtained or set for one object managed by the trigger then that
+     * property's value is assumed to have also been obtained or set for all
+     * objects managed by the trigger.
      *
-     * @type {Object<string, external:Promise>}
+     * Setting this value clears the
+     * [_valueStatus]{@link DataTrigger#_valueStatus} and should only be done
+     * before a trigger is used.
+     *
+     * @private
+     * @type {string}
      */
-    _dataPromises: {
+    _isGlobal: {
         configurable: true,
-        enumerable: true,
         get: function () {
-            if (!this.__dataPromises) {
-                this.__dataPromises = new WeakMap();
+            // To save memory a separate _isGlobal boolean is not maintained and
+            // the _isGlobal value is derived from the _valueStatus type.
+            return !(this._valueStatus instanceof WeakMap);
+        },
+        set: function (isGlobal) {
+            if (this._isGlobal === !isGlobal) {
+                this._valueStatus = !isGlobal ? new WeakMap : undefined;
             }
-            return this.__dataPromises;
         }
     },
 
     /**
-     * For each object whose property is managed by this trigger and for which
-     * the value of that property is currently being obtained, this map holds
-     * a resolution function that will resolve the corresponding promise in the
-     * [data promises map]{@link DataTrigger#_dataPromises}.
+     * For global triggers, holds the status of this trigger's property value.
+     * For other triggers, holds a map from objects whose property is managed
+     * by this trigger to the status of that property's value for each of those
+     * objects.
      *
-     * This allows this trigger to know when the property it manages is being
-     * obtained, and if necessary to mark that value as already obtained.
+     * See [_getValueStatus()]{@link DataTrigger#_getValueStatus} for the
+     * possible status values.
      *
-     * @type {Object<string, function>}
+     * @private
+     * @type {Object|WeakMap}
      */
-    _dataResolves: {
+    _valueStatus: {
         configurable: true,
-        enumerable: true,
-        get: function () {
-            if (!this.__dataResolves) {
-                this.__dataResolves = new WeakMap();
+        value: undefined
+    },
+
+    /**
+     * Gets the status of a property value managed by this trigger:
+     *
+     * - The status will be `undefined` when the value has not yet been
+     *   requested or set.
+     *
+     * - The status will be `null` when the value was requested and has already
+     *   been obtained or when it has been set.
+     *
+     * - When the value has been requested but is still in the process of being
+     *   obtained, the status will be an object with a "promise" property set to
+     *   a promise that will be resolved when the value is obtained and a
+     *   "resolve" property set to a function that will resolve that promise.
+     *
+     * @private
+     * @method
+     * @argument {Object} object
+     * @returns {Object}
+     */
+    _getValueStatus: {
+        configurable: true,
+        value: function (object) {
+            return this._isGlobal ? this._valueStatus : this._valueStatus.get(object);
+        }
+    },
+
+    /**
+     * Sets the status of a property value managed by this trigger.
+     *
+     * See [_getValueStatus()]{@link DataTrigger#_getValueStatus} for the
+     * possible status values.
+     *
+     * @private
+     * @method
+     * @argument {Object} object
+     * @argument {Object} status
+     */
+    _setValueStatus: {
+        configurable: true,
+        value: function (object, status) {
+            if (this._isGlobal) {
+                this._valueStatus = status;
+            } else {
+                this._valueStatus.set(object, status);
             }
-            return this.__dataResolves;
         }
     },
 
@@ -182,8 +221,8 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
      * Note that if a trigger's property value is set after that values is
      * requested but before it is obtained from the trigger's service the
      * property's value will only temporarily be set to the specified value:
-     * When the service finishes obtaining the value for the property the
-     * property's value will be reset to that obtained value.
+     * When the service finishes obtaining the value the property's value will
+     * be reset to that obtained value.
      *
      * @method
      * @argument {Object} object
@@ -193,11 +232,13 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
         configurable: true,
         writable: true,
         value: function (object, value) {
-            var resolve, prototype, descriptor, getter, setter, writable;
-            // Mark this trigger's property value as fetched. This way if the
-            // setter called below requests that value it will get the value the
-            // property had before it was set, and it will get it immediately.
-            resolve = this._setPropertyDataResolved(object);
+            var status, prototype, descriptor, getter, setter, writable;
+            // Get the value's current status and update that status to indicate
+            // the value has been obtained. This way if the setter called below
+            // requests the property's value it will get the value the property
+            // had before it was set, and it will get that value immediately.
+            status = this._getValueStatus(object);
+            this._setValueStatus(object, null);
             // Search the prototype chain for a setter for this trigger's
             // property, starting just after the trigger prototype that caused
             // this method to be called.
@@ -217,8 +258,8 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
                 object[this._privatePropertyName] = value;
             }
             // Resolve any pending promise for this trigger's property value.
-            if (resolve) {
-                resolve(null);
+            if (status) {
+                status.resolve(null);
             }
         }
      },
@@ -230,12 +271,15 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
      */
     getPropertyData: {
         value: function (object) {
-            // Request a fetch of this trigger's property data, but only if
-            // necessary: Only if that data isn't already in the process of
-            // being obtained and if it wasn't previously obtained or set. To
-            // unconditionally request a fetch of this property data, use
+            // Request a fetch of this trigger's property data but only if that
+            // data isn't already in the process of being obtained and only if
+            // it wasn't previously obtained or set. To unconditionally request
+            // a fetch of this property data use
             // [updatePropertyData()]{@link DataTrigger#updatePropertyData}.
-            return this._dataPromises.get(object) || this.updatePropertyData(object);
+            var status = this._getValueStatus(object);
+            return status ?          status.promise :
+                   status === null ? this._service.nullPromise :
+                                     this.updatePropertyData(object);
         }
     },
 
@@ -246,22 +290,20 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
      */
     updatePropertyData: {
         value: function (object) {
-            var self = this;
+            var self = this,
+                status = this._getValueStatus(object) || {};
             // If this trigger's property data isn't in the process of being
             // obtained, request the most up to date value of that data from
             // this trigger's service.
-            if (!this._dataResolves.has(object)) {
-                this._dataPromises.set(object, new Promise(function (resolve) {
-                    self._dataResolves.set(object, resolve);
-                    self._service.getPropertyData(object, self._propertyName).then(function () {
-                        self._setPropertyDataResolved(object);
-                        resolve(null);
-                        return null;
-                    });
-                }));
+            if (!status.promise) {
+                this._setValueStatus(object, status);
+                status.promise = new Promise(function (resolve) {
+                    status.resolve = resolve;
+                    self._getServicePropertyData(object);
+                });
             }
             // Return the existing or just created promise for this data.
-            return this._dataPromises.get(object);
+            return status.promise;
         }
     },
 
@@ -269,13 +311,19 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
      * @private
      * @method
      * @argument {Object} object
+     * @returns {external:Promise}
      */
-    _setPropertyDataResolved: {
+    _getServicePropertyData: {
         value: function (object) {
-            var resolve = this._dataResolves.get(object);
-            this._dataPromises.set(object, this._service.nullPromise);
-            this._dataResolves.delete(object);
-            return resolve;
+            var self = this;
+            this._service.getPropertyData(object, this._propertyName).then(function () {
+                var status = self._getValueStatus(object);
+                self._setValueStatus(object, null);
+                if (status) {
+                    status.resolve(null);
+                }
+                return null;
+            });
         }
     }
 
@@ -291,9 +339,9 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */{
      */
     addTriggers: {
         value: function (service, prototype) {
-            var triggers, trigger, name;
-            triggers = {};
-            for (name in service.type.properties) {
+            var triggers = {},
+                trigger, name;
+            for (name in service.type.propertyDescriptors) {
                 trigger = this.addTrigger(service, prototype, name);
                 if (trigger) {
                     triggers[name] = trigger;
@@ -312,10 +360,13 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */{
      */
     addTrigger: {
         value: function (service, prototype, name) {
-            var trigger;
-            if (service.type.properties[name] && service.type.properties[name].isRelationship) {
-                trigger = Object.create(this._getTriggerPrototype(service, prototype));
+            var descriptor = service.type.propertyDescriptors[name],
+                trigger;
+            if (descriptor && descriptor.isRelationship) {
+                trigger = Object.create(this._getTriggerPrototype(service));
+                trigger._objectPrototype = prototype;
                 trigger._propertyName = name;
+                trigger._isGlobal = descriptor.isGlobal;
                 Montage.defineProperty(prototype, name, {
                     get: function () {
                         return trigger.getPropertyValue(this);
@@ -330,9 +381,9 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */{
     },
 
     /**
-     * To avoid having each trigger contain a reference to the service and
-     * prototype it's working for, all triggers of a service share a prototype
-     * that contains those references.
+     * To avoid having each trigger hold a reference to the service it uses, all
+     * triggers that use a service are derived from a prototype that contains
+     * this references. See [_service]{@link DataTrigger#_service} for details.
      *
      * @private
      * @method
@@ -340,12 +391,11 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */{
      * @returns {DataTrigger}
      */
     _getTriggerPrototype: {
-        value: function (service, prototype) {
+        value: function (service) {
             var trigger = this._triggerPrototypes && this._triggerPrototypes.get(service);
             if (!trigger) {
                 trigger = new this();
                 trigger._service = service;
-                trigger._objectPrototype = prototype;
                 this._triggerPrototypes = this._triggerPrototypes || new WeakMap();
                 this._triggerPrototypes.set(service, trigger);
             }

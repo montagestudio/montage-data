@@ -246,7 +246,7 @@ describe("An Enumeration", function() {
         expect(Side.TAILS.id).toEqual("T");
         expect(Side.TAILS.name).toEqual("Tails");
         // Add and test a new type of side.
-        Side.EDGE = Side.create("E", "Edge");
+        Side.EDGE = Side.withIdAndName("E", "Edge");
         expect(Side.EDGE.id).toEqual("E");
         expect(Side.EDGE.name).toEqual("Edge");
     });

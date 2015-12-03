@@ -6,26 +6,30 @@ var Montage = require("montage").Montage;
  * subclasses and their possible values can be defined as in the following:
  *
  *     exports.Suit = Enumeration.specialize("id", "name", {
- *         SPADES: [0, "Spade"],
- *         HEARTS: [1, "Heart"],
- *         DIAMONDS: [2, "Diamond"],
- *         CLUBS: [3, "Club"]
+ *         SPADES: [0, "Spades"],
+ *         HEARTS: [1, "Hearts"],
+ *         DIAMONDS: [2, "Diamonds"],
+ *         CLUBS: [3, "Clubs"]
  *     });
  *
  *     // To be use like this:
  *     myCard = {value: 12, suit: Suit.HEARTS};
  *
  * Enumerated types can also be defined as class properties using the
- * [getterFor()]{@link #Enumeration.getterFor}, as in the following:
+ * [getterFor()]{@link Enumeration.getterFor} constructor, as in the following:
  *
  *     exports.Card = Montage.specialize({
+ *
  *         value: {
  *             value: undefined
- *         }
+ *         },
+ *
  *         suit: {
  *             value: undefined
  *         }
+ *
  *     }, {
+ *
  *         Suit: {
  *             get: Enumeration.getterFor("_Suit", "id", "name", {
  *                 SPADES: [1, "Spade"],
@@ -34,6 +38,7 @@ var Montage = require("montage").Montage;
  *                 CLUBS: [4, "Club"]
  *             })
  *         }
+ *
  *     });
  *
  *     // To be use like this:
@@ -41,15 +46,16 @@ var Montage = require("montage").Montage;
  *     myCard.value = 12;
  *     myCard.suit = Card.Suit.HEARTS;
  *
- * In addition to being defined as shown above, instances of enumerated type
- * subclasses can be created with a `create()` class method defined for each
- * subclass, as in the following:
+ * In addition to being created as shown above, instances of an enumerated
+ * type subclasses can be created using a `with*()` class method that will be
+ * automatically generated for each subclass based on the subclass' property
+ * names, as in the following:
  *
- *     Card.Suit.ROSES = Card.Suit.create(5, "Roses");
+ *     Card.Suit.ROSES = Card.Suit.withIdAndName(5, "Roses");
  *
  * Once instances of an enumerated type subclass are created they can be looked
- * up by any of the type's unique properties, as in
- * the following:
+ * up using `for*()` class methods that will be automatically generated for each
+ * of the subclass's unique property names, as in the following:
  *
  *     myCard.value = Math.floor(1 + 13 * Math.random());
  *     myCard.suit = Card.Suit.forId(Math.floor(1 + 4 * Math.random()));
@@ -74,6 +80,34 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
         value: function (uniquePropertyNames, otherPropertyNames,
                          prototypeDescriptor, constructorDescriptor, constants) {
             return this._specialize(this._parseSpecializeArguments(arguments));
+        }
+    },
+
+    /**
+     * Creates and returns a getter which, when first called, will create and
+     * cache a new enumeration subclass with the specified attributes.
+     *
+     * @method
+     * @argument {string} key
+     * @argument {?Array.<string>|string} uniquePropertyNames
+     * @argument {?Array.<string>|...string} otherPropertyNames
+     * @argument {?Object} prototypeDescriptor
+     * @argument {?Object} constructorDescriptor
+     * @argument {?Object} constants
+     * @returns {function()} - A getter that will create and cache the desired
+     * Enumeration subclass.
+     */
+    getterFor: {
+        value: function (key, uniquePropertyNames, otherPropertyNames,
+                         prototypeDescriptor, constructorDescriptor, constants) {
+            var specializeArguments = this._parseSpecializeArguments(arguments, 1);
+            // Return a function that will create the desired enumeration.
+            return function () {
+                if (!this.hasOwnProperty(key)) {
+                    this[key] = exports.Enumeration._specialize(specializeArguments);
+                }
+                return this[key];
+            };
         }
     },
 
@@ -122,51 +156,24 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
      */
     _specialize: {
         value: function (arguments) {
-            var uniquePropertyNames = arguments.unique,
-                otherPropertyNames = arguments.other,
-                prototypeDescriptor = arguments.prototype,
-                constructorDescriptor = arguments.constructor,
+            var unique = arguments.unique,
+                other = arguments.other,
+                prototype = arguments.prototype,
+                constructor = arguments.constructor,
                 constants = arguments.constants,
-                enumeration, i;
+                enumeration, create, i;
             // Create the desired enumeration.
-            this._addPropertiesToDescriptor(prototypeDescriptor, uniquePropertyNames, otherPropertyNames);
-            this._addLookupFunctionsToDescriptor(constructorDescriptor, uniquePropertyNames);
-            this._addCreateFunctionToDescriptor(constructorDescriptor, uniquePropertyNames, otherPropertyNames);
-            enumeration = Montage.specialize.call(exports.Enumeration, prototypeDescriptor, constructorDescriptor);
+            this._addPropertiesToDescriptor(prototype, unique, other);
+            this._addLookupFunctionsToDescriptor(constructor, unique);
+            this._addConstructorFunctionToDescriptor(constructor, unique, other);
+            enumeration = Montage.specialize.call(exports.Enumeration, prototype, constructor);
             // Add the requested constants.
+            create = this._makeCreateFunction(unique, other);
             for (i in constants) {
-                enumeration[i] = enumeration.create.apply(enumeration, constants[i]);
+                enumeration[i] = create.apply(enumeration, constants[i]);
             }
             // Return the created enumeration.
             return enumeration;
-        }
-    },
-
-    /**
-     * Creates and returns a getter which, when first called, will create and
-     * cache a new enumeration subclass with the specified attributes.
-     *
-     * @method
-     * @argument {string} key
-     * @argument {?Array.<string>|string} uniquePropertyNames
-     * @argument {?Array.<string>|...string} otherPropertyNames
-     * @argument {?Object} prototypeDescriptor
-     * @argument {?Object} constructorDescriptor
-     * @argument {?Object} constants
-     * @returns {function()} - A getter that will create and cache the desired
-     * Enumeration subclass.
-     */
-    getterFor: {
-        value: function (key, uniquePropertyNames, otherPropertyNames,
-                         prototypeDescriptor, constructorDescriptor, constants) {
-            var specializeArguments = this._parseSpecializeArguments(arguments, 1);
-            // Return a function that will create the desired enumeration.
-            return function () {
-                if (!this.hasOwnProperty(key)) {
-                    this[key] = exports.Enumeration._specialize(specializeArguments);
-                }
-                return this[key];
-            };
         }
     },
 
@@ -174,10 +181,14 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
         value: function(prototypeDescriptor, uniquePropertyNames, otherPropertyNames) {
             var i, n;
             for (i = 0, n = uniquePropertyNames.length; i < n; i += 1) {
-                prototypeDescriptor[uniquePropertyNames[i]] = {value: undefined};
+                if (!prototypeDescriptor[uniquePropertyNames[i]]) {
+                    prototypeDescriptor[uniquePropertyNames[i]] = {value: undefined};
+                }
             }
             for (i = 0, n = otherPropertyNames.length; i < n; i += 1) {
-                prototypeDescriptor[otherPropertyNames[i]] = {value: undefined};
+                if (!prototypeDescriptor[otherPropertyNames[i]]) {
+                    prototypeDescriptor[otherPropertyNames[i]] = {value: undefined};
+                }
             }
         }
     },
@@ -203,10 +214,25 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
         }
     },
 
-    _addCreateFunctionToDescriptor: {
+    _addConstructorFunctionToDescriptor: {
         value: function(constructorDescriptor, uniquePropertyNames, otherPropertyNames) {
-            var create = this._makeCreateFunction(uniquePropertyNames, otherPropertyNames);
-            constructorDescriptor.create = {value: create};
+            var create, names, name, i, n;
+            if (uniquePropertyNames.length || otherPropertyNames.length) {
+                create = this._makeCreateFunction(uniquePropertyNames, otherPropertyNames);
+                names = ["with"];
+                for (i = 0, n = uniquePropertyNames.length; i < n; i += 1) {
+                    names.push(uniquePropertyNames[i][0].toUpperCase());
+                    names.push(uniquePropertyNames[i].slice(1));
+                }
+                for (i = 0, n = otherPropertyNames.length; i < n; i += 1) {
+                    names.push(otherPropertyNames[i][0].toUpperCase());
+                    names.push(otherPropertyNames[i].slice(1));
+                }
+                if (names.length > 2) {
+                    names.splice(names.length - 2, 0, "And");
+                }
+                constructorDescriptor[names.join("")] = {value: create};
+            }
         }
     },
 

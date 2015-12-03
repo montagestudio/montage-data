@@ -1,8 +1,8 @@
 var ObjectDescriptor = require("logic/model/object-descriptor").ObjectDescriptor,
-    PropertyDescriptor = require("logic/model/property-descriptor").PropertyDescriptor;
+    DataPropertyDescriptor = require("logic/model/data-property-descriptor").DataPropertyDescriptor;
 
 /**
- * Extends an object descriptor with the additional information needed by
+ * Extends an object descriptor with the additional object information needed by
  * Montage Data.
  *
  * @class
@@ -11,101 +11,182 @@ var ObjectDescriptor = require("logic/model/object-descriptor").ObjectDescriptor
 exports.DataObjectDescriptor = ObjectDescriptor.specialize(/** @lends DataObjectDescriptor.prototype */ {
 
     /**
+     * The names of the properties containing the identifier for this type of
+     * data object.
+     *
      * @type {Array.<string>}
      */
-    identifiers: {
+    identifierNames: {
         value: []
     },
 
     /**
+     * Descriptors of the properties of data objects of this type, by property
+     * name.
+     *
+     * The returned map should not be modified.
+     * [setPropertyDescriptor()]{@link DataObjectDescriptor#setPropertyDescriptor}
+     * and
+     * [deletePropertyDescriptor()]{@link ObjectDescriptor#deletePropertyDescriptor}
+     * should be used instead to modify the property descriptors.
+     *
      * @type {Object.<string, DataPropertyDescriptor>}
      */
-    properties: {
+    propertyDescriptors: {
         get: function () {
-            return Object.getOwnPropertyDescriptor(ObjectDescriptor.prototype, "properties").get.call(this);
+            // This returns the same value as the superclass property of the
+            // same name, only the JSDoc type is different.
+            return Object.getOwnPropertyDescriptor(ObjectDescriptor.prototype, "propertyDescriptors").get.call(this);
         }
     },
 
     /**
+     * Add or replace a property descriptor.
+     *
      * @method
-     * @argument {string} name
-     * @argument {DataPropertyDescriptor} descriptor
+     * @argument {string} name                       - The name of the property.
+     * @argument {DataPropertyDescriptor} descriptor - Describes the property.
      */
-    setProperty: {
+    setPropertyDescriptor: {
+        // This does the same thing as the superclass method of the same name,
+        // only the JSDoc type is different.
         value: function (name, descriptor) {
-            ObjectDescriptor.prototype.setProperty.call(this, name, descriptor);
+            ObjectDescriptor.prototype.setPropertyDescriptor.call(this, name, descriptor);
         }
     },
 
-    _addRelations: {
-        value: function (relations) {
+    /**
+     * Create a property descriptor.
+     *
+     * This overrides the
+     * [superclass implementation]{@link PropertyDescriptor#makePropertyDescriptor}
+     * to create a {@link DataPropertyDescriptor} instead of a
+     * {@link PropertyDescriptor} instance.
+     *
+     * @method
+     * @returns {DataPropertyDescriptor} - The created property descriptor.
+     */
+    makePropertyDescriptor: {
+        value: function () {
+            return new DataPropertyDescriptor();
+        }
+    },
+
+    /**
+     * @private
+     * @method
+     */
+    _addRelationships: {
+        value: function (relationships) {
             var names, i, n;
-            names = Object.keys(relations);
+            names = Object.keys(relationships);
             for (i = 0, n = names.length; i < n; i += 1) {
-                this._addRelationship(names[i], relations[names[i]]);
+                this._addRelationship(names[i], relationships[names[i]]);
             }
         }
     },
 
+    /**
+     * @private
+     * @method
+     */
     _addRelationship: {
-        value: function (name, relation) {
+        value: function (name, relationship) {
             // TODO: Add derived properties, relationship criteria,
             // relationship targets, and shared fetch information.
-            if (this.properties[name]) {
-                this.properties[name].isRelationship = true;
-            } else {
-                this.setProperty(name, this.makePropertyDescriptor(true));
+            if (!this.properties[name]) {
+                this.setProperty(name, this.makePropertyDescriptor());
             }
-        }
-    },
-
-    makePropertyDescriptor: {
-        value: function (isRelationship) {
-            var descriptor = new PropertyDescriptor();
-            if (isRelationship) {
-                descriptor.isRelationship = true;
-            }
-            return descriptor;
+            this.properties[name].isRelationship = true;
+            this.properties[name].isGlobal = relationship.isGlobal ? true : false;
         }
     }
 
 }, /** @lends DataObjectDescriptor */ {
 
+    /**
+     * Used for [data services]{@link DataService} that manage any type of data
+     * object.
+     *
+     * @type {ObjectDescriptor}
+     */
+    ANY_TYPE: {
+        get: function () {
+        }
+    },
+
+    /**
+     * Generates a getter function that will create and cache a data object
+     * descriptor.
+     *
+     * @method
+     * @argument {Object} exports                        - A Montage Require
+     *                                                     exports object
+     *                                                     defining the
+     *                                                     constructor for the
+     *                                                     object to describe.
+     *                                                     Usually this is
+     *                                                     `exports`.
+     * @argument {string} constructorName                - The name with which
+     *                                                     that constructor can
+     *                                                     be looked up in the
+     *                                                     exports. This will
+     *                                                     also be used as the
+     *                                                     name of the type
+     *                                                     defined by the
+     *                                                     created object
+     *                                                     descriptor.
+     * @argument {?Object<string, string>} propertyTypes - The types of each of
+     *                                                     the object's
+     *                                                     properties, by
+     *                                                     property name. If
+     *                                                     this is omitted the
+     *                                                     property information
+     *                                                     will be derived from
+     *                                                     the properties of the
+     *                                                     prototype of the
+     *                                                     described object.
+     */
     getterFor: {
-        value: function (exports, name, types, identifiers, relations) {
-            // Note: The returned getter function has to check
-            // this.hasOwnProperty("_type"), not just this._type, because if
-            // the class using the getter is a subclass of another class using
-            // a similar getter this._type will return the value of the the
-            // parent class type even in the child class' getter.
+        value: function (exports, constructorName, propertyTypes, identifierNames, relationships) {
+            // The returned getter function has to check
+            // `this.hasOwnProperty("_type")`, not just `this._type`, because if
+            // the class using the getter is a subclass of another class using a
+            // similar getter `this._type` will return the value of the the
+            // superclass type instead of the desired subclass type.
             var self = this,
                 parsed = self._parseGetterForArguments(arguments),
                 getter = ObjectDescriptor.getterFor.call(self, parsed.exports, parsed.name, parsed.types);
             return function () {
-                if (!this.hasOwnProperty("_type")) {
-                    this._type = getter.call(this);
-                    this._type.identifiers = parsed.identifiers;
-                    this._type._addRelations(parsed.relations);
+                if (!this.hasOwnProperty("_TYPE")) {
+                    this._TYPE = getter.call(this);
+                    this._TYPE.identifierNames = parsed.identifiers;
+                    this._TYPE._addRelationships(parsed.relationships);
                 }
-                return this._type;
+                return this._TYPE;
             }
         }
     },
 
+    /**
+     * @private
+     * @method
+     */
     _parseGetterForArguments: {
         value: function (arguments) {
             var types, identifiers, offset, i, n;
-            // The type object is the third argument if it's a non-array
-            // non-string object and if it's not the last argument.
+            // The types map is the third argument if it's a non-array
+            // non-string non-numeric non-boolean object and if it's not the
+            // last argument.
             types = arguments.length > 3 && this._isObject(arguments[2]) && arguments[2];
             offset = types ? 0 : -1;
-            // The identifiers array is the fourth argument if that's an array,
+            // The identifier names array is the fourth argument if that's an array,
             // or an array containing the fourth argument and all following ones
             // that are strings if there are any, or an empty array.
-            identifiers = Array.isArray(arguments[3 + offset]) && arguments[3 + offset];
-            for (i = 3 + offset, n = arguments.length; !identifiers; i += 1) {
+            identifiers = Array.isArray(arguments[offset + 3]) && arguments[offset + 3];
+            for (i = offset + 3, n = arguments.length; !identifiers; i += 1) {
                 if (i === n || typeof arguments[i] !== "string") {
-                    identifiers = Array.prototype.slice.call(arguments, 3 + offset, i);
+                    identifiers = Array.prototype.slice.call(arguments, offset + 3, i);
                     offset = i - 4;
                 }
             }
@@ -115,11 +196,15 @@ exports.DataObjectDescriptor = ObjectDescriptor.specialize(/** @lends DataObject
                 name: arguments[1],
                 types: types || undefined,
                 identifiers: identifiers,
-                relations: arguments[4 + offset] || {}
+                relationships: arguments[offset + 4] || {}
             };
         }
     },
 
+    /**
+     * @private
+     * @method
+     */
     _isObject: {
         value: function (value) {
             return value &&

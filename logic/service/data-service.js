@@ -4,7 +4,7 @@ var Montage = require("montage").Montage,
     DataStream = require("logic/service/data-stream").DataStream,
     DataTrigger = require("logic/service/data-trigger").DataTrigger,
     Map = require("collections/map"),
-    ObjectDescriptor = require("logic/model/object-descriptor").ObjectDescriptor,
+    DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
     Promise = require("bluebird"),
     Set = require("collections/set"),
     WeakMap = require("collections/weak-map");
@@ -40,30 +40,41 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      */
 
     /**
-     * The type of data managed by this service if this service manages only one
-     * type of data, `undefined` otherwise.
+     * The types of data managed by this service. This may be `undefined` for
+     * the [main service]{@link DataService.mainService}.
      *
-     * An application typically includes one service for each of its data
-     * types and one [main service]{@link DataService.mainService} which has
-     * no data type of its own and instead has child services for each of the
-     * application's data types. That main service delegates data management
-     * for each of the application's data type to its child service with the
-     * corresponding type.
+     * An application typically includes one service for each set of related
+     * data types and one parent [main service]{@link DataService.mainService}
+     * which has no types of its own and which delegates work to its child
+     * services based on data type.
      *
-     * A service's type cannot be changed after it is set, and it must be set
-     * before the service is added as a child of another service.
+     * A service's types cannot be changed after it is added as a child of
+     * another service. Often the simplest way to define a service's type is
+     * to override the `types` property in the service's prototype.
      *
-     * @type {ObjectDescriptor}
+     * @type {Array.<DataObjectDescriptor>?}
      */
-    type: {
+    types: {
         get: function () {
-            return this._type;
+            return this._types;
         },
-        set: function (type) {
-            if (type && !this._type) {
-                this._type = type;
+        set: function (types) {
+            if (types && !this._types) {
+                this._types = types;
             }
         }
+    },
+
+    /**
+     * The priority of this service relative to other services that can manage
+     * the same type of data. If two child services of a single parent service
+     * manage the same type of data and have the same priority, they will be
+     * prioritized by the order in which they were added to their parent.
+     *
+     * @type {Array.<DataObjectDescriptor>?}
+     */
+    priority: {
+        value: 100
     },
 
     /**
@@ -71,7 +82,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      * to map the raw data on which this service is based to the data objects
      * returned by this service.
      *
-     * @type {Object}
+     * @type {Object?}
      */
     mapping: {
         value: undefined
@@ -82,19 +93,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      */
 
     /**
-     * Parent of this service: Every service other than a
-     * [root service]{@link DataService#rootService} must have a parent.
-     *
-     * @private
-     * @type {DataService}
-     */
-    _parentService: {
-        value: undefined
-    },
-
-    /**
-     * The ancestor of this child service that has no parent
-     * service. For most applications this will be the
+     * Convenience read-only reference to the root of the service tree
+     * containing this service. For most applications this will be the
      * [main service]{@link DataService.mainService}.
      *
      * @type {DataService}
@@ -110,12 +110,23 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     },
 
     /**
-     * The children of this service, provided as a map of each of the data types
-     * managed by this service to the child service responsible for managing
-     * that data type.
+     * Parent of this service: Every service other than a
+     * [root service]{@link DataService#rootService} must have a parent.
      *
      * @private
-     * @type {Map<ObjectDescriptor, DataService>}
+     * @type {DataService}
+     */
+    _parentService: {
+        value: undefined
+    },
+
+    /**
+     * The children of this service, provided as a map from each of the data
+     * types managed by all the children to an array of the child services that
+     * can manage each data type, with the array ordered by service priority.
+     *
+     * @private
+     * @type {Map<DataObjectDescriptor, DataService>}
      */
     _childServices: {
         get: function() {
@@ -127,42 +138,162 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     },
 
     /**
-     * Get the child service responsible for managing data of a particular type.
+     * Get the first child service that can manage data of a particular type.
      *
+     * @private
      * @method
      * @argument {DataService} service
      */
-    getChildService: {
+    _getFirstChildServiceForType: {
         value: function (type) {
-            return !type ? undefined : type === this.type ? this : this._childServices.get(type);
+            var services = type && this._childServices.get(type);
+            return services && services[0];
         }
     },
 
     /**
-     * Adds the specified service as a child of this service. The added service
-     * must have a type and it will become responsible for managing data of that
-     * type for this service.
+     * Adds the specified service as a child of this service. That added service
+     * must have one or more types which will determine which kind of data it
+     * will manage for this service.
      *
      * @method
      * @argument {DataService} service
      */
     addChildService: {
         value: function (service) {
-            var previous = service.type && this._childServices.get(service.type);
-            if (previous && previous !== service) {
-                previous._parentService = undefined;
+            var types = this._getChildServiceTypes(service),
+                any = this._childServices.get(DataObjectDescriptor.ANY_TYPE),
+                type, services, added, i, n;
+            // For each of the service's types (or for each of the known types
+            // when adding an ANY_TYPE service), add the new service to the
+            // type's services array, and if this is a new type also add all the
+            // previously defined ANY_TYPE services to the type's services
+            // array. This way all ANY_TYPE services will always be in all the
+            // type service arrays.
+            for (i = 0, n = types ? types.length : 0; i < n; i += 1) {
+                services = this._childServices.get(types[i]);
+                if (services) {
+                    this._insertChildService(services, service);
+                } else {
+                    this._childServices.set(types[i], [service]);
+                    if (types[i] !== DataObjectDescriptor.ANY_TYPE) {
+                        this._insertChildServices(this._childServices.get(types[i]), any);
+                    }
+                }
             }
-            if (service.type && service !== previous) {
+            // Set the service parent.
+            if (types.length) {
                 service._parentService = this;
-                this._childServices.set(service.type, service);
             }
+        }
+    },
+
+    /**
+     * Returns the types array of the service, or if the service types includes
+     * ANY_TYPE, returns all types currently known to the service.
+     *
+     * @private
+     * @method
+     */
+    _getChildServiceTypes: {
+        value: function (service) {
+            // If this service handles any type, use all the known types for it.
+            var types = service.types;
+            if (types && types.indexOf(DataObjectDescriptor.ANY_TYPE) >= 0) {
+                types = [DataObjectDescriptor.ANY_TYPE];
+                this._childServices.forEach(function (services, type) {
+                    if (type !== DataObjectDescriptor.ANY_TYPE) {
+                        types.push(type);
+                    }
+                });
+            }
+            return types;
+        }
+    },
+
+    /**
+     * @private
+     * @method
+     */
+    _insertChildServices: {
+        value: function (services, inserts) {
+            var i, n;
+            for (i = 0, n = inserts.length; i < n; ++i) {
+                this._insertChildService(services, inserts[i]);
+            }
+        }
+    },
+
+    /**
+     * @private
+     * @method
+     */
+    _insertChildService: {
+        value: function (services, insert) {
+            var i = this._getChildServiceInsertionIndex(services, insert);
+            if (services[i] !== insert) {
+                services.splice(i, 0, insert);
+            }
+        }
+    },
+
+    /**
+     * Returns the index where an service should be inserted in an array of
+     * services to preserve the array's decreasing service priority. If the
+     * service is already in the array the service's index will be returned. If
+     * the service has the same priority as other services already in the array
+     * the index of the element after the last of those equal priority services
+     * will be returned.
+     *
+     * The search for this index has performance O(log n), unless there are many
+     * services with the same priority as the service to insert, in which case
+     * the performance can go up to O(m), where m is the number of services with
+     * that same priority.
+     *
+     * @private
+     * @method
+     */
+    _getChildServiceInsertionIndex: {
+        value: function _binarySearch(services, insert) {
+            var below, above, i, n;
+            // Start with a simple binary search. "above" will always be the
+            // index of a service with a higher prioritity than the service to
+            // insert. "below" will always be the index of a service with a
+            // lower priority than the service to inset, except when a service
+            // is found with the same priority as the service to insert, in
+            // which case "below" will set to the value of "above".
+            for (n = services.length, below = -1, above = n; above > below + 1;) {
+                i = Math.floor((below + above) / 2);
+                if (services[i].priority < insert.priority) {
+                    below = i;
+                } else if (services[i].priority > insert.priority) {
+                    above = i;
+                } else {
+                    below = above;
+                }
+            }
+            // When the services array contains services with the same priority
+            // as the service to insert, a linear search is required to check
+            // whether the service to insert is already in that array.
+            if (below === above) {
+                for (i -= 1; i >= 0 && services[i].priority === insert.priority; i -= 1);
+                for (i += 1; i < above; i += 1) {
+                    if (services[i] === insert || services[i].priority !== insert.priority) {
+                        above = i;
+                    }
+                }
+            }
+            // Return the index of the service to insert it it's already in the
+            // array, or return the index of the first service with a higher
+            // priority than the service to insert.
+            return above;
         }
     },
 
     /**
      * Remove the specified service as a child of this service.
      *
-     * This method will clear the removed service's parentService.
+     * This method will clear the removed service's parent service.
      *
      * @method
      * @argument {DataService} service
@@ -206,8 +337,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      *
      * @method
      * @argument {DataSelector} selector - Defines what data should be returned.
-     *                                     A [type]{@link ObjectDescriptor} can
-     *                                     be provided instead of a
+     *                                     A [type]{@link DataObjectDescriptor}
+     *                                     can be provided instead of a
      *                                     {@link DataSelector}, in which
      *                                     case a DataSelector with no
      *                                     [criteria]{@link DataSelector#criteria}
@@ -222,7 +353,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     fetchData: {
         value: function (selector, stream) {
             var type = selector instanceof DataSelector ? selector.type : selector,
-                service = this.getChildService(type);
+                service = this._getFirstChildServiceForType(type);
             // Set up the stream, accepting a type in lieu of a selector.
             if (!stream) {
                 stream = new DataStream();
@@ -255,8 +386,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
 
     /**
      * A set of the data objects created by this service or any other descendent
-     * of this service's [root service]@{link DataService.rootService} since
-     * [saveDataChanges()]@{link DataService.saveDataChanges} was last called,
+     * of this service's [root service]{@link DataService#rootService} since
+     * [saveDataChanges()]{@link DataService#saveDataChanges} was last called,
      * or since the root service was created if saveDataChanges() hasn't been
      * called yet.
      *
@@ -274,10 +405,11 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
 
     /**
      * A set of the data objects managed by this service or any other descendent
-     * of this service's [root service]@{link DataService.rootService} that have
-     * been changed since [saveDataChanges()]@{link DataService.saveDataChanges}
+     * of this service's [root service]{@link DataService#rootService} that have
+     * been changed since [saveDataChanges()]{@link DataService#saveDataChanges}
      * was last called, or since the root service was created if
-     * saveDataChanges() hasn't been called yet.
+     * [saveDataChanges()]{@link DataService#saveDataChanges} hasn't been called
+     * yet.
      *
      * @type {Set<Object>}
      */
@@ -316,13 +448,17 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      * Create a new data object of a specified type.
      *
      * @method
-     * @argument {ObjectDescriptor} type - The type of object to create.
-     * @returns {Object}                 - The created object.
+     * @argument {DataObjectDescriptor} type - The type of object to create.
+     * @returns {Object}                     - The created object.
      */
     createDataObject: {
         value: function (type) {
-            var object = this._createDataObject(type);
-            if (object) {
+            var root = this.rootService,
+                object = this !== root ? root.createDataObject(type) : this._createDataObject(type);
+            if (this !== root) {
+                object = root.createDataObject();
+
+            } else if (object) {
                 this.createdDataObjects.add(object);
             }
             return object;
@@ -334,24 +470,15 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      *
      * @private
      * @method
-     * @argument {ObjectDescriptor} type - The type of object to create.
-     * @returns {Object}                 - The created object.
+     * @argument {DataObjectDescriptor} type - The type of object to create.
+     * @returns {Object}                     - The created object.
      */
     _createDataObject: {
         value: function (type) {
+            // Create the object.
             // TODO [Charles]: Object uniquing.
-            var service, object;
-            // Use the appropriate service to create the object.
-            service = this.getChildService(type);
-            if (service === this) {
-                object = Object.create(this._dataObjectPrototype);
-                object.constructor.call(object);
-            } else if (service) {
-                object = service.createDataObject(type);
-            } else {
-                object = Object.create(type.prototype);
-                object.constructor.call(object);
-            }
+            var object = Object.create(type.objectPrototype);
+            object.constructor.call(object);
             // Registering the created object's type.
             if (object) {
                 this._registerObjectType(object, type);
@@ -364,7 +491,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     _dataObjectPrototype: {
         get: function () {
             if (!this.__dataObjectPrototype && this.type) {
-                this.__dataObjectPrototype = Object.create(this.type.prototype);
+                this.__dataObjectPrototype = Object.create(this.type.objectPrototype);
                 this._triggers = DataTrigger.addTriggers(this, this.__dataObjectPrototype);
             }
             return this.__dataObjectPrototype;
@@ -376,12 +503,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      * such object exists, create one.
      *
      * @method
-     * @argument {ObjectDescriptor} type - The type of object to get or create.
-     * @argument {Object} data           - An object whose property values hold
-     *                                     the raw data.
-     * @argument {?} context             - A value that was passed in to the
-     *                                     [addRawData()]{@link DataService#addRawData}
-     *                                     call that invoked this method.
+     * @argument {DataObjectDescriptor} type - The type of object to get or
+     *                                         create.
+     * @argument {Object} data               - An object whose property values
+     *                                         hold the raw data.
+     * @argument {?} context                 - A value that was passed in to the
+     *                                         [addRawData()]{@link DataService#addRawData}
+     *                                         call that invoked this method.
      * @returns {Object} - The object corresponding to the specified raw data,
      * or if no such object exists a newly created object for that data.
      */
@@ -403,7 +531,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     saveDataObject: {
         value: function (object) {
             var type = this.rootService.getObjectType(object),
-                service = this.rootService.getChildService(type);
+                service = this.rootService._getFirstChildServiceForType(type);
             return service !== this ? service.saveDataObject(object) :
                                       this._mapAndSaveDataObject(object);
         }
@@ -425,7 +553,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     deleteDataObject: {
         value: function (object) {
             var type = this.rootService.getObjectType(object),
-                service = this.rootService.getChildService(type);
+                service = this.rootService._getFirstChildServiceForType(type);
             return service !== this ? service.deleteDataObject(object) :
                                       this._mapAndDeleteDataObject(object);
         }
@@ -447,19 +575,34 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      * Get the type of the specified data object.
      *
      * @method
-     * @argument {Object} object   - The object whose type is sought.
-     * @returns {ObjectDescriptor} - The type of the object, or undefined if no
-     * type can be determined.
+     * @argument {Object} object       - The object whose type is sought.
+     * @returns {DataObjectDescriptor} - The type of the object, or undefined if
+     * no type can be determined.
      */
     getObjectType: {
         value: function (object) {
-            var registry = this.rootService._typeRegistry,
-                type = registry && registry.get(object);
-            while (object && !(type instanceof ObjectDescriptor)) {
-                type = object.constructor.TYPE;
-                object = Object.getPrototypeOf(object);
+            return this.rootService._getObjectType(object);
+        }
+    },
+
+    /**
+     * @private
+     * @method
+     * @argument {Object} object       - The object whose type is sought.
+     * @returns {DataObjectDescriptor} - The type of the object, or undefined if
+     * no type can be determined.
+     */
+    _getObjectType: {
+        value: function (object) {
+            var type = this._typeRegistry && this._typeRegistry.get(object);
+            while (!type && object) {
+                if (type instanceof DataObjectDescriptor) {
+                    type = object.constructor.TYPE;
+                } else {
+                    object = Object.getPrototypeOf(object);
+                }
             }
-            return object && type;
+            return type;
         }
     },
 
@@ -468,22 +611,17 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      *
      * @private
      * @method
-     * @argument {Object} object         - The object whose type is sought.
-     * @argument {ObjectDescriptor} type - The type to register for that object.
+     * @argument {Object} object
+     * @argument {DataObjectDescriptor} type
      */
     _registerObjectType: {
         value: function (object, type) {
-            var prototype, root;
-            // Check if the type can be determined from a constructor.
-            prototype = object;
-            while (prototype && (prototype.constructor.TYPE instanceof ObjectDescriptor)) {
-                prototype = Object.getPrototypeOf(prototype);
-            }
-            // If not, record the type.
-            if (!prototype) {
-                root = this.rootService;
-                root._typeRegistry = root._typeRegistry || new WeakMap();
-                root._typeRegistry.set(object, type);
+            var root = this.rootService;
+            if (this !== root) {
+                root._registerObjectType(object, type);
+            } else if (this.getObjectType(object) !== type){
+                this._typeRegistry = this._typeRegistry || new WeakMap();
+                this._typeRegistry.set(object, type);
             }
         }
     },
@@ -581,7 +719,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
             // Convert the raw data to appropriate data objects. The conversion
             // will be done in place to avoid creating an extra array.
             var i, n, object;
-            for (i = 0, n = rawData ? rawData.length : 0; i < n; ++i) {
+            for (i = 0, n = rawData ? rawData.length : 0; i < n; i += 1) {
                 object = this.getDataObject(this.type, rawData[i], context);
                 this.mapFromRawData(object, rawData[i], context);
                 rawData[i] = object;
@@ -700,7 +838,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
             // Request each data value separately, collecting unique resulting
             // promises into an array and a set, but avoid creating that array
             // and that set until that is necessary.
-            for (i = start, n = names.length; i < n; ++i) {
+            for (i = start, n = names.length; i < n; i += 1) {
                 promise = this.getPropertyData(object, names[i]);
                 if (promise !== this.nullPromise) {
                     if (!promises) {
@@ -737,7 +875,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
             // Request each data value separately, collecting unique resulting
             // promises into an array and a set, but avoid creating that array
             // and that set until that is necessary.
-            for (i = start, n = names.length; i < n; ++i) {
+            for (i = start, n = names.length; i < n; i += 1) {
                 promise = this.updatePropertyData(object, names[i]);
                 if (promise !== this.nullPromise) {
                     if (!promises) {
@@ -823,7 +961,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
             //    event loop and return a promise that is fulfilled when the
             //    fetch is done and when the returned values has been set.
             var type = this.rootService.getObjectType(object),
-                service = this.rootService.getChildService(type),
+                service = this.rootService._getFirstChildServiceForType(type),
                 trigger = service !== this && service._triggers && service._triggers[propertyName];
             return trigger ? trigger.getPropertyData(object) : this.nullPromise;
         }
@@ -846,7 +984,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
             //    event loop and return a promise that is fulfilled when the
             //    fetch is done and when the returned values has been set.
             var type = this.rootService.getObjectType(object),
-                service = this.rootService.getChildService(type),
+                service = this.rootService._getFirstChildServiceForType(type),
                 trigger = service !== this && service._triggers && service._triggers[propertyName];
             return trigger ? trigger.updatePropertyData(object) : this.nullPromise;
         }
@@ -881,6 +1019,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      *     return this.fetchSomethingAsynchronously().then(function (data) {
      *         return self.doSomethingAsynchronously(data.part);
      *     }).then(this.nullFunction);
+     *
+     * @type {function}
      */
     nullFunction: {
         value: function () {
