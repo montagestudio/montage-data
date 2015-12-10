@@ -1,10 +1,9 @@
 var Montage = require("montage").Montage,
-    DataMapping = require("logic/service/data-mapping").DataMapping,
+    DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
     DataSelector = require("logic/service/data-selector").DataSelector,
     DataStream = require("logic/service/data-stream").DataStream,
     DataTrigger = require("logic/service/data-trigger").DataTrigger,
     Map = require("collections/map"),
-    DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
     Promise = require("bluebird"),
     Set = require("collections/set"),
     WeakMap = require("collections/weak-map");
@@ -84,7 +83,115 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     },
 
     /***************************************************************************
-     * Service tree management
+     * Handling offline
+     */
+
+    /*
+     * @type {boolean}
+     */
+    worksOffline: {
+        value: false
+    },
+
+    /*
+     * @type {boolean}
+     */
+    isOffline: {
+        // TODO.
+        get: function () {
+            if (this._isRootService && this._isOffline === undefined) {
+                this._isOffline = false;
+                window.setInterval(this._offlinePoll, 2000, this);
+            }
+            return this._isRootService ? this._isOffline : this.rootService.isOffline;
+        },
+        set: function (isOffline) {
+            isOffline = isOffline ? true : false;
+            if (!this._isRootService) {
+                this.rootService.isOffline = isOffline;
+            } else if (isOffline !== this.isOffline) {
+                this._isOffline = isOffline;
+                this._offlineService.isOfflineDidChange(isOffline);
+            }
+        }
+    },
+
+    /*
+     * @method
+     */
+    isOfflineDidChange: {
+        value: function (isOffline) {
+            // Subclasses can overrride this.
+        }
+    },
+
+    _offlinePoll: {
+        value: function (self) {
+            var request = new XMLHttpRequest();
+            request.timeout = 15000;
+            request.onerror = self._setOfflineToTrue;
+            request.onload = self._setOfflineToFalse;
+            request.ontimeout = self._setOfflineToTrue;
+            request.open("GET", "http://emopstest.pdc.org/emops/assets/pdc/version.html", true);
+            request.send();
+        }
+    },
+
+    _setOfflineToFalse: {
+        get: function () {
+            if (!this.__setOfflineToFalse) {
+                this.__setOfflineToFalse = function () {
+                    this.isOffline = false;
+                }.bind(this);
+            }
+            return this.__setOfflineToFalse;
+        }
+    },
+
+    _setOfflineToTrue: {
+        get: function () {
+            if (!this.__setOfflineToTrue) {
+                this.__setOfflineToTrue = function () {
+                    this.isOffline = true;
+                }.bind(this);
+            }
+            return this.__setOfflineToTrue;
+        }
+    },
+
+    /**
+     * Get the offline service.
+     *
+     * For now there can only be a single offline service and it must be a
+     * direct child of the root service.
+     *
+     * @private
+     * @type {OfflineService}
+     */
+    _offlineService: {
+        get: function () {
+            if (this._isRootService && this.__offlineService === undefined) {
+                this.__offlineService = this._findOfflineService();
+            }
+            return this._isRootService ? this.__offlineService : this.rootService._offlineService;
+        }
+    },
+
+    _findOfflineService: {
+        value: function () {
+            var children = this.rootService._childServices.get(DataObjectDescriptor.ALL_TYPES),
+                offline, i, n;
+            for (i = 0, n = children.length; i < n && !offline; ++i) {
+                if (children[i].worksOffline) {
+                    offline = children[i];
+                }
+            }
+            return offline || null;
+        }
+    },
+
+    /***************************************************************************
+     * Managing service trees
      */
 
     /**
@@ -164,7 +271,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
         value: function (service) {
             var types = this._getChildServiceTypes(service),
                 all = this._childServices.get(DataObjectDescriptor.ALL_TYPES),
-                type, services, added, i, n;
+                services, i, n;
             // For each of the service's types (or for each of the known types
             // when adding an ALL_TYPES service), add the new service to the
             // type's services array. For each new type other than ALL_TYPES
@@ -240,47 +347,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
                 });
             }
             return types;
-        }
-    },
-
-    /**
-     * Get the first service that can manage the specified object based on the
-     * object's type.
-     *
-     * See [_firstServiceForType()]{@link DataService#_firstServiceForType} for
-     * details.
-     *
-     * @private
-     * @method
-     * @argument {Object} object
-     * @returns {DataService}
-     */
-    _firstServiceForObject: {
-        value: function (object) {
-            return this._firstServiceForType(this.rootService._getObjectType(object));
-        }
-    },
-
-    /**
-     * Get the first service that can manage data of the specified type, which
-     * will be this service if it manages all types or if the specified type is
-     * one of the types it manages, or the the first of the child services of
-     * this service that is registered to manage the specified type.
-     *
-     * If no service is found that satisfies these criteria, this service's
-     * parent is given an opportunity to find and provide the desired service.
-     *
-     * @private
-     * @method
-     * @argument {DataObjectDescriptor} type
-     * @returns {DataService}
-     */
-    _firstServiceForType: {
-        value: function (type) {
-            return this.types.indexOf(DataObjectDescriptor.ALL_TYPES) >= 0 && this ||
-                   this.types.indexOf(type) >= 0 && this ||
-                   this._childServices.has(type) && this._childServices.get(type)[0] ||
-                   this._parentService && this._parentService._firstServiceForType(type);
         }
     },
 
@@ -363,7 +429,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
             // the above index to that service's index and otherwise setting
             // the above index to just after the set of same priority services.
             if (below === above) {
-                for (i -= 1; i >= 0 && services[i].priority === insert.priority; i -= 1)
+                for (i -= 1; i >= 0 && services[i].priority === insert.priority; i -= 1);
                 for (i += 1; i < above; i += 1) {
                     if (services[i] === insert || services[i].priority !== insert.priority) {
                         above = i;
@@ -379,8 +445,49 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
         }
     },
 
+    /**
+     * Get the first service that can manage the specified object based on the
+     * object's type.
+     *
+     * See [_firstServiceForType()]{@link DataService#_firstServiceForType} for
+     * details.
+     *
+     * @private
+     * @method
+     * @argument {Object} object
+     * @returns {DataService}
+     */
+    _firstServiceForObject: {
+        value: function (object) {
+            return this._firstServiceForType(this.rootService._getObjectType(object));
+        }
+    },
+
+    /**
+     * Get the first service that can manage data of the specified type, which
+     * will be this service if it manages all types or if the specified type is
+     * one of the types it manages, or the the first of the child services of
+     * this service that is registered to manage the specified type.
+     *
+     * If no service is found that satisfies these criteria, this service's
+     * parent is given an opportunity to find and provide the desired service.
+     *
+     * @private
+     * @method
+     * @argument {DataObjectDescriptor} type
+     * @returns {DataService}
+     */
+    _firstServiceForType: {
+        value: function (type) {
+            return this.types.indexOf(DataObjectDescriptor.ALL_TYPES) >= 0 && this ||
+                   this.types.indexOf(type) >= 0 && this ||
+                   this._childServices.has(type) && this._childServices.get(type)[0] ||
+                   this._parentService && this._parentService._firstServiceForType(type);
+        }
+    },
+
     /***************************************************************************
-     * Data objects
+     * Managing data objects
      */
 
     /**
@@ -442,10 +549,9 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      */
     saveDataObject: {
         value: function (object) {
-            var service = this._firstServiceForObject(object),
-                data = {};
-            service.mapToRawData(object, data);
-            return service.saveRawData(data, object);
+            return !this._isRootService ? this.saveRawData(this._toRawData(object), object) :
+                   this.isOffline ?       this._offlineService.saveDataObject(object) :
+                                          this._firstServiceForObject(object).saveDataObject(object);
         }
     },
 
@@ -459,10 +565,17 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      */
     deleteDataObject: {
         value: function (object) {
-            var service = this._firstServiceForObject(object),
-                data = {};
-            service.mapToRawData(object, data);
-            return service.deleteRawData(data, object);
+            return !this._isRootService ? this.deleteRawData(this._toRawData(object), object) :
+                   this.isOffline ?       this._offlineService.saveDataObject(object) :
+                                          this._firstServiceForObject(object).saveDataObject(object);
+        }
+    },
+
+    _toRawData: {
+        value: function (object) {
+            var data = {};
+            this.mapToRawData(object, data);
+            return data;
         }
     },
 
@@ -551,7 +664,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     },
 
     /***************************************************************************
-     * Data object types
+     * Managing data object types
      */
 
     /**
@@ -683,7 +796,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     },
 
     /***************************************************************************
-     * Object data
+     * Obtaining data object property values
      */
 
     /**
@@ -738,7 +851,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
             // of string arguments while avoiding the creation of any new array.
             var names, start, promise;
             if (this._isRootService) {
-                names = Array.isArray(propertyNames) ? propertyNames : arguments,
+                names = Array.isArray(propertyNames) ? propertyNames : arguments;
                 start = names === propertyNames ? 0 : 1;
                 promise = this._getOrUpdateObjectProperties(object, names, start, false);
             }
@@ -777,7 +890,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
             // of string arguments while avoiding the creation of any new array.
             var names, start, promise;
             if (this._isRootService) {
-                names = Array.isArray(propertyNames) ? propertyNames : arguments,
+                names = Array.isArray(propertyNames) ? propertyNames : arguments;
                 start = names === propertyNames ? 0 : 1;
                 promise = this._getOrUpdateObjectProperties(object, names, start, true);
             }
@@ -864,7 +977,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     },
 
     /***************************************************************************
-     * Fetching
+     * Fetching data objects
      *
      * These methods should not be overridden.
      */
@@ -872,6 +985,10 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     /**
      * Fetch data from the service. This is the main method to be called by
      * objects using this service.
+     *
+     * This method must only be called on the
+     * [root service][root service]{@link DataService#rootService}
+     * of a service tree.
      *
      * This method fetches raw data from a server or other source using the
      * [fetchRawData()]{@link DataService#fetchRawData} method, gets or creates
@@ -910,36 +1027,43 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      */
     fetchData: {
         value: function (selector, stream) {
-            var type = selector instanceof DataSelector ? selector.type : selector,
-                service = this._firstServiceForType(type);
-            // Set up the stream, accepting a type in lieu of a selector.
-            if (!stream) {
-                stream = new DataStream();
+            var type, offline, service;
+            if (this._isRootService) {
+                type = selector instanceof DataSelector ? selector.type : selector;
+                service = this.isOffline ? null : this._firstServiceForType(type);
+                offline = service || service === null ? this._offlineService : null;
+                // Set up the stream, accepting a type in lieu of a selector.
+                if (!stream) {
+                    stream = new DataStream();
+                }
+                if (!stream.service) {
+                    stream.service = this;
+                }
+                if (selector !== type) {
+                    stream.selector = selector;
+                } else {
+                    stream.selector = DataSelector.withTypeAndCriteria(type);
+                }
+                // Get the data from raw data.
+                if (service) {
+                    service.fetchRawData(stream);
+                    stream.then(function () {
+                        offline.didFetchData(stream);
+                    });
+                } else if (offline) {
+                    offline.fetchData(selector, stream);
+                } else {
+                    console.warn("Can't fetch data of unknown type -", type.typeName + "/" + type.uuid);
+                    stream.dataDone();
+                }
+                // Return the passed in or created stream.
             }
-            if (!stream.service) {
-                stream.service = this;
-            }
-            if (selector !== type) {
-                stream.selector = selector;
-            } else {
-                stream.selector = DataSelector.withTypeAndCriteria(type);
-            }
-            // Get the data from raw data or from a child service.
-            if (service === this) {
-                service.fetchRawData(stream);
-            } else if (service) {
-                stream = service.fetchData(stream.selector, stream);
-            } else {
-                console.warn("Can't fetch data of unknown type -", type.typeName + "/" + type.uuid);
-                stream.dataDone();
-            }
-            // Return the passed in or created stream.
             return stream;
         }
     },
 
     /***************************************************************************
-     * Raw data
+     * Fetching and modifying raw data
      *
      * These methods should only be called by the service itself. They are
      * typically overridden by subclasses to implement a service.
@@ -1070,12 +1194,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      */
     mapFromRawData: {
         value: function (object, data, context) {
-            var i;
+            var keys, i, n;
             if (this.mapping) {
                 this.mapping.mapFromRawData(object, data, context);
             } else if (data) {
-                for (i in data) {
-                    object[i] = data[i];
+                keys = Object.keys(data);
+                for (i = 0, n = keys.length; i < n; i += 1) {
+                    object[keys[i]] = data[keys[i]];
                 }
             }
         }
@@ -1160,7 +1285,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      */
     spliceWithArray: {
         value: function (array, insert, index, length) {
-            index = index || 0,
+            index = index || 0;
             length = length || length === 0 ? length : Infinity;
             return insert ? array.splice.apply(array, [index, length].concat(insert)) :
                             array.splice(index, length);

@@ -30,6 +30,28 @@ var DataProvider = require("logic/service/data-provider").DataProvider,
  */
 exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */{
 
+    /***************************************************************************
+     * Basic properties
+     */
+
+    /**
+     * The service responsible for this stream's data.
+     *
+     * @type {DataService}
+     */
+    service: {
+        value: undefined
+    },
+
+    /**
+     * The selector defining the data returned in this stream.
+     *
+     * @type {DataSelector}
+     */
+    selector: {
+        value: undefined
+    },
+
     _isDataDone: {
         value: false // Set in dataDone().
     },
@@ -52,23 +74,9 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */{
         }
     },
 
-    /**
-     * The service responsible for this stream's data.
-     *
-     * @type {DataService}
+    /***************************************************************************
+     * Receiving data (DataProvider)
      */
-    service: {
-        value: undefined
-    },
-
-    /**
-     * The selector defining the data returned in this stream.
-     *
-     * @type {DataSelector}
-     */
-    selector: {
-        value: undefined
-    },
 
     /**
      * All the objects that has been ever been added to the stream. Property
@@ -92,37 +100,9 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */{
         }
     },
 
-    /**
-     * Add some object to the stream's [data]{@link DataStream#data} array.
-     *
-     * @method
-     * @argument {Array} objects - An array of objects to add to the stream's
-     *                             data. If this array is empty or `undefined`,
-     *                             no objects are added.
+    /***************************************************************************
+     * Receiving data (Promise)
      */
-    addData: {
-        value: function (objects) {
-            if (objects && objects.length) {
-                this.data.push.apply(this.data, objects);
-            }
-        }
-    },
-
-    /**
-     * To be called when all the data expected by this stream has been added to
-     * its [data]{@link DataStream#data} array.
-     *
-     * @method
-     */
-    dataDone: {
-        value: function () {
-            this._isDataDone = true;
-            if (this._resolve) {
-                this._resolve(this.data);
-                this._resolve = null;
-            }
-        }
-    },
 
     /**
      * Method of the [Promise]{@linkcode external:Promise} class used to
@@ -165,6 +145,42 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */{
     catch: {
         value: function (onRejected) {
             return this._promise.catch(onRejected);
+        }
+    },
+
+    /***************************************************************************
+     * Adding data
+     */
+
+    /**
+     * Add some object to the stream's [data]{@link DataStream#data} array.
+     *
+     * @method
+     * @argument {Array} objects - An array of objects to add to the stream's
+     *                             data. If this array is empty or `undefined`,
+     *                             no objects are added.
+     */
+    addData: {
+        value: function (objects) {
+            if (objects && objects.length) {
+                this.data.push.apply(this.data, objects);
+            }
+        }
+    },
+
+    /**
+     * To be called when all the data expected by this stream has been added to
+     * its [data]{@link DataStream#data} array.
+     *
+     * @method
+     */
+    dataDone: {
+        value: function () {
+            this._isDataDone = true;
+            if (this._resolve) {
+                this._resolve(this.data);
+                this._resolve = null;
+            }
         }
     }
 
