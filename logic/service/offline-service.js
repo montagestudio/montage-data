@@ -47,6 +47,26 @@ exports.OfflineService = DataService.specialize(/** @lends OfflineService.protot
      */
 
     /**
+     * @method
+     */
+    saveDataObject: {
+        value: function (object) {
+            this._journal.push({action: DataService.prototype.saveDataObject, object: object});
+            return this.nullPromise;
+        }
+    },
+
+    /**
+     * @method
+     */
+    deleteDataObject: {
+        value: function (object) {
+            this._journal.push({action: DataService.prototype.deleteDataObject, object: object});
+            return this.nullPromise;
+        }
+    },
+
+    /**
      * @private
      * @type {Array.<Object>}
      */
@@ -68,24 +88,6 @@ exports.OfflineService = DataService.specialize(/** @lends OfflineService.protot
                     self._applyJournaledChanges();
                 });
             }
-        }
-    },
-
-    /**
-     * @method
-     */
-    saveDataObject: {
-        value: function (object) {
-            this._journal.push({action: DataService.prototype.saveDataObject, object: object});
-        }
-    },
-
-    /**
-     * @method
-     */
-    deleteDataObject: {
-        value: function (object) {
-            this._journal.push({action: DataService.prototype.deleteDataObject, object: object});
         }
     },
 
