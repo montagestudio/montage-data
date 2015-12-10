@@ -82,8 +82,9 @@ exports.OfflineService = DataService.specialize(/** @lends OfflineService.protot
     _applyJournaledChanges: {
         value: function () {
             var self = this,
-                entry = this.isOnline && this._journal.length && this._journal[0];
+                entry = !this.isOffline && this._journal.length && this._journal[0];
             if (entry) {
+                this._journal.splice(0, 1);
                 entry.action.call(this.rootService, entry.object).then(function () {
                     self._applyJournaledChanges();
                 });
