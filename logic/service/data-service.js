@@ -132,8 +132,15 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
             request.onerror = self._setOfflineToTrue;
             request.onload = self._setOfflineToFalse;
             request.ontimeout = self._setOfflineToTrue;
-            request.open("GET", "http://emopstest.pdc.org/emops/assets/pdc/version.html", true);
+            request.open("GET", self._offlinePollUrl, true);
             request.send();
+        }
+    },
+
+    _offlinePollUrl: {
+        get: function () {
+            var random = Math.floor(Math.random() * 10000000000000000000);
+            return "http://emopstest.pdc.org/emops/assets/pdc/version.html?r=" + random;
         }
     },
 
