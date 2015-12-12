@@ -101,7 +101,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
         get: function () {
             if (this._isRootService && this._isOffline === undefined) {
                 this._isOffline = false;
-                window.setInterval(this._offlinePoll, 2000, this);
+                window.setInterval(this._offlinePolling, 2000, this);
             }
             return this._isRootService ? this._isOffline : this.rootService.isOffline;
         },
@@ -125,22 +125,22 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
         }
     },
 
-    _offlinePoll: {
+    _offlinePolling: {
         value: function (self) {
             var request = new XMLHttpRequest();
             request.timeout = 15000;
             request.onerror = self._setOfflineToTrue;
             request.onload = self._setOfflineToFalse;
             request.ontimeout = self._setOfflineToTrue;
-            request.open("GET", self._offlinePollUrl, true);
+            request.open("GET", self._offlinePollingUrl, true);
             request.send();
         }
     },
 
-    _offlinePollUrl: {
+    _offlinePollingUrl: {
         get: function () {
             var random = Math.floor(Math.random() * 10000000000000000000);
-            return "http://emopstest.pdc.org/emops/assets/pdc/version.html?r=" + random;
+            return "https://avatars0.githubusercontent.com/u/1391764?s=1&_=" + random;
         }
     },
 
@@ -466,7 +466,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      */
     _firstServiceForObject: {
         value: function (object) {
-            return this._firstServiceForType(this.rootService._getObjectType(object));
+            return this._firstServiceForType(this.rootService.getObjectType(object));
         }
     },
 
@@ -556,9 +556,12 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      */
     saveDataObject: {
         value: function (object) {
+            var self = this;
             return !this._isRootService ? this.saveRawData(this._toRawData(object), object) :
                    this.isOffline ?       this._offlineService.saveDataObject(object) :
-                                          this._firstServiceForObject(object).saveDataObject(object);
+                                          this._firstServiceForObject(object).saveDataObject(object).then(function () {
+                                              self.createdDataObjects.delete(object);
+                                          });
         }
     },
 
@@ -572,9 +575,12 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      */
     deleteDataObject: {
         value: function (object) {
+            var self = this;
             return !this._isRootService ? this.deleteRawData(this._toRawData(object), object) :
-                   this.isOffline ?       this._offlineService.saveDataObject(object) :
-                                          this._firstServiceForObject(object).saveDataObject(object);
+                   this.isOffline ?       this._offlineService.deleteDataObject(object) :
+                                          this._firstServiceForObject(object).deleteDataObject(object).then(function () {
+                                              self.createdDataObjects.delete(object);
+                                          });
         }
     },
 
@@ -663,7 +669,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
         value: function (object) {
             var triggers, type;
             if (this._isRootService) {
-                type = this._getObjectType(object);
+                type = this.getObjectType(object);
                 triggers = type && this.__dataObjectTriggers && this.__dataObjectTriggers.get(type);
             }
             return triggers;
@@ -687,7 +693,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      * @returns {DataObjectDescriptor} - The type of the object, or undefined if
      * no type can be determined.
      */
-    _getObjectType: {
+    getObjectType: {
         value: function (object) {
             var type;
             if (this._isRootService) {
@@ -718,7 +724,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
      */
     _registerObjectType: {
         value: function (object, type) {
-            if (this._isRootService && this._getObjectType(object) !== type){
+            if (this._isRootService && this.getObjectType(object) !== type){
                 this._typeRegistry = this._typeRegistry || new WeakMap();
                 this._typeRegistry.set(object, type);
             }
@@ -805,6 +811,26 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
     /***************************************************************************
      * Obtaining data object property values
      */
+
+    /**
+     * @todo Rename and document API and implementation.
+     *
+     * @method
+     */
+    decacheObjectProperties: {
+        value: function (object, propertyNames) {
+            var names = Array.isArray(propertyNames) ? propertyNames : arguments,
+                start = names === propertyNames ? 0 : 1,
+                triggers = this._getTriggersForObject(object),
+                trigger, i, n;
+            for (i = start, n = names.length; i < n; i += 1) {
+                trigger = triggers && triggers[names[i]];
+                if (trigger) {
+                    trigger.decacheObjectProperty(object);
+                }
+            }
+        }
+    },
 
     /**
      * Request possibly asynchronous values of a data object's properties. These

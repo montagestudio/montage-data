@@ -188,8 +188,10 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
         value: function (object, status) {
             if (this._isGlobal) {
                 this._valueStatus = status;
-            } else {
+            } else if (status !== undefined) {
                 this._valueStatus.set(object, status);
+            } else {
+                this._valueStatus.delete(object);
             }
         }
     },
@@ -266,6 +268,16 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
         }
      },
 
+    /**
+     * @todo Rename and document API and implementation.
+     *
+     * @method
+     */
+    decacheObjectProperty: {
+        value: function (object) {
+            this._setValueStatus(object, undefined);
+        }
+    },
     /**
      * Request a fetch of the value of this trigger's property for the
      * specified object but only if that data isn't already in the process

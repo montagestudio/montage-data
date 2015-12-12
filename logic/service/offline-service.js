@@ -99,19 +99,19 @@ exports.OfflineService = DataService.specialize(/** @lends OfflineService.protot
     /*
      * @method
      */
-    didFetchData: {
-        value: function (stream) {
-            // console.log("didFetch " + stream.selector.type.typeName, stream.selector.criteria, stream.data);
+    fetchData: {
+        value: function (selector, stream) {
+            // console.log("fetch " + selector.type.typeName, selector.criteria);
+            stream.dataDone();
         }
     },
 
     /*
      * @method
      */
-    fetchData: {
-        value: function (selector, stream) {
-            // console.log("fetch " + selector.type.typeName, selector.criteria);
-            stream.dataDone();
+    didFetchData: {
+        value: function (stream) {
+            // console.log("didFetch " + stream.selector.type.typeName, stream.selector.criteria, stream.data);
         }
     }
 
