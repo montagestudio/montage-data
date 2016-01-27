@@ -86,13 +86,13 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
 
     fetchHttpRawData: {
         value: function (types, url, headers, body) {
-            return this._fetchHttpRawData(this._parseSendHttpRequestArguments(arguments), true);
+            return this._fetchHttpRawData(this._parseFetchHttpRawDataArguments(arguments), true);
         }
     },
 
     fetchHttpRawDataWithoutCredentials: {
         value: function (types, url, headers, body) {
-            return this._fetchHttpRawData(this._parseSendHttpRequestArguments(arguments), false);
+            return this._fetchHttpRawData(this._parseFetchHttpRawDataArguments(arguments), false);
         }
     },
 
@@ -141,7 +141,7 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
         }
     },
 
-    _parseSendHttpRequestArguments: {
+    _parseFetchHttpRawDataArguments: {
         value: function (arguments) {
             var types, offset, i, n;
             // The type array is the first argument if that's an array, or an
@@ -154,12 +154,14 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
                     offset = i - 1;
                 }
             }
-            // The remaining argument values come from the remaining arguments.
+            // The remaining argument values come from the remaining arguments,
+            // with offset undefined here if and only if the first argument was
+            // a types array.
             return {
                 types:   types.length ? types : [this.constructor.DataType.JSON],
-                url:     arguments[1 + offset || 0],
-                headers: arguments[2 + offset || 1] || {},
-                body:    arguments[3 + offset || 2]
+                url:     arguments[1 + (offset || 0)],
+                headers: arguments[2 + (offset || 0)] || {},
+                body:    arguments[3 + (offset || 0)]
             };
         }
     },
