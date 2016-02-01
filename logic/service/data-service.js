@@ -48,7 +48,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
                 if(this.providesAuthorization) {
                     DataService.authorizationManager.registerAuthorizationService(this);
                 }
-                if(this.authorizationPolicy === AuthorizationPolicyType.OnDemandAuthorizationPolicy) {
+                if(this.authorizationPolicy === AuthorizationPolicyType.UpfrontAuthorizationPolicy) {
                     DataService.authorizationManager.authorizeService(this).then(function(authorization) {
 
                     });
