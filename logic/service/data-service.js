@@ -6,7 +6,24 @@ var Montage = require("montage").Montage,
     Map = require("collections/map"),
     Promise = require("bluebird"),
     Set = require("collections/set"),
-    WeakMap = require("collections/weak-map");
+    WeakMap = require("collections/weak-map"),
+    Enum = require("montage/core/enum").Enum,
+    AuthorizationPolicyType = new Enum().initWithMembers("NoAuthorizationPolicy","UpfrontAuthorizationPolicy","OnFirstFetchAuthorizationPolicy","OnDemandAuthorizationPolicy"),
+    AuthorizationManager = require("logic/service/authorization-manager").AuthorizationManager;
+
+    /**
+     * AuthorizationPolicyType
+     *
+     * UpfrontAuthorizationPolicy
+     *      Authorization is asked upfront, immediately after data service is created / launch of an app.
+     *
+     * UpfrontAuthorizationPolicy
+     *      Authorization is required when a request fails because of lack of authorization.
+     *      This is likely to be a good strategy for DataServices that offer data to
+     *   both anonymous and authorized .
+     *
+     */
+
 
 /**
  * Provides data objects and potentially manages changes to them.
@@ -18,16 +35,25 @@ var Montage = require("montage").Montage,
  * @class
  * @extends external:Montage
  */
-exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
+var DataService = exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
 
     /***************************************************************************
      * Initialization
      */
 
     constructor: {
-        value: function () {
+        value: function DataService() {
             if (!exports.DataService.mainService) {
                 exports.DataService.registerService(this);
+                if(this.providesAuthorization) {
+                    DataService.authorizationManager.registerAuthorizationService(this);
+                }
+                if(this.authorizationPolicy === AuthorizationPolicyType.OnDemandAuthorizationPolicy) {
+                    DataService.authorizationManager.authorizeService(this).then(function(authorization) {
+
+                    });
+                }
+
             }
         }
     },
@@ -1323,6 +1349,34 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
             return insert ? array.splice.apply(array, [index, length].concat(insert)) :
                             array.splice(index, length);
         }
+    },
+
+    /**
+     * indicate wether a service can provide user-level authorization to its data.
+     * Defaults to false. Concrete services need to override this as needed.
+     * @returns {boolean}
+     */
+    providesAuthorization: {
+        value: false
+    },
+
+    /**
+     * Returns the list of DataServices a sevice accepts to provide authorization on its behalf.
+     * If an array has multiple authorizationServices, the final choice will be up to the App user regarding which one to use.
+     * This array is expected to return moduleIds, not objects, allowing the AuthorizationManager to manage unicity
+     *
+     * @returns [{moduleId}]
+     */
+    authorizationServices: {
+        value: null
+    },
+
+    /**
+     * Returns the AuthorizationPolicyType used by this DataService.
+     * @returns {AuthorizationPolicyType}
+     */
+    authorizationPolicy: {
+        value: AuthorizationPolicyType.NoAuthorizationPolicy
     }
 
 }, /** @lends DataService */ {
@@ -1387,6 +1441,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
         value: function (service) {
             this._mainService = service;
         }
+    },
+
+    "AuthorizationPolicyType": {
+        value: AuthorizationPolicyType
+    },
+    authorizationManager: {
+        value: AuthorizationManager
     }
 
 });

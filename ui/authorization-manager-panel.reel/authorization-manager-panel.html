@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <link rel="stylesheet" type="text/css" href="authorization-manager-panel.css">
+    <script type="text/montage-serialization">
+    {
+        "owner": {
+            "properties": {
+                "element": {"#": "main"}
+            }
+        },
+        "authorizationPanels": {
+            "prototype": "montage/ui/repetition.reel",
+            "properties": {
+                "element": {"#": "authorizationPanels"},
+            },
+            "bindings": {
+                "content": { "<-": "@owner.authorizationPanels" }
+            }
+
+        },
+        "authorizationPanelSlot": {
+            "prototype": "montage/ui/slot.reel",
+            "properties": {
+                "element": {"#": "authorizationPanelSlot"}
+            },
+            "bindings": {
+                "content": { "<-": "@authorizationPanels:iteration.object" }
+            }
+        }
+    </script>
+</head>
+<body>
+    <div data-montage-id="main" class="Main">
+        <div data-montage-id="authorizationPanels" class="">
+            <div data-montage-id="authorizationPanelSlot" class=""></div>
+        </div>
+    </div>
+</body>
+</html>
