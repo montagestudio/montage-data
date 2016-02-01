@@ -7,13 +7,13 @@
     {
         "owner": {
             "properties": {
-                "element": {"#": "main"}
+                "element": {"#": "authorization-manager-panel"}
             }
         },
         "authorizationPanels": {
             "prototype": "montage/ui/repetition.reel",
             "properties": {
-                "element": {"#": "authorizationPanels"},
+                "element": {"#": "authorizationPanels"}
             },
             "bindings": {
                 "content": { "<-": "@owner.authorizationPanels" }
@@ -29,10 +29,11 @@
                 "content": { "<-": "@authorizationPanels:iteration.object" }
             }
         }
+    }
     </script>
 </head>
 <body>
-    <div data-montage-id="main" class="Main">
+    <div data-montage-id="authorization-manager-panel" class="AuthorizationManagerPanel">
         <div data-montage-id="authorizationPanels" class="">
             <div data-montage-id="authorizationPanelSlot" class=""></div>
         </div>

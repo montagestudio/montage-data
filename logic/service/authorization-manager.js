@@ -25,6 +25,7 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
 
             this._registeredAuthorizationServicesByModuleId = new Map;
             this._registeredAuthorizationPanelsByModuleId = new Map;
+            this._dataServicesForAuthorizationPanels = new Map;
             return this;
         }
     },
@@ -94,21 +95,28 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
                         if(!iAuthorizationPanel) {
                             // Lookup if already created, else ....
                             var iPromise = mr.async(iAuthorizationPanelModuleId);
-                            // var iPromise = mr.async(iAuthorizationPanel).then(function (exports) {
-                            //         console.log("loaded ",iAuthorizationPanel,exports)
-                            //                     });
-
 
                             authorizationPanels.push(iPromise);
+                            this._dataServicesForAuthorizationPanels.set(iAuthorizationPanelModuleId,iService);
                         }
                         else {
                             authorizationPanels.push(Promise.resolve(iAuthorizationPanel));
+                            this._dataServicesForAuthorizationPanels.set(iAuthorizationPanel,iService);
+
                         }
 
                     }
                     Promise.all(authorizationPanels).bind(this).then(function(authorizationPanelExports) {
                         console.log("loaded ",authorizationPanelExports);
-                        var i, countI, iAuthorizationPanelExport, iAuthorizationPanel, authorizationPanels = [];
+                        var i,
+                            countI,
+                            iAuthorizationPanelExport,
+                            iAuthorizationPanel,
+                            iAuthorizationPanelConstructor,
+                            authorizationPanels = [],
+                            iAuthorizationPanelInfo
+                            iService;
+
                         for(i=0, countI = authorizationPanelExports.length; i<countI; i++) {
                             iAuthorizationPanelExport = authorizationPanelExports[i];
 
@@ -116,9 +124,17 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
                             //We need to be smarter about this as there could be multiple symbols on
                             //an exports, for now we take the first one.
                             for(var key in iAuthorizationPanelExport) {
-                                iAuthorizationPanel = iAuthorizationPanelExport[key];
+                                iAuthorizationPanelConstructor = iAuthorizationPanelExport[key];
+                                iAuthorizationPanel = new iAuthorizationPanelConstructor;
+                                var iAuthorizationPanelInfo = Montage.getInfoForObject(iAuthorizationPanel);
+                                // WEAKNESS: The FreeNAS service returned a moduleId of "/ui/sign-in.reel", which worked to load
+                                // but the info conained "ui/sign-in.reel", causing the lookup to fail. We need to be careful and
+                                // investigate a possible solution.
+                                iService = this._dataServicesForAuthorizationPanels.get(iAuthorizationPanelInfo.moduleId);
+                                this._dataServicesForAuthorizationPanels.set(iAuthorizationPanel,iService);
+                                iAuthorizationPanel.dataService = iService;
                                 // We need to cache/lookup if we already have one like that.
-                                authorizationPanels.push(new iAuthorizationPanel);
+                                authorizationPanels.push(iAuthorizationPanel);
                                 break;
                             }
                             console.log("iAuthorizationPanel ",iAuthorizationPanel);
