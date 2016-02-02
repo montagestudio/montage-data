@@ -26,10 +26,14 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
             this._registeredAuthorizationServicesByModuleId = new Map;
             this._registeredAuthorizationPanelsByModuleId = new Map;
             this._dataServicesForAuthorizationPanels = new Map;
+            this._pendingAuthorizationServices = [];
             return this;
         }
     },
     delegate: {
+        value: null
+    },
+    pendingAuthorizationServices: {
         value: null
     },
     authorizationManagerPanel: {
@@ -48,6 +52,26 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
 
         }
     },
+    /**
+     * Takes care of obtaining authorization for a DataService. Returns a promis of Authorization
+     *
+     * TODO:
+     * 1. Handle repeated calls: if a DataService authorizes on-demand it's likelily
+     * it would come from fetching data. Multiple independent fetches could trigger repeated
+     * attempts to authorize: The promise should be cached and returned when pending.
+     *
+     * TODO:
+     * 2. A service could require mandatory authorization from 2 dataService, right now it's implemented
+     * in a way that we extect user to make a choice in one of aDataService.authorizationServices,
+     * not a combination of. We need another sturcture to represent that.
+     *
+     * TODO
+     * right now, Promises for existing objects are resolved, meaning that the loops could see different
+     * types of objects coming in. Existing objects could be just added to array filled after the Promise.all().then..
+     *
+     * @method
+     */
+
     authorizeService : {
         value: function(aDataService) {
             var self = this;
@@ -63,9 +87,7 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
 
                     //Looks like we don't have that service yet, we need to load it.
                     if(!iService) {
-                        var iPromise = new Promise(function(resolve, reject) {
-                            // TODO FIXME
-                        });
+                        var iPromise = mr.async(iServiceModuleId);
                         authorizationServices[i] = iPromise;
 
                     }
@@ -155,7 +177,7 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
 
                                 authorizationManagerPanelModuleId = self.callDelegateMethod("authorizationManagerWillLoadAuthorizationManagerPanel", self, authorizationManagerPanelModuleId) || authorizationManagerPanelModuleId;
 
-                                mr.async(authorizationManagerPanelModuleId).bind(this).then(function (exports) {
+                                mr.async(authorizationManagerPanelModuleId).bind(self).then(function (exports) {
                                         var AuthorizationManagerPanel = exports.AuthorizationManagerPanel;
                                         this.authorizationManagerPanel = new AuthorizationManagerPanel();
                                         console.log("this.authorizationManagerPanel is ",this.authorizationManagerPanel);
