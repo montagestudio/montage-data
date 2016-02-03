@@ -561,6 +561,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
                    this.isOffline ?       this._offlineService.saveDataObject(object) :
                                           this._firstServiceForObject(object).saveDataObject(object).then(function () {
                                               self.createdDataObjects.delete(object);
+                                              return null;
                                           });
         }
     },
@@ -580,6 +581,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
                    this.isOffline ?       this._offlineService.deleteDataObject(object) :
                                           this._firstServiceForObject(object).deleteDataObject(object).then(function () {
                                               self.createdDataObjects.delete(object);
+                                              return null;
                                           });
         }
     },
