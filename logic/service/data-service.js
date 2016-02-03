@@ -145,6 +145,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
     /*
      * @method
      */
+     //Benoit: name, really?!!
     isOfflineDidChange: {
         value: function (isOffline) {
             // Subclasses can overrride this.
