@@ -188,9 +188,11 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
         value: function () {
             var children = this.rootService._childServices.get(DataObjectDescriptor.ALL_TYPES),
                 offline, i, n;
-            for (i = 0, n = children.length; i < n && !offline; ++i) {
-                if (children[i].worksOffline) {
-                    offline = children[i];
+            if (children) {
+                for (i = 0, n = children.length; i < n && !offline; ++i) {
+                    if (children[i].worksOffline) {
+                        offline = children[i];
+                    }
                 }
             }
             return offline || null;
@@ -1082,9 +1084,11 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */{
                 // Get the data from raw data.
                 if (service) {
                     service.fetchRawData(stream);
-                    stream.then(function () {
-                        offline.didFetchData(stream);
-                    });
+                    if (offline) {
+                        stream.then(function () {
+                            offline.didFetchData(stream);
+                        });
+                    }
                 } else if (offline) {
                     offline.fetchData(selector, stream);
                 } else {
