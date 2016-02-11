@@ -127,7 +127,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
         get: function () {
             if (this._isRootService && this._isOffline === undefined) {
                 this._isOffline = false;
-                window.setInterval(this._offlinePolling, 2000, this);
+                window.setInterval(this._offlinePolling, this.offlinePollingInterval, this);
             }
             return this._isRootService ? this._isOffline : this.rootService.isOffline;
         },
@@ -151,16 +151,36 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
             // Subclasses can overrride this.
         }
     },
+    offlinePollingInterval: {
+        value: 2000
+    },
+    __offlinePollingRequest: {
+        value: void 0
+    },
+    _offlinePollingRequest: {
+        get: function() {
+            if(!this.__offlinePollingRequest) {
+                var request = new XMLHttpRequest();
+                request.timeout = 15000;
+                request.onerror = this._setOfflineToTrue;
+                request.onload = this._setOfflineToFalse;
+                request.ontimeout = this._setOfflineToTrue;
+                this.__offlinePollingRequest = request;
+            }
+            return this.__offlinePollingRequest;
+        }
+    },
 
     _offlinePolling: {
         value: function (self) {
-            var request = new XMLHttpRequest();
-            request.timeout = 15000;
-            request.onerror = self._setOfflineToTrue;
-            request.onload = self._setOfflineToFalse;
-            request.ontimeout = self._setOfflineToTrue;
-            request.open("GET", self._offlinePollingUrl, true);
-            request.send();
+            if(typeof navigator.onLine === "boolean") {
+                this.isOffline = !navigator.onLine;
+            }
+            else {
+                request = self._offlinePollingRequest;
+                request.open("GET", self._offlinePollingUrl, true);
+                request.send();
+            }
         }
     },
 
