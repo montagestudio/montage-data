@@ -36,10 +36,21 @@
         };
     </script>
 
-    <!-- Load and run the tests. The run.js loaded here both defines the tests
-     !   and uses the runJasmine() function created above to run them. See
-     !   run.js for more details and to define tests. -->
-    <script src="node_modules/montage/packages/mr/bootstrap.js" data-module="run"></script>
+    <!-- Load and run the tests within Montage. The run.reel/run.js loaded here
+     !   both defines the tests and uses the runJasmine() function created above
+     !   to run them. Edit run.reel/run.js to define the tests. -->
+    <script src="node_modules/montage/montage.js"></script>
+    <script type="text/montage-serialization">
+    {
+        "owner": {
+            "prototype": "montage/ui/loader.reel",
+            "properties": {
+                "mainModule": "run.reel",
+                "mainName": "Run"
+            }
+        }
+    }
+    </script>
 </head>
 <body>
 </body>
