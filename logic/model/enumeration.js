@@ -62,6 +62,14 @@ var Montage = require("montage").Montage;
  *
  * @class
  * @extends external:Montage
+ *
+ * @todo [Charles] Simplify this extremely, notably by making enumerations
+ * instances of the Enumeration class instead of subclasses of it and by
+ * reworking the [getterFor()]{@link Enumeration.getterFor} constructor.
+ * @todo [Charles] Switch to initial-caps enumeration value names like "Spades"
+ * instead of all-caps names like "NAMES".
+ * @todo [Charles] Provide a "values" property to the enumeration similar to
+ * Java's "values()" Enum method.
  */
 exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
 
@@ -69,17 +77,23 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
      * Creates a new enumeration subclass with the specified attributes.
      *
      * @method
-     * @argument {?Array.<string>|?string} uniquePropertyNames
-     * @argument {?Array.<string>|...string} otherPropertyNames
-     * @argument {?Object} prototypeDescriptor
-     * @argument {?Object} constructorDescriptor
-     * @argument {?Object} constants
+     * @argument {Array.<string>|string} [uniquePropertyNames]
+     * @argument {Array.<string>|...string} [otherPropertyNames]
+     * @argument {Object} [prototypeDescriptor]
+     * @argument {Object} [constructorDescriptor]
+     * @argument {Object} [constants]
      * @returns {function()} - The created Enumeration subclass.
+     *
+     * @todo [Charles] Simplify this API, possibly by making
+     * "uniquePropertyNames", "otherPropertyNames", and "constants"
+     * properties of the derived instance, leaving "specialize()"
+     * to its "Montage.specialize()" API and meaning.
      */
     specialize: {
         value: function (uniquePropertyNames, otherPropertyNames,
-                         prototypeDescriptor, constructorDescriptor, constants) {
-            return this._specialize(this._parseSpecializeArguments(arguments));
+                         prototypeDescriptor, constructorDescriptor,
+                         constants) {
+            return this._specialize(this._parseSpecializeArguments.apply(this, arguments));
         }
     },
 
@@ -89,18 +103,23 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
      *
      * @method
      * @argument {string} key
-     * @argument {?Array.<string>|string} uniquePropertyNames
-     * @argument {?Array.<string>|...string} otherPropertyNames
-     * @argument {?Object} prototypeDescriptor
-     * @argument {?Object} constructorDescriptor
-     * @argument {?Object} constants
+     * @argument {Array.<string>|string} [uniquePropertyNames]
+     * @argument {Array.<string>|...string} [otherPropertyNames]
+     * @argument {Object} [prototypeDescriptor]
+     * @argument {Object} [constructorDescriptor]
+     * @argument {Object} [constants]
      * @returns {function()} - A getter that will create and cache the desired
      * Enumeration subclass.
+     *
+     * @todo [Charles] Simplify this API, replacing it with simpler
+     * methods like Enumeration.withNames(), Enumeration.withValues(),
+     * and Enumeration.withPrototypeAndValues().
      */
     getterFor: {
         value: function (key, uniquePropertyNames, otherPropertyNames,
-                         prototypeDescriptor, constructorDescriptor, constants) {
-            var specializeArguments = this._parseSpecializeArguments(arguments, 1);
+                         prototypeDescriptor, constructorDescriptor,
+                         constants) {
+            var specializeArguments = this._parseSpecializeArguments.apply(this, Array.prototype.slice.call(arguments, 1));
             // Return a function that will create the desired enumeration.
             return function () {
                 if (!this.hasOwnProperty(key)) {
@@ -112,12 +131,14 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
     },
 
     _parseSpecializeArguments: {
-        value: function (arguments, start) {
-            var unique, other, end, i, n;
+        value: function (/* uniquePropertyNames, otherPropertyNames,
+                         prototypeDescriptor, constructorDescriptor,
+                         constants */) {
+            var start, unique, other, end, i, n;
             // The unique property names array is the first argument if that's
             // an array, or an array containing the first argument if that's a
             // non-empty string, or an empty array.
-            start = start || 0;
+            start = 0;
             if (Array.isArray(arguments[start])) {
                 unique = arguments[start];
             } else if (typeof arguments[start] === "string" && arguments[start].length > 0) {
@@ -155,12 +176,12 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
      * @method
      */
     _specialize: {
-        value: function (arguments) {
-            var unique = arguments.uniquePropertyNames,
-                other = arguments.otherPropertyNames,
-                prototype = arguments.prototypeDescriptor,
-                constructor = arguments.constructorDescriptor,
-                constants = arguments.constantDescriptors,
+        value: function (parsed) {
+            var unique = parsed.uniquePropertyNames,
+                other = parsed.otherPropertyNames,
+                prototype = parsed.prototypeDescriptor,
+                constructor = parsed.constructorDescriptor,
+                constants = parsed.constantDescriptors,
                 enumeration, create, i;
             // Create the desired enumeration, including a constructor taking
             // only unique property values (like `withId()`), and if there are
@@ -253,32 +274,32 @@ exports.Enumeration = Montage.specialize({}, /** @lends Enumeration */ {
     },
 
     _parseCreateArguments: {
-        value: function(uniquePropertyNames, otherPropertyNames, arguments) {
+        value: function(uniquePropertyNames, otherPropertyNames, zArguments) {
             var count = uniquePropertyNames.length + otherPropertyNames.length;
             return {
-                propertyValues: Array.prototype.slice.call(arguments, 0, count),
-                propertyDescriptors: arguments[count] || {}
+                propertyValues: Array.prototype.slice.call(zArguments, 0, count),
+                propertyDescriptors: zArguments[count] || {}
             };
         }
     },
 
     _create: {
-        value: function(type, uniquePropertyNames, otherPropertyNames, arguments) {
+        value: function(type, uniquePropertyNames, otherPropertyNames, zArguments) {
             var instance, name, i, m, n;
             // Create the instance.
             instance = new type();
             // Add to the instance the properties specified in the descriptor.
-            Montage.defineProperties(instance, arguments.propertyDescriptors);
+            Montage.defineProperties(instance, zArguments.propertyDescriptors);
             // Add to the instance the property values specified.
             for (i = 0, n = uniquePropertyNames.length, m = otherPropertyNames.length; i < n + m; i += 1) {
                 name = i < n ? uniquePropertyNames[i] : otherPropertyNames[i - n];
-                instance[name] = arguments.propertyValues[i];
+                instance[name] = zArguments.propertyValues[i];
             }
             // Record the instance in the appropriate lookup maps.
             for (i = 0, n = uniquePropertyNames.length; i < n; i += 1) {
                 type._instances = type._instances || {};
                 type._instances[uniquePropertyNames[i]] = type._instances[uniquePropertyNames[i]] || {};
-                type._instances[uniquePropertyNames[i]][arguments.propertyValues[i]] = instance;
+                type._instances[uniquePropertyNames[i]][zArguments.propertyValues[i]] = instance;
             }
             // Return the created instance.
             return instance;

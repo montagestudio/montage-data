@@ -132,39 +132,29 @@ exports.ObjectDescriptor = Montage.specialize(/** @lends ObjectDescriptor.protot
      * descriptor.
      *
      * @method
-     * @argument {Object} exports                        - A Montage Require
-     *                                                     exports object
-     *                                                     defining the
-     *                                                     constructor for the
-     *                                                     object to describe.
-     *                                                     Usually this is
-     *                                                     `exports`.
-     * @argument {string} constructorName                - The name with which
-     *                                                     that constructor can
-     *                                                     be looked up in the
-     *                                                     exports. This will
-     *                                                     also be used as the
-     *                                                     name of the type
-     *                                                     defined by the
-     *                                                     created object
-     *                                                     descriptor.
-     * @argument {?Object<string, string>} propertyTypes - The types of each of
-     *                                                     the object's
-     *                                                     properties, by
-     *                                                     property name. If
-     *                                                     this is omitted the
-     *                                                     property information
-     *                                                     will be derived from
-     *                                                     the properties of the
-     *                                                     prototype of the
-     *                                                     described object.
+     * @argument {Object} exports         - A
+     *                                      [Montage Require]{@link external:Require}
+     *                                      exports object defining the
+     *                                      constructor for the objects to
+     *                                      describe. Usually this is `exports`.
+     * @argument {string} constructorName - The name with which that constructor
+     *                                      can be looked up in the exports.
+     *                                      This will also be used as the
+     *                                      created descriptor's type name.
+     * @argument {Object<string, string>}
+     *           [propertyTypes]          - The types of each of the described
+     *                                      objects' properties, by property
+     *                                      name. If this is not specified the
+     *                                      property information will be derived
+     *                                      from the properties of the objects'
+     *                                      prototype.
      */
     getterFor: {
         value: function (exports, constructorName, propertyTypes) {
             // The returned getter function has to check
-            // `this.hasOwnProperty("_type")`, not just `this._type`, because if
+            // `this.hasOwnProperty("_TYPE")`, not just `this._TYPE`, because if
             // the class using the getter is a subclass of another class using a
-            // similar getter `this._type` will return the value of the the
+            // similar getter `this._TYPE` will return the value of the the
             // superclass type instead of the desired subclass type.
             var self = this;
             return function () {

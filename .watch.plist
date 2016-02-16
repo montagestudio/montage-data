@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.montagestudio.montagedata.watch</string>
+	<key>Program</key>
+	<string>/absolute/path/to/montage-data/.watch.sh</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/absolute/path/to/montage-data/.watch.sh</string>
+	</array>
+	<key>WatchPaths</key>
+	<array>
+		<string>/absolute/path/to/montage-data/logic/model</string>
+		<string>/absolute/path/to/montage-data/logic/service</string>
+	</array>
+	<key>ThrottleInterval</key>
+	<integer>1</integer>
+</dict>
+</plist>

@@ -42,6 +42,7 @@ exports.DataMapping = Montage.specialize(/** @lends DataMapping.prototype */{
      */
     mapFromRawData: {
         value: function (object, data, context) {
+            var key;
             if (data) {
                 for (key in data) {
                     object[key] = data[key]

@@ -2,12 +2,10 @@
 // Types
 
 /**
- * An object that represents an operation that may not have completed yet but
- * this is expected to complete in the future if it's not already completed, and
- * that yields a value when it's completed.
+ * The Montage framework enumeration type.
  *
- * @external Promise
- * @see {@linkcode https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise}
+ * @external Enum
+ * @see {@linkcode http://docs.montagestudio.com/api/Enum.html}
  */
 
 /**
@@ -15,6 +13,15 @@
  *
  * @external Montage
  * @see {@linkcode http://docs.montagestudio.com/api/Montage.html}
+ */
+
+/**
+ * An object that represents an operation that may not have completed yet but
+ * this is expected to complete in the future if it's not already completed, and
+ * that yields a value when it's completed.
+ *
+ * @external Promise
+ * @see {@linkcode https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise}
  */
 
 /**
@@ -56,8 +63,8 @@
  */
 
 /**
- * A well defined set of properties and methods that can be found in objects
- * that adhere to it. Sometimes incorrectly called an interface.
+ * A well defined set of properties, methods, and behaviors that can be found in
+ * objects that adhere to it. Sometimes incorrectly called an interface.
  *
  * @external Protocol
  * @see {@linkplain https://en.wikipedia.org/wiki/Protocol_(object-oriented_programming)}
@@ -69,6 +76,13 @@
  *
  * @external RangeChangeListener
  * @see {@linkplain http://www.collectionsjs.com/method/add-range-change-listener}
+ */
+
+/**
+ * A CommonJS module system for the front-end.
+ *
+ * @external Require
+ * @see {@linkplain https://github.com/montagejs/mr}
  */
 
 /**

@@ -40,3 +40,4 @@ var Authorization = exports.Authorization = Montage.specialize(/** @lends Author
       "created_at": "2011-09-06T17:26:27Z",
       "fingerprint": "jklmnop12345678"
     }
+*/

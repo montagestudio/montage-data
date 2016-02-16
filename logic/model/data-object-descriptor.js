@@ -79,9 +79,11 @@ exports.DataObjectDescriptor = ObjectDescriptor.specialize(/** @lends DataObject
     _addRelationships: {
         value: function (relationships) {
             var names, i, n;
-            names = Object.keys(relationships);
-            for (i = 0, n = names.length; i < n; i += 1) {
-                this._addRelationship(names[i], relationships[names[i]]);
+            if (relationships) {
+                names = Object.keys(relationships);
+                for (i = 0, n = names.length; i < n; i += 1) {
+                    this._addRelationship(names[i], relationships[names[i]]);
+                }
             }
         }
     },
@@ -124,43 +126,64 @@ exports.DataObjectDescriptor = ObjectDescriptor.specialize(/** @lends DataObject
      * descriptor.
      *
      * @method
-     * @argument {Object} exports                        - A Montage Require
-     *                                                     exports object
-     *                                                     defining the
-     *                                                     constructor for the
-     *                                                     object to describe.
-     *                                                     Usually this is
-     *                                                     `exports`.
-     * @argument {string} constructorName                - The name with which
-     *                                                     that constructor can
-     *                                                     be looked up in the
-     *                                                     exports. This will
-     *                                                     also be used as the
-     *                                                     name of the type
-     *                                                     defined by the
-     *                                                     created object
-     *                                                     descriptor.
-     * @argument {?Object<string, string>} propertyTypes - The types of each of
-     *                                                     the object's
-     *                                                     properties, by
-     *                                                     property name. If
-     *                                                     this is omitted the
-     *                                                     property information
-     *                                                     will be derived from
-     *                                                     the properties of the
-     *                                                     prototype of the
-     *                                                     described object.
+     * @argument {Object} exports             - A
+     *                                          [Montage Require]{@link external:Require}
+     *                                          exports object defining the
+     *                                          constructor for the object to
+     *                                          describe. Usually this is
+     *                                          `exports`.
+     * @argument {string} constructorName     - The name with which that
+     *                                          constructor can be looked up in
+     *                                          the exports. This will also be
+     *                                          used as the created descriptor's
+     *                                          type name.
+     * @argument {Object<string, string>}
+     *           [propertyTypes]              - The types of each of the
+     *                                          described objects' properties,
+     *                                          by property name. Optional
+     *                                          except if identifier names or
+     *                                          relationship information are to
+     *                                          be specified. Pass in a null
+     *                                          or undefined value to specify
+     *                                          identifier names or relationship
+     *                                          information but no property
+     *                                          types. If no types array is
+     *                                          specified the property
+     *                                          information will be derived from
+     *                                          the properties of the objects'
+     *                                          prototype. If an empty types
+     *                                          array is specified the objects
+     *                                          will be assumed to have no
+     *                                          properties.
+     * @argument {Array.<string>}
+     *           [identifierNames=[]]         - The names of the properties of
+     *                                          described objects whose values,
+     *                                          when taken together, define
+     *                                          a unique identifier for each
+     *                                          such object. If no names are
+     *                                          specified those objects are
+     *                                          assumed to not be uniquely
+     *                                          identifiable. The names can be
+     *                                          specified as an array or as a
+     *                                          sequence of strings.
+     * @argument {Object<string, Object>}
+     *           [relationshipInformation={}] - Information about each of the
+     *                                          objects' relationships, by
+     *                                          relationship property name. If
+     *                                          no information is provided the
+     *                                          objects are assumed to have no
+     *                                          relationships.
      */
     getterFor: {
-        value: function (exports, constructorName, propertyTypes, identifierNames, relationships) {
+        value: function (exports, constructorName, propertyTypes, identifierNames, relationshipInformation) {
             // The returned getter function has to check
-            // `this.hasOwnProperty("_type")`, not just `this._type`, because if
+            // `this.hasOwnProperty("_TYPE")`, not just `this._TYPE`, because if
             // the class using the getter is a subclass of another class using a
-            // similar getter `this._type` will return the value of the the
+            // similar getter `this._TYPE` will return the value of the the
             // superclass type instead of the desired subclass type.
             var self = this,
-                parsed = self._parseGetterForArguments(arguments),
-                getter = ObjectDescriptor.getterFor.call(self, parsed.exports, parsed.name, parsed.types);
+                parsed = this._parseGetterForArguments.apply(this, arguments),
+                getter = ObjectDescriptor.getterFor.call(this, parsed.exports, parsed.name, parsed.types);
             return function () {
                 if (!this.hasOwnProperty("_TYPE")) {
                     this._TYPE = getter.call(this);
@@ -177,31 +200,39 @@ exports.DataObjectDescriptor = ObjectDescriptor.specialize(/** @lends DataObject
      * @method
      */
     _parseGetterForArguments: {
-        value: function (arguments) {
-            var types, identifiers, offset, i, n;
-            // The types map is the third argument if it's a non-array
-            // non-string non-numeric non-boolean object and if it's not the
-            // last argument.
-            types = arguments.length > 3 && this._isObject(arguments[2]) && arguments[2];
-            offset = types ? 0 : -1;
-            // The identifier names array is the fourth argument if that's an array,
-            // or an array containing the fourth argument and all following ones
-            // that are strings if there are any, or an empty array.
-            identifiers = Array.isArray(arguments[offset + 3]) && arguments[offset + 3];
-            for (i = offset + 3, n = arguments.length; !identifiers; i += 1) {
-                if (i === n || typeof arguments[i] !== "string") {
-                    identifiers = Array.prototype.slice.call(arguments, offset + 3, i);
-                    offset = i - 4;
-                }
+        value: function (/* exports, constructorName, [propertyTypes,] identifierNames[, relationshipInformation]
+                            exports, constructorName, [propertyTypes,] relationshipInformation
+                            exports, constructorName */) {
+            var parsed, index, i, n;
+            // Parse the exports object and constructor name.
+            parsed = {exports: arguments[0], name: arguments[1]};
+            // Parse the property types if they are provided: They must be a
+            // "real" object (non-array, non-string, non-numeric, and
+            // non-boolean), and they can't be the last argument (they must
+            // be followed by either an identifier name or a relationship
+            // information argument). After this parsing "index" will point to
+            // the next argument to parse.
+            if (arguments.length > 3 && this._isRealObject(arguments[2])) {
+                parsed.types = arguments[2];
+                index = 3;
+            } else {
+                index = 2;
             }
-            // The remaining argument values come from the remaining arguments.
-            return {
-                exports: arguments[0],
-                name: arguments[1],
-                types: types || undefined,
-                identifiers: identifiers,
-                relationships: arguments[offset + 4] || {}
-            };
+            // Parse the identifier names: If provided these will be in an array
+            // or in a sequence of string. After this parsing "index" will point
+            // to the next argument to parse.
+            if (Array.isArray(arguments[index])) {
+                parsed.identifiers = arguments[index];
+                index += 1;
+            } else {
+                for (i = index, n = arguments.length; i < n && typeof arguments[i] === "string"; i += 1);
+                parsed.identifiers = Array.prototype.slice.call(arguments, index, i);
+                index = i;
+            }
+            // Parse the relationship information.
+            parsed.relationships = arguments[index];
+            // Return the parsed arguments.
+            return parsed;
         }
     },
 
@@ -209,7 +240,7 @@ exports.DataObjectDescriptor = ObjectDescriptor.specialize(/** @lends DataObject
      * @private
      * @method
      */
-    _isObject: {
+    _isRealObject: {
         value: function (value) {
             return value &&
                    typeof value === "object" &&

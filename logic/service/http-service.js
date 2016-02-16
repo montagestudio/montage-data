@@ -1,3 +1,4 @@
+// Note: Bluebird promises are used even if ECMAScript 6 promises are available.
 var DataService = require("logic/service/data-service").DataService,
     DataSelector = require("logic/service/data-selector").DataSelector,
     Enumeration = require("logic/model/enumeration").Enumeration,
@@ -5,10 +6,15 @@ var DataService = require("logic/service/data-service").DataService,
     Promise = require("bluebird");
 
 /**
- * Provides utility methods for REST services.
+ * Superclass for services communicating using HTTP, usually REST services.
  *
  * @class
- * @extends external:DataService
+ */
+/*
+ * TODO: Restore @extends when parent class has been cleaned up to not provide
+ * so many unnecessary properties and methods.
+ *
+ * @extends DataService
  */
 exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */ {
 
@@ -16,6 +22,9 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
      * Constants
      */
 
+    /**
+     * @type {Object<string, string>}
+     */
     FORM_URL_ENCODED_CONTENT_TYPE_HEADER: {
         value: {"Content-Type": "application/x-www-form-urlencoded"}
     },
@@ -57,13 +66,16 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
                     self._setCachedFetchPromise(object, propertyName, null);
                     return data;
                 }));
-
             }
             // Return the created or cached fetch promise.
             return this._getCachedFetchPromise(object, propertyName);
         }
     },
 
+    /**
+     * @private
+     * @method
+     */
     _getCachedFetchPromise: {
         value: function (object, propertyName) {
             this._cachedFetchPromises = this._cachedFetchPromises || {};
@@ -72,6 +84,10 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
         }
     },
 
+    /**
+     * @private
+     * @method
+     */
     _setCachedFetchPromise: {
         value: function (object, propertyName, promise) {
             this._cachedFetchPromises = this._cachedFetchPromises || {};
@@ -81,44 +97,70 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
     },
 
     /***************************************************************************
-     * Sending requests
+     * Getting raw data
      */
 
+    /**
+     * Fetches raw data from an HTTP REST endpoint.
+     *
+     * @method
+     * @argument {String} url                        - The URL of the endpoint.
+     * @argument {Object<string, string>}
+     *           [headers={}]                        - HTTP header names and
+     *                                                 values. Optional except
+     *                                                 if a body or types are to
+     *                                                 be specified. Pass in an
+     *                                                 empty, null, or undefined
+     *                                                 header to specify a body
+     *                                                 or types but no header.
+     * @argument [body]                              - The body to send with the
+     *                                                 XMLHttpRequest. Optional
+     *                                                 except if types are to be
+     *                                                 specified. Pass in a null
+     *                                                 or undefined body to
+     *                                                 specify types but no
+     *                                                 body.
+     * @argument {Array<HttpService.DataType>}
+     *           [types=[HttpService.DataType.JSON]] - The possible types of
+     *                                                 the data expected in
+     *                                                 responses. These will
+     *                                                 be used to parse the
+     *                                                 response data. Currently
+     *                                                 only the first type is
+     *                                                 taken into account. The
+     *                                                 types can be specified as
+     *                                                 an array or as a sequence
+     *                                                 of
+     *                                                 [DataType]{@link HttpService.DataType}
+     *                                                 arguments.
+     * @argument {boolean} [sendCredentials=true]    - Determines whether
+     *                                                 credentials are sent with
+     *                                                 the request.
+     * @returns {external:Promise} - A promise settled when the fetch is
+     * complete. On success the promise will be fulfilled with the data returned
+     * from the fetch, parsed according to the specified or detaul types. On
+     * error the promise will be rejected with the error.
+     */
     fetchHttpRawData: {
-        value: function (types, url, headers, body) {
-            return this._fetchHttpRawData(this._parseFetchHttpRawDataArguments(arguments), true);
-        }
-    },
-
-    fetchHttpRawDataWithoutCredentials: {
-        value: function (types, url, headers, body) {
-            return this._fetchHttpRawData(this._parseFetchHttpRawDataArguments(arguments), false);
-        }
-    },
-
-    _fetchHttpRawData: {
-        value: function (arguments, useCredentials) {
+        value: function (url, headers, body, types, sendCredentials) {
             var self = this,
-                types = arguments.types,
-                url = arguments.url,
-                headers = arguments.headers,
-                body = arguments.body;
+                parsed = this._parseFetchHttpRawDataArguments.apply(this, arguments);
             return new Promise(function (resolve, reject) {
                 var request, name;
                 // Fetch the requested raw data.
-                // TODO: Reject the promise instead of returning null on error.
-                if (url) {
+                // TODO: Reject the promise for invalid arguments.
+                if (!parsed) {
+                    console.warn(new Error("Invalid arguments to fetchHttpRawData()"));
+                    resolve(null);
+                } if (parsed.url) {
                     request = new XMLHttpRequest();
                     request.onload = function () { resolve(request); };
-                    request.open(body ? "POST" : "GET", url, true);
-                    for (name in headers) {
-                        request.setRequestHeader(name, headers[name]);
+                    request.open(parsed.body ? "POST" : "GET", parsed.url, true);
+                    for (name in parsed.headers) {
+                        request.setRequestHeader(name, parsed.headers[name]);
                     }
-                    request.withCredentials = useCredentials;
-                    request.send(body);
-                } else {
-                    console.warn(new Error("Undefined REST URL"));
-                    resolve(null);
+                    request.withCredentials = parsed.credentials;
+                    request.send(parsed.body);
                 }
             }).then(function (request) {
                 // The response status can be 0 initially even for successful
@@ -127,45 +169,91 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
                 return self._makeEventLoopPromise(request);
             }).then(function (request) {
                 // Log a warning and return null for error status responses.
-                // TODO: Return a rejected promise instead of null on error.
+                // TODO: Reject the promise for error statuses.
                 if (request && request.status >= 300) {
-                    console.warn(new Error("Status " + request.status + " received for REST URL " + url));
+                    console.warn(new Error("Status " + request.status + " received for REST URL " + parsed.url));
                     request = null;
                 }
                 return request;
             }).then(function (request) {
-                // Parse the request response according to the requested type.
+                // Parse the request response according to the specified types.
                 // TODO: Support multiple alternate types.
-                return request && types[0].parseResponse(request, url);
+                return request && parsed.types[0].parseResponse(request, parsed.url);
             });
         }
     },
 
+    /**
+     * @private
+     * @method
+     */
     _parseFetchHttpRawDataArguments: {
-        value: function (arguments) {
-            var types, offset, i, n;
-            // The type array is the first argument if that's an array, or an
-            // array containing the first argument and all following ones that
-            // are HttpService DataTypes if there are any, or an empty array.
-            types = Array.isArray(arguments[0]) && arguments[0];
-            for (i = 0, n = arguments.length; !types; i += 1) {
-                if (i === n || !(arguments[i] instanceof exports.HttpService.DataType)) {
-                    types = Array.prototype.slice.call(arguments, 0, i);
-                    offset = i - 1;
+        value: function (/* url [, headers [, body [, types]]][, sendCredentials] */) {
+            var parsed, last, i, n;
+            // Parse the url argument, setting the "last" argument index to -1
+            // if the URL is invalid.
+            parsed = {url: arguments[0]};
+            last = typeof parsed.url === "string" ? arguments.length - 1 : -1;
+            if (last < 0) {
+                console.warn(new Error("Invalid URL for fetchHttpRawData()"));
+            }
+            // Parse the sendCredentials argument, which must be the last
+            // argument if it is provided, and set the "last" argument index to
+            // point just past the last non-sendCredentials argument.
+            parsed.credentials = last < 1 || arguments[last];
+            if (parsed.credentials instanceof Boolean) {
+                parsed.credentials = parsed.credentials.valueOf();
+            } else if (typeof parsed.credentials !== "boolean") {
+                parsed.credentials = true;
+                last += 1;
+            }
+            // Parse the headers argument, which cannot be a boolean.
+            parsed.headers = last > 1 && arguments[1] || {};
+            if (this._isBoolean(parsed.headers)) {
+                console.warn(new Error("Invalid headers for fetchHttpRawData()"));
+                last = -1;
+            }
+            // Parse the body argument, which cannot be a boolean.
+            if (last > 2 && arguments[2]) {
+                parsed.body = arguments[2];
+                if (this._isBoolean(parsed.body)) {
+                    console.warn(new Error("Invalid body for fetchHttpRawData()"));
+                    last = -1;
                 }
             }
-            // The remaining argument values come from the remaining arguments,
-            // with offset undefined here if and only if the first argument was
-            // a types array.
-            return {
-                types:   types.length ? types : [this.constructor.DataType.JSON],
-                url:     arguments[1 + (offset || 0)],
-                headers: arguments[2 + (offset || 0)] || {},
-                body:    arguments[3 + (offset || 0)]
-            };
+            // Parse the types, which can be provided as an array or as a
+            // sequence of DataType arguments.
+            if (last === 4 && Array.isArray(arguments[3])) {
+                parsed.types = arguments[3];
+            } else if (last < 4) {
+                parsed.types = [exports.HttpService.DataType.JSON];
+            } else {
+                for (i = 3, n = last; i < n && arguments[i] instanceof exports.HttpService.DataType; i += 1);
+                parsed.types = Array.prototype.slice.call(arguments, 3, i);
+                if (i < n) {
+                    console.warn(new Error("Invalid types for fetchHttpRawData()"));
+                    last = -1;
+                }
+            }
+            // Return the parsed arguments.
+            return last >= 0 ? parsed : undefined;
         }
     },
 
+    /**
+     * @private
+     * @method
+     */
+    _isBoolean: {
+        value: function (value) {
+            return typeof value === "boolean" || value instanceof Boolean;
+        }
+    },
+
+    /**
+     * @private
+     * @method
+     */
     _makeEventLoopPromise: {
         value: function (value) {
             return new Promise(function (resolve, reject) {
@@ -182,13 +270,22 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
      * Types
      */
 
+    /**
+     * @class
+     */
     DataType: {
-        get: Enumeration.getterFor("_DataType", {
+        get: Enumeration.getterFor("_DataType", /** @lends HttpService.DataType */ {
 
+            /**
+             * @type {DataType}
+             */
             BINARY: [{
                 // TO DO.
             }],
 
+            /**
+             * @type {DataType}
+             */
             JSON: [{
                 parseResponse: {
                     value: function (request, url) {
@@ -209,12 +306,15 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
                 }
             }],
 
+            /**
+             * @type {DataType}
+             */
             JSONP: [{
                 parseResponse: {
                     value: function (request, url) {
                         var text = request && request.responseText,
-                            start = text && text.indexOf("(") + 1;
-                            end = text && text.length && text.charAt(text.length - 1) === ")" && text.length - 1;
+                            start = text && text.indexOf("(") + 1,
+                            end = text && Math.max(text.lastIndexOf(")"), 0),
                             data = null;
                         if (start && end) {
                             try {
@@ -234,10 +334,16 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
                 }
             }],
 
+            /**
+             * @type {DataType}
+             */
             TEXT: [{
                 // TO DO.
             }],
 
+            /**
+             * @type {DataType}
+             */
             XML: [{
                 // TO DO.
             }]

@@ -1,3 +1,4 @@
+// Note: Bluebird promises are used even if ECMAScript 6 promises are available.
 var Montage = require("montage").Montage,
     DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
     DataSelector = require("logic/service/data-selector").DataSelector,
@@ -269,6 +270,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
     },
 
     /**
+     * @private
      * @type {boolean}
      */
     _isRootService: {
@@ -1415,6 +1417,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
     /**
      * A shared empty array.
      *
+     * @private
      * @type {Array}
      */
     _EMPTY_ARRAY: {

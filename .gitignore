@@ -13,6 +13,7 @@
 atlassian-ide-plugin.xml
 
 # Build and test generated files that shouldn't be committed.
+/.watch.log
 /builds
 /out
 TEST-*.xml

@@ -1,0 +1,8 @@
+[2016-01-14 Charles] Brief notes from a Montage Data source code review with
+  Benoit and Thibault:
+
+    - service nesting, main service created by default, no parent/child.
+    - requestData returns promise.
+    - DataSteam is not a promise any more.
+    - move delegating (used by mainService) functionality of DataService into a dedicated non-public subclass, maybe DelegatingDataService...
+    - should be able to deleteDataObject() an object created with createDataObject() and not yet saved with saveDataObject().
