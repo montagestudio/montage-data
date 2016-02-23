@@ -92,7 +92,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      * manage the same type of data and have the same priority, they will be
      * prioritized by the order in which they were added to their parent.
      *
-     * @type {Array.<DataObjectDescriptor>?}
+     * @type {number}
      */
     priority: {
         value: 100
@@ -103,7 +103,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      * to map the raw data on which this service is based to the data objects
      * returned by this service.
      *
-     * @type {Object?}
+     * @type {DataMapping}
      */
     mapping: {
         value: undefined
@@ -799,7 +799,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      * [root service][root service]{@link DataService#rootService}
      * of a service tree.
      *
-     * @type {Set<Object>}
+     * @type {Set.<Object>}
      */
     createdDataObjects: {
         get: function () {
@@ -824,7 +824,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      * [root service][root service]{@link DataService#rootService}
      * of a service tree.
      *
-     * @type {Set<Object>}
+     * @type {Set.<Object>}
      */
     changedDataObjects: {
         get: function () {
@@ -1383,7 +1383,8 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
     /**
      * indicate wether a service can provide user-level authorization to its data.
      * Defaults to false. Concrete services need to override this as needed.
-     * @returns {boolean}
+     *
+     * @type {boolean}
      */
     providesAuthorization: {
         value: false
@@ -1394,7 +1395,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      * If an array has multiple authorizationServices, the final choice will be up to the App user regarding which one to use.
      * This array is expected to return moduleIds, not objects, allowing the AuthorizationManager to manage unicity
      *
-     * @returns [{moduleId}]
+     * @type [{moduleId}]
      */
     authorizationServices: {
         value: null
@@ -1402,7 +1403,8 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
 
     /**
      * Returns the AuthorizationPolicyType used by this DataService.
-     * @returns {AuthorizationPolicyType}
+     *
+     * @type {AuthorizationPolicyType}
      */
     authorizationPolicy: {
         value: AuthorizationPolicyType.NoAuthorizationPolicy
@@ -1437,7 +1439,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      * of different types of data to child services specialized for each type.
      *
      * For this property to be correctly set
-     * [registerService()]{@link DataService.registerService] must be called at
+     * [registerService()]{@link DataService.registerService} must be called at
      * least once with a service that is either the main service or a descendent
      * of the main service.
      *
