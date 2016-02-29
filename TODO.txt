@@ -6,3 +6,6 @@
     - DataSteam is not a promise any more.
     - move delegating (used by mainService) functionality of DataService into a dedicated non-public subclass, maybe DelegatingDataService...
     - should be able to deleteDataObject() an object created with createDataObject() and not yet saved with saveDataObject().
+    - getDataObject() should return a promise to support asynchronous.
+    - createDataObject() should return a promise.
+    - getDataObject()

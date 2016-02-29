@@ -103,7 +103,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      * to map the raw data on which this service is based to the data objects
      * returned by this service.
      *
-     * @type {DataMapping}
+     * @type {?DataMapping}
      */
     mapping: {
         value: undefined
@@ -248,7 +248,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
     },
 
     /***************************************************************************
-     * Managing service trees
+     * Managing service hierarchies
      */
 
     /**
@@ -1322,11 +1322,65 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
     },
 
     /***************************************************************************
+     * Authorizing
+     */
+
+    /**
+     * indicate wether a service can provide user-level authorization to its
+     * data. Defaults to false. Concrete services need to override this as
+     * needed.
+     *
+     * @type {boolean}
+     */
+    providesAuthorization: {
+        value: false
+    },
+
+    /**
+     * Returns the list of DataServices a sevice accepts to provide
+     * authorization on its behalf. If an array has multiple
+     * authorizationServices, the final choice will be up to the App user
+     * regarding which one to use. This array is expected to return moduleIds,
+     * not objects, allowing the AuthorizationManager to manage unicity
+     *
+     * @type {moduleId}
+     */
+    authorizationServices: {
+        value: null
+    },
+
+    /**
+     * Returns the AuthorizationPolicyType used by this DataService.
+     *
+     * @type {AuthorizationPolicyType}
+     */
+    authorizationPolicy: {
+        value: AuthorizationPolicyType.NoAuthorizationPolicy
+    },
+
+    /***************************************************************************
      * Utilities
      */
 
     /**
-     * A shared Promise resolved with a value of
+     * A function that does nothing but returns null, useful for terminating
+     * a promise chain that needs to return null, as in the following code:
+     *
+     *     var self = this;
+     *     return this.fetchSomethingAsynchronously().then(function (data) {
+     *         return self.doSomethingAsynchronously(data.part);
+     *     }).then(this.nullFunction);
+     *
+     * @type {function}
+     */
+    nullFunction: {
+        value: function () {
+            return null;
+        }
+    },
+
+    /**
+     * A shared promise resolved with a value of
      * `null`, useful for returning from methods like
      * [fetchObjectProperty()]{@link DataService#fetchObjectProperty}
      * when the requested data is already there.
@@ -1343,19 +1397,25 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
     },
 
     /**
-     * A function that does nothing but returns null, useful for terminating
-     * a promise chain that needs to return null, as in the following code:
+     * A possibly shared promise resolved in the next cycle of the event loop
+     * or soon thereafter, at which point the current event handling will be
+     * complete. This is useful for services that need to buffer up actions so
+     * they're committed only once in a given event loop.
      *
-     *     var self = this;
-     *     return this.fetchSomethingAsynchronously().then(function (data) {
-     *         return self.doSomethingAsynchronously(data.part);
-     *     }).then(this.nullFunction);
-     *
-     * @type {function}
+     * @type {external:Promise}
      */
-    nullFunction: {
-        value: function () {
-            return null;
+    eventLoopPromise: {
+        get: function () {
+            var self = this;
+            if (!this._eventLoopPromise) {
+                this._eventLoopPromise = new Promise(function (resolve, reject) {
+                    window.setTimeout(function () {
+                        self._eventLoopPromise = undefined;
+                        resolve();
+                    }, 0);
+                });
+            }
+            return this._eventLoopPromise;
         }
     },
 
@@ -1378,42 +1438,51 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
             return insert ? array.splice.apply(array, [index, length].concat(insert)) :
                             array.splice(index, length);
         }
-    },
-
-    /**
-     * indicate wether a service can provide user-level authorization to its data.
-     * Defaults to false. Concrete services need to override this as needed.
-     *
-     * @type {boolean}
-     */
-    providesAuthorization: {
-        value: false
-    },
-
-    /**
-     * Returns the list of DataServices a sevice accepts to provide authorization on its behalf.
-     * If an array has multiple authorizationServices, the final choice will be up to the App user regarding which one to use.
-     * This array is expected to return moduleIds, not objects, allowing the AuthorizationManager to manage unicity
-     *
-     * @type [{moduleId}]
-     */
-    authorizationServices: {
-        value: null
-    },
-
-    /**
-     * Returns the AuthorizationPolicyType used by this DataService.
-     *
-     * @type {AuthorizationPolicyType}
-     */
-    authorizationPolicy: {
-        value: AuthorizationPolicyType.NoAuthorizationPolicy
     }
 
 }, /** @lends DataService */ {
 
     /***************************************************************************
-     * Class constants, variables, and methods
+     * Managing service hierarchies
+     */
+
+    /**
+     * Register the main service or one of its descendants.
+     *
+     * For the [mainService]{@link DataService.mainService] property to be set
+     * correctly this method must be called at least once with a service that is
+     * either the main service or a descendent of the main service. It can be
+     * called multiple times with the main service or a descendent of the main
+     * service, but it cannot be called with a service that will not be the main
+     * service or a descendent of the main service.
+     *
+     * The {@link DataService} constructor calls this method by default for the
+     * first created services, so [mainService]{@link DataService.mainService}
+     * will be set correctly if the first created service is either the main
+     * service or a descendant of the main service.
+     *
+     * @method
+     */
+    registerService: {
+        value: function (service) {
+            this._mainService = service;
+        }
+    },
+
+    /***************************************************************************
+     * Authorizing
+     */
+
+    "AuthorizationPolicyType": {
+        value: AuthorizationPolicyType
+    },
+
+    authorizationManager: {
+        value: AuthorizationManager
+    },
+
+    /***************************************************************************
+     * Utilities
      */
 
     /**
@@ -1450,36 +1519,6 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
             this._mainService = this._mainService && this._mainService.rootService;
             return this._mainService;
         }
-    },
-
-    /**
-     * Register the main service or one of its descendants.
-     *
-     * For the [mainService]{@link DataService.mainService] property to be set
-     * correctly this method must be called at least once with a service that is
-     * either the main service or a descendent of the main service. It can be
-     * called multiple times with the main service or a descendent of the main
-     * service, but it cannot be called with a service that will not be the main
-     * service or a descendent of the main service.
-     *
-     * The {@link DataService} constructor calls this method by default for the
-     * first created services, so [mainService]{@link DataService.mainService}
-     * will be set correctly if the first created service is either the main
-     * service or a descendant of the main service.
-     *
-     * @method
-     */
-    registerService: {
-        value: function (service) {
-            this._mainService = service;
-        }
-    },
-
-    "AuthorizationPolicyType": {
-        value: AuthorizationPolicyType
-    },
-    authorizationManager: {
-        value: AuthorizationManager
     }
 
 });

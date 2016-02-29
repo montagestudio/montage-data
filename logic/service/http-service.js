@@ -35,16 +35,21 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
 
     fetchHttpObjectProperty: {
         value: function (type, object, propertyName, prerequisitePropertyNames, criteria) {
-            var self, selector, prerequisites;
+            var self, selector, prerequisites, stream;
             // Create and cache a new fetch promise if necessary.
             if (!this._getCachedFetchPromise(object, propertyName)) {
                 // Parse arguments.
-                selector = DataSelector.withTypeAndCriteria(type, arguments[arguments.length - 1]);
-                prerequisites = prerequisitePropertyNames;
-                if (arguments.length < 5 || !prerequisites) {
+                if (arguments.length >= 4) {
+                    selector = DataSelector.withTypeAndCriteria(type, arguments[arguments.length - 1]);
+                } else {
+                    selector = DataSelector.withTypeAndCriteria(type);
+                }
+                if (arguments.length < 5 || !prerequisitePropertyNames) {
                     prerequisites = [];
                 } else if (!Array.isArray(prerequisites)) {
                     prerequisites = Array.prototype.slice.call(arguments, 3, -1);
+                } else {
+                    prerequisites = prerequisitePropertyNames;
                 }
                 // Create and cache a new fetch promise
                 self = this;
@@ -53,18 +58,19 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
                     return self.rootService.getObjectProperties(object, prerequisites);
                 }).then(function () {
                     // Then fetch the requested data...
-                    return self.rootService.fetchData(selector);
-                }).then(function (data) {
+                    stream = self.rootService.fetchData(selector);
+                    return stream;
+                }).then(function () {
                     // Then wait until the next event loop to ensure only one
                     // fetch is dispatched per event loop (caching ensures all
                     // subsequent requests for the same fetch promise within the
                     // same event loop will return the same promise)...
-                    return self._makeEventLoopPromise(data);
-                }).then(function (data) {
+                    return self.eventLoopPromise;
+                }).then(function () {
                     // Then removes the promise from the cache so subsequent
                     // requests for this fetch promise generate new fetches.
                     self._setCachedFetchPromise(object, propertyName, null);
-                    return data;
+                    return stream.data;
                 }));
             }
             // Return the created or cached fetch promise.
@@ -144,41 +150,47 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
     fetchHttpRawData: {
         value: function (url, headers, body, types, sendCredentials) {
             var self = this,
-                parsed = this._parseFetchHttpRawDataArguments.apply(this, arguments);
+                parsed, error, request;
+            // Parse arguments.
+            parsed = this._parseFetchHttpRawDataArguments.apply(this, arguments);
+            if (!parsed) {
+                error = new Error("Invalid arguments to fetchHttpRawData()");
+            } else if (!parsed.url) {
+                error = new Error("No URL provided to fetchHttpRawData()");
+            }
+            // Create and return a promise for the fetch results.
             return new Promise(function (resolve, reject) {
-                var request, name;
-                // Fetch the requested raw data.
-                // TODO: Reject the promise for invalid arguments.
-                if (!parsed) {
-                    console.warn(new Error("Invalid arguments to fetchHttpRawData()"));
-                    resolve(null);
-                } if (parsed.url) {
+                var i;
+                // Report errors or fetch the requested raw data.
+                if (error) {
+                    console.warn(error);
+                    reject(error);
+                } else {
                     request = new XMLHttpRequest();
                     request.onload = function () { resolve(request); };
                     request.open(parsed.body ? "POST" : "GET", parsed.url, true);
-                    for (name in parsed.headers) {
-                        request.setRequestHeader(name, parsed.headers[name]);
+                    for (i in parsed.headers) {
+                        request.setRequestHeader(i, parsed.headers[i]);
                     }
                     request.withCredentials = parsed.credentials;
                     request.send(parsed.body);
                 }
-            }).then(function (request) {
+            }).then(function () {
                 // The response status can be 0 initially even for successful
                 // requests, so defer the processing of this response until the
                 // next event loop to give the status time to be set correctly.
-                return self._makeEventLoopPromise(request);
-            }).then(function (request) {
-                // Log a warning and return null for error status responses.
+                return self.eventLoopPromise;
+            }).then(function () {
+                // Log a warning for error status responses.
                 // TODO: Reject the promise for error statuses.
-                if (request && request.status >= 300) {
-                    console.warn(new Error("Status " + request.status + " received for REST URL " + parsed.url));
-                    request = null;
+                if (!error && request.status >= 300) {
+                    error = new Error("Status " + request.status + " received for REST URL " + parsed.url);
+                    console.warn(error);
                 }
-                return request;
-            }).then(function (request) {
-                // Parse the request response according to the specified types.
+                // Return null for errors or return the results of parsing the
+                // request response according to the specified types.
                 // TODO: Support multiple alternate types.
-                return request && parsed.types[0].parseResponse(request, parsed.url);
+                return error ? null : parsed.types[0].parseResponse(request, parsed.url);
             });
         }
     },
@@ -247,20 +259,6 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
     _isBoolean: {
         value: function (value) {
             return typeof value === "boolean" || value instanceof Boolean;
-        }
-    },
-
-    /**
-     * @private
-     * @method
-     */
-    _makeEventLoopPromise: {
-        value: function (value) {
-            return new Promise(function (resolve, reject) {
-                window.setTimeout(function () {
-                    resolve(value);
-                }, 0);
-            });
         }
     }
 
