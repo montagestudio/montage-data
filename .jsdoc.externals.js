@@ -1,5 +1,6 @@
-////////////////////////////////////////////////////////////////////////////////
-// Types
+/*******************************************************************************
+ * Types
+ */
 
 /**
  * The Montage framework enumeration type.
@@ -31,27 +32,9 @@
  * @see {@linkcode http://docs.montagestudio.com/api/Repetition.html}
  */
 
-////////////////////////////////////////////////////////////////////////////////
-// Callbacks
-
-/**
- * A callback function called when a [Promise]{@linkcode external:Promise} is
- * fulfilled.
- *
- * @callback OnFulfilled
- * @param {Object} value - The fulfillment value.
+/*******************************************************************************
+ * Concepts
  */
-
-/**
- * A callback function called when a [Promise]{@linkcode external:Promise} is
- * rejected.
- *
- * @callback OnRejected
- * @param {Object} reason - The reason for the rejection.
- */
-
-////////////////////////////////////////////////////////////////////////////////
-// Concepts
 
 /**
  * An expression that can be evaluated relative to an object to return a value.

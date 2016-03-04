@@ -10,7 +10,7 @@
         "dictionaries": ["jsdoc"]
     },
     "source": {
-        "include": [".jsdoc.externals.js", "logic"],
+        "include": [".jsdoc.externals.js", ".jsdoc.globals.js", "logic"],
         "includePattern": ".+\\.js(doc)?$",
         "excludePattern": "(^|\\/|\\\\)_"
     },

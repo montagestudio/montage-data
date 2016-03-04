@@ -1122,9 +1122,6 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
                 if (!stream) {
                     stream = new DataStream();
                 }
-                if (!stream.service) {
-                    stream.service = this;
-                }
                 if (selector !== type) {
                     stream.selector = selector;
                 } else {

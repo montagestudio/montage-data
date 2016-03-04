@@ -36,19 +36,23 @@ exports.DataProvider = Montage.specialize(/** @lends DataProvider.prototype */{
      *
      * Although the contents of a data provider's
      * [data]{@link DataProvider#data} array may change over time, the array
-     * itself will not change. This class creates the
+     * itself will not change. Subclasses will typically want to create the
      * [data]{@link DataProvider#data} array lazilly the first time it is needed
-     * and then does not allow that property to change.
+     * and then not allow that property to change, with code like the following:
+     *
+     *     data: {
+     *         get: function() {
+     *             if (!this._data) {
+     *                 this._data = [];
+     *             }
+     *             return this._data;
+     *         }
+     *     },
      *
      * @type {Array}
      */
     data: {
-        get: function() {
-            if (!this._data) {
-                this._data = [];
-            }
-            return this._data;
-        }
+        value: undefined
     },
 
     /**

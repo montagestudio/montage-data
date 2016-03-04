@@ -4,25 +4,32 @@ var DataProvider = require("logic/service/data-provider").DataProvider,
 
 /**
  * A [DataProvider]{@link DataProvider} whose data is received sequentially.
- * A DataStreams is also a [Promise]{@linkcode external:Promise} which is
+ * A DataStream is also a [promise]{@linkcode external:Promise} which is
  * fulfilled when all the data it expects has been received.
  *
  * Objects receiving data from a stream will use its
  * [data]{@link DataStream#data} property to access that data. Alternatively
- * they can use its [then()]{@link DataStream#then} method to get that data.
+ * they can use its [then()]{@link DataStream#then} method to get that data or
+ * to handle errors, or its [catch()]{@link DataStream#catch} method to handle
+ * errors.
  *
- * Objects putting data in a stream will use its
+ * Objects feeding data to a stream will use its
  * [addData()]{@link DataStream#addData} method to add that data and its
  * [dataDone()]{@link DataStream#dataDone} method to indicate that all available
- * data has been added.
+ * data has been added or its [dataError()]{@link DataStream#dataError} method
+ * to indicate an error occurred.
  *
  * Objects can either receive data from a stream or add data to it, but not
  * both. Additionally, only one object can ever add data to a particular
  * stream. Typically that object will be a [Service]{@link DataService}.
  *
- * Streams are also [promises]{@linkcode external:Promise} that become fulfilled
- * when all the data they expect to get is first received. These promises will
- * not be fulfilled again if that data subsequently changes for any reason.
+ * Each stream is also a [promise]{@linkcode external:Promise} that becomes
+ * fulfilled when all the data expected for it is first received and
+ * [dataDone()]{@link DataStream#dataDone} is called, or rejected when an
+ * error is first encountered and [dataError()]{@link DataStream#dataError}
+ * is called. Each such promise is fulfilled or rejected only once and will
+ * not be fulfilled or rejected again if the stream's data changes or if an
+ * error is encountered subsequently for any reason.
  *
  * @class
  * @extends DataProvider
@@ -35,15 +42,6 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */{
      */
 
     /**
-     * The service responsible for this stream's data.
-     *
-     * @type {DataService}
-     */
-    service: {
-        value: undefined
-    },
-
-    /**
      * The selector defining the data returned in this stream.
      *
      * @type {DataSelector}
@@ -52,42 +50,32 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */{
         value: undefined
     },
 
-    _isDataDone: {
-        value: false // Set in dataDone().
-    },
+    /***************************************************************************
+     * DataProvider behavior
+     */
 
-    _resolve: {
-        value: undefined // Set in _promise getter, used in dataDone().
-    },
-
-    _promise: {
-        get: function () {
-            var self = this;
-            if (!this.__promise) {
-                if (this._isDataDone) {
-                    this.__promise = Promise.resolve(this.data);
-                } else {
-                    this.__promise = new Promise(function(resolve) { self._resolve = resolve; });
-                }
+    /**
+     * The objects that has been ever been added to the stream, as defined in
+     * this class' [DataProvider]{@link DataProvider} superclass. This array is
+     * created lazilly the first time it is needed and then not allowed to
+     * change, though its contents can and typically will change.
+     *
+     * @type {Array}
+     */
+    data: {
+        get: function() {
+            if (!this._data) {
+                this._data = [];
             }
-            return this.__promise;
+            return this._data;
         }
     },
 
-    /***************************************************************************
-     * Receiving data (DataProvider)
-     */
-
     /**
-     * All the objects that has been ever been added to the stream. Property
-     * defined by this class' [DataProvider]{@link DataProvider} superclass.
-     *
-     * @member {Array} DataStream#data
-     */
-
-    /**
-     * Unused method of this class' [DataProvider]{@link DataProvider}
-     * superclass.
+     * Request specific data, as defined in this class'
+     * [DataProvider]{@link DataProvider} superclass. Calling this method has
+     * no effect as data will come in the order in which it is added to the
+     * stream and this order cannot be changed.
      *
      * @method
      * @argument {int} start  - See [superclass]{@link DataProvider#requestData}.
@@ -95,38 +83,87 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */{
      */
     requestData: {
         value: function (start, length) {
-            // Don't do anything, data will come in the order it is added to the
-            // stream and no request can change that.
+            // Don't do anything.
         }
     },
 
     /***************************************************************************
-     * Receiving data (Promise)
+     * Promise behavior
      */
+
+    _resolve: {
+        value: function (value) {
+            if (!this.__promise) {
+                this.__promise = Promise.resolve(value);
+            }
+        }
+    },
+
+    _reject: {
+        value: function (reason) {
+            if (!this.__promise) {
+                this.__promise = Promise.reject(reason);
+            }
+        }
+    },
+
+    _promise: {
+        get: function () {
+            var self = this;
+            if (!this.__promise) {
+                this.__promise = new Promise(function(resolve, reject) {
+                    self._resolve = resolve;
+                    self._reject = reject;
+                });
+            }
+            return this.__promise;
+        }
+    },
 
     /**
      * Method of the [Promise]{@linkcode external:Promise} class used to
      * kick off additional processing when all the data expected by this
-     * stream has been received.
+     * stream has been received or when an error has been encountered.
      *
      * @method
-     * @argument {OnFulfilled} onFulfilled - Called when the stream has received
-     *                                       all the data it is expected to
-     *                                       receive. Because changes in
-     *                                       selectors, filters, sorting, or on
-     *                                       in service data may occur after
-     *                                       that, this stream'
+     * @argument {OnFulfilled} onFulfilled - Called when the stream's
+     *                                       [dataDone()]{@link DataStream#dataDone}
+     *                                       method is called, usually after all
+     *                                       the data expected for the stream
+     *                                       has been sent to it. Because a
+     *                                       stream's selector can change after
+     *                                       that, or changes in the service
+     *                                       data can occur for other reasons,
+     *                                       it is possible for a stream's
      *                                       [data]{@link DataStream#data} array
-     *                                       may actually change after this
-     *                                       method is called, but if that
-     *                                       happens this method will not be
-     *                                       called again. This method therefore
-     *                                       only provides an indication of when
-     *                                       the first set of data received by
-     *                                       this stream was received.
-     * @argument {OnRejected} onRejected   - DataStreams are never rejected so
-     *                                       rejection callbacks passed in to
-     *                                       this method are never called.
+     *                                       contents to change after this
+     *                                       callback is called. If that happens
+     *                                       this callback will not be called
+     *                                       again. This callback therefore only
+     *                                       provides an indication of when the
+     *                                       first set of data expected by a
+     *                                       stream is received. The value
+     *                                       passed in to this callback is the
+     *                                       stream's {@link DataStream#data}.
+     * @argument {OnRejected} [onRejected] - Called when the stream's
+     *                                       [dataError()]{@link DataStream#dataError}
+     *                                       method is called, usually after
+     *                                       an error is encountered while
+     *                                       fetching data for the stream.
+     *                                       The value passed in to this
+     *                                       callback will be the `reason`
+     *                                       received by the stream's
+     *                                       [dataError()]{@link DataStream#dataError}
+     *                                       method. Because
+     *                                       [catch()]{@link DataStream#catch}
+     *                                       also handles the case where
+     *                                       exceptions are encountered
+     *                                       in the `onFulfilled`
+     *                                       callback, this argument is
+     *                                       usually not provided and
+     *                                       [catch()]{@link DataStream#catch}
+     *                                       is usually used instead to specify
+     *                                       the `onRejected` callback.
      */
     then: {
         value: function (onFulfilled, onRejected) {
@@ -135,12 +172,20 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */{
     },
 
     /**
-     * Unused method of the [Promise]{@linkcode external:Promise} class.
+     * Method of the [Promise]{@linkcode external:Promise} class used to
+     * kick off additional processing when an error has been encountered.
      *
      * @method
-     * @argument {OnRejected} onRejected - Rejection callback. DataStreams are
-     *                                     never rejected so callbacks passed
-     *                                     in to this method are never called.
+     * @argument {OnRejected} onRejected   - Called when the stream's
+     *                                       [dataError()]{@link DataStream#dataError}
+     *                                       method is called, usually after
+     *                                       an error is encountered while
+     *                                       fetching data for the stream.
+     *                                       The value passed in to this
+     *                                       callback will be the `reason`
+     *                                       received by the stream's
+     *                                       [dataError()]{@link DataStream#dataError}
+     *                                       method.
      */
     catch: {
         value: function (onRejected) {
@@ -149,7 +194,7 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */{
     },
 
     /***************************************************************************
-     * Adding data
+     * Feeding the stream
      */
 
     /**
@@ -157,8 +202,8 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */{
      *
      * @method
      * @argument {Array} objects - An array of objects to add to the stream's
-     *                             data. If this array is empty or `undefined`,
-     *                             no objects are added.
+     *                             data. If this array is empty, `null`, or
+     *                             `undefined`, no objects are added.
      */
     addData: {
         value: function (objects) {
@@ -169,18 +214,42 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */{
     },
 
     /**
-     * To be called when all the data expected by this stream has been added to
-     * its [data]{@link DataStream#data} array.
+     * To be called when all the data expected by this stream has been added
+     * to its [data]{@link DataStream#data} array. After this is called
+     * all subsequent calls to [dataDone()]{@link DataStream#dataDone}
+     * or [dataError()]{@link DataStream#dataError} will be ignored.
      *
      * @method
      */
     dataDone: {
         value: function () {
-            this._isDataDone = true;
-            if (this._resolve) {
-                this._resolve(this.data);
-                this._resolve = null;
-            }
+            this._resolve(this.data);
+            delete this._resolve;
+            delete this._reject;
+        }
+    },
+
+    /**
+     * To be called when a problem is encountered while trying to
+     * fetch data for this stream. After this is called all subsequent
+     * calls to [dataError()]{@link DataStream#dataError} or
+     * [dataDone()]{@link DataStream#dataDone} will be ignored.
+     *
+     * @method
+     * @argument {Object} [reason] - An object, usually an {@link Error},
+     *                               indicating what caused the problem.
+     *                               This will be passed in to any
+     *                               {@link external:onRejected}
+     *                               callback specified in
+     *                               [then()]{@link DataStream#then} or
+     *                               [catch()]{@link DataStream#catch} calls
+     *                               to the stream.
+     */
+    dataError: {
+        value: function (reason) {
+            this._reject(reason);
+            delete this._reject;
+            delete this._resolve;
         }
     }
 
