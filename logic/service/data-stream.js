@@ -101,8 +101,14 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */{
 
     _reject: {
         value: function (reason) {
+            // Defers the creation of the rejection promise by setting __promise
+            // to a function that will create the appropriate promise when it
+            // is needed. This way if the promise is not needed it won't be
+            // created. This avoids the "unhandled rejection" error that
+            // Bluebird logs for promises that are rejected but whose rejection
+            // is not handled.
             if (!this.__promise) {
-                this.__promise = Promise.reject(reason);
+                this.__promise = function () {return Promise.reject(reason);};
             }
         }
     },
@@ -110,7 +116,9 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */{
     _promise: {
         get: function () {
             var self = this;
-            if (!this.__promise) {
+            if (typeof this.__promise === "function") {
+                this.__promise = this.__promise();
+            } else if (!this.__promise) {
                 this.__promise = new Promise(function(resolve, reject) {
                     self._resolve = resolve;
                     self._reject = reject;
