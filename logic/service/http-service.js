@@ -23,10 +23,26 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
      */
 
     /**
+     * The Content-Type header corresponding to
+     * [application/x-www-form-urlencoded]{@link https://www.w3.org/TR/html401/interact/forms.html#h-17.13.4.1},
+     * the default format of form data.
+     *
      * @type {Object<string, string>}
      */
-    FORM_URL_ENCODED_CONTENT_TYPE_HEADER: {
+    FORM_URL_ENCODED: {
         value: {"Content-Type": "application/x-www-form-urlencoded"}
+    },
+
+    /**
+     * @type {Object<string, string>}
+     * @deprecated in favor of
+     *             [FORM_URL_ENCODED]{@link HttpService#FORM_URL_ENCODED}.
+     */
+    FORM_URL_ENCODED_CONTENT_TYPE_HEADER: {
+        get: function () {
+            console.warn("HttpService.FORM_URL_ENCODED_CONTENT_TYPE_HEADER is deprecated - use HttpService.FORM_URL_ENCODED instead");
+            return this.FORM_URL_ENCODED;
+        }
     },
 
     /***************************************************************************
@@ -259,6 +275,18 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
     _isBoolean: {
         value: function (value) {
             return typeof value === "boolean" || value instanceof Boolean;
+        }
+    },
+
+    /***************************************************************************
+     * Utilities
+     */
+
+    formUrlEncode: {
+        value: function (string) {
+            return encodeURIComponent(string).replace(/ /g, "+").replace(/[!'()*]/g, function(c) {
+                return '%' + c.charCodeAt(0).toString(16);
+            });
         }
     }
 
