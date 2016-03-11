@@ -364,14 +364,44 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
              * @type {DataType}
              */
             TEXT: [{
-                // TO DO.
+                parseResponse: {
+                    value: function (request, url) {
+                        var text = request && request.responseText;
+
+                        if (!text) {
+                            console.warn(new Error("No text received from URL " + url));
+                            return null;
+                        }
+
+                        return text;
+                    }
+                }
             }],
 
             /**
              * @type {DataType}
              */
             XML: [{
-                // TO DO.
+                parseResponse: {
+                    value: function (request, url) {
+                        var text = request && request.responseText,
+                            parser = new DOMParser(),
+                            data = null;
+
+                        if (text) {
+                            try {
+                                data = parser.parseFromString(text, "text/xml");
+                            } catch (error) {
+                                console.warn(new Error("Can't parse XML received from URL " + url));
+                                console.warn("Response text:", text);
+                            }
+                        } else if (request) {
+                            console.warn(new Error("No XML received from URL " + url));
+                        }
+
+                        return data;
+                    }
+                }
             }]
 
         })
