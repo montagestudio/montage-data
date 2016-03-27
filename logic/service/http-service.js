@@ -256,7 +256,7 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
             } else if (last < 4) {
                 parsed.types = [exports.HttpService.DataType.JSON];
             } else {
-                for (i = 3, n = last; i < n && arguments[i] instanceof exports.HttpService.DataType; i += 1);
+                for (i = 3, n = last; i < n && arguments[i] instanceof exports.HttpService.DataType; i += 1) {}
                 parsed.types = Array.prototype.slice.call(arguments, 3, i);
                 if (i < n) {
                     console.warn(new Error("Invalid types for fetchHttpRawData()"));
@@ -321,11 +321,11 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
                             try {
                                 data = JSON.parse(text);
                             } catch (error) {
-                                console.warn(new Error("Can't parse JSON received for REST URL " + url));
+                                console.warn(new Error("Can't parse JSON received from " + url));
                                 console.warn("Response text:", text);
                             }
                         } else if (request) {
-                            console.warn(new Error("No JSON received for REST URL " + url));
+                            console.warn(new Error("No JSON response received from " + url));
                         }
                         return data;
                     }
@@ -346,14 +346,14 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
                             try {
                                 data = text && JSON.parse(text.slice(start, end));
                             } catch (error) {
-                                console.warn(new Error("Can't parse JSONP received for REST URL " + url));
+                                console.warn(new Error("Can't parse JSONP received from " + url));
                                 console.warn("Response text:", text);
                             }
                         } else if (text) {
-                            console.warn(new Error("Can't parse JSONP received for REST URL " + url));
+                            console.warn(new Error("Can't parse JSONP received from " + url));
                             console.warn("Response text:", text);
                         } else if (request) {
-                            console.warn(new Error("No JSONP received for REST URL " + url));
+                            console.warn(new Error("No JSONP response received from " + url));
                         }
                         return data;
                     }
@@ -364,7 +364,15 @@ exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */
              * @type {DataType}
              */
             TEXT: [{
-                // TO DO.
+                parseResponse: {
+                    value: function (request, url) {
+                        var text = request && request.responseText;
+                        if (!text && request) {
+                            console.warn(new Error("No text response received from " + url));
+                        }
+                        return text;
+                    }
+                }
             }],
 
             /**
