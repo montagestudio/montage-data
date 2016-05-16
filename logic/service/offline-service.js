@@ -34,7 +34,7 @@ exports.OfflineService = DataService.specialize(/** @lends OfflineService.protot
     /*
      * @method
      */
-    isOfflineDidChange: {
+    offlineDidChange: {
         value: function (isOffline) {
             if (!isOffline) {
                 this._applyJournaledChanges();

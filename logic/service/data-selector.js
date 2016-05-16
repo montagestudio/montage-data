@@ -19,11 +19,12 @@ exports.DataSelector = Montage.specialize(/** @lends DataSelector.prototype */{
     },
 
     /**
-     * A set of named values defining the criteria that must be satisfied by
-     * objects for them to be included in the data set defined by this selector.
+     * An object defining the criteria that must be satisfied by objects for
+     * them to be included in the data set defined by this selector.
      *
-     * Properties and corresponding values can be added or removed from the
-     * criteria object but that criteria object itself cannot be replaced.
+     * Initially this can be any object and will typically be a set of key-value
+     * pairs, ultimately this will probably be an object representing an
+     * expression.
      *
      * @type {Object}
      */
@@ -33,6 +34,9 @@ exports.DataSelector = Montage.specialize(/** @lends DataSelector.prototype */{
                 this._criteria = {};
             }
             return this._criteria;
+        },
+        set: function (criteria) {
+            this._criteria = criteria;
         }
     }
 
@@ -43,11 +47,7 @@ exports.DataSelector = Montage.specialize(/** @lends DataSelector.prototype */{
             var selector, key;
             selector = new this();
             selector.type = type;
-            if (criteria) {
-                for (key in criteria) {
-                    selector.criteria[key] = criteria[key];
-                }
-            }
+            selector.criteria = criteria;
             return selector;
         }
     }

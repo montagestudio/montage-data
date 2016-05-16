@@ -12,19 +12,19 @@ var Montage = require("montage").Montage,
     AuthorizationPolicyType = new Enum().initWithMembers("NoAuthorizationPolicy","UpfrontAuthorizationPolicy","OnFirstFetchAuthorizationPolicy","OnDemandAuthorizationPolicy"),
     AuthorizationManager = require("logic/service/authorization-manager").AuthorizationManager;
 
-    /**
-     * AuthorizationPolicyType
-     *
-     * UpfrontAuthorizationPolicy
-     *      Authorization is asked upfront, immediately after data service is created / launch of an app.
-     *
-     * UpfrontAuthorizationPolicy
-     *      Authorization is required when a request fails because of lack of authorization.
-     *      This is likely to be a good strategy for DataServices that offer data to
-     *   both anonymous and authorized .
-     *
-     */
-
+/**
+ * AuthorizationPolicyType
+ *
+ * UpfrontAuthorizationPolicy
+ *      Authorization is asked upfront, immediately after data service is
+ *      created / launch of an app.
+ *
+ * OnDemandAuthorizationPolicy
+ *      Authorization is required when a request fails because of lack of
+ *      authorization. This is likely to be a good strategy for DataServices
+ *      that offer data to both anonymous and authorized users.
+ *
+ */
 
 /**
  * Provides data objects and potentially manages changes to them.
@@ -46,15 +46,14 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
         value: function DataService() {
             if (!exports.DataService.mainService) {
                 exports.DataService.registerService(this);
-                if(this.providesAuthorization) {
-                    DataService.authorizationManager.registerAuthorizationService(this);
+                if (this.providesAuthorization) {
+                    exports.DataService.authorizationManager.registerAuthorizationService(this);
                 }
-                if(this.authorizationPolicy === AuthorizationPolicyType.UpfrontAuthorizationPolicy) {
-                    DataService.authorizationManager.authorizeService(this).then(function(authorization) {
-
+                if (this.authorizationPolicy === AuthorizationPolicyType.UpfrontAuthorizationPolicy) {
+                    exports.DataService.authorizationManager.authorizeService(this).then(function(authorization) {
+                        return null;
                     });
                 }
-
             }
         }
     },
@@ -124,11 +123,12 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      * @type {boolean}
      */
     isOffline: {
-        // TODO.
         get: function () {
             if (this._isRootService && this._isOffline === undefined) {
                 this._isOffline = false;
-                window.setInterval(this._offlinePolling, this.offlinePollingInterval, this);
+                window.setInterval(function () {
+                    this.isOffline = !navigator.onLine;
+                }, this.offlinePollingInterval, this);
             }
             return this._isRootService ? this._isOffline : this.rootService.isOffline;
         },
@@ -138,80 +138,18 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
                 this.rootService.isOffline = isOffline;
             } else if (isOffline !== this.isOffline) {
                 this._isOffline = isOffline;
-                this._offlineService.isOfflineDidChange(isOffline);
+                this._offlineService.offlineDidChange(isOffline);
             }
         }
     },
 
     /*
-     * @method
+     * In milliseconds.
+     *
+     * @type {number}
      */
-     //Benoit: name, really?!!
-    isOfflineDidChange: {
-        value: function (isOffline) {
-            // Subclasses can overrride this.
-        }
-    },
     offlinePollingInterval: {
-        value: 2000
-    },
-    __offlinePollingRequest: {
-        value: void 0
-    },
-    _offlinePollingRequest: {
-        get: function() {
-            if(!this.__offlinePollingRequest) {
-                var request = new XMLHttpRequest();
-                request.timeout = 15000;
-                request.onerror = this._setOfflineToTrue;
-                request.onload = this._setOfflineToFalse;
-                request.ontimeout = this._setOfflineToTrue;
-                this.__offlinePollingRequest = request;
-            }
-            return this.__offlinePollingRequest;
-        }
-    },
-
-    _offlinePolling: {
-        value: function (self) {
-            if(typeof navigator.onLine === "boolean") {
-                this.isOffline = !navigator.onLine;
-            }
-            else {
-                request = self._offlinePollingRequest;
-                request.open("GET", self._offlinePollingUrl, true);
-                request.send();
-            }
-        }
-    },
-
-    _offlinePollingUrl: {
-        get: function () {
-            var random = Math.floor(Math.random() * 10000000000000000000);
-            return "https://avatars0.githubusercontent.com/u/1391764?s=1&_=" + random;
-        }
-    },
-
-    _setOfflineToFalse: {
-        get: function () {
-            if (!this.__setOfflineToFalse) {
-                this.__setOfflineToFalse = function () {
-                    this.isOffline = false;
-                }.bind(this);
-            }
-            return this.__setOfflineToFalse;
-        }
-    },
-
-    _setOfflineToTrue: {
-        get: function () {
-            if (!this.__setOfflineToTrue) {
-                this.__setOfflineToTrue = function () {
-                    this.isOffline = true;
-                }.bind(this);
-            }
-            return this.__setOfflineToTrue;
-        }
+        value: 100
     },
 
     /**

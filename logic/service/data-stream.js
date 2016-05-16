@@ -55,10 +55,10 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */{
      */
 
     /**
-     * The objects that has been ever been added to the stream, as defined in
-     * this class' [DataProvider]{@link DataProvider} superclass. This array is
-     * created lazilly the first time it is needed and then not allowed to
-     * change, though its contents can and typically will change.
+     * The objects that have been added to the stream, as defined in this class'
+     * [DataProvider]{@link DataProvider} superclass. This array is created
+     * lazilly the first time it is needed and then not allowed to change,
+     * though its contents can and typically will change.
      *
      * @type {Array}
      */
