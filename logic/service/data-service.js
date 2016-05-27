@@ -401,7 +401,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
         value: function _binarySearch(services, insert) {
             var below, above, i, n;
             // Start with a simple binary search. "above" will always be the
-            // index of a service with a higher prioritity than the service to
+            // index of a service with a higher priority than the service to
             // insert. "below" will always be the index of a service with a
             // lower priority than the service to inset, except when a service
             // is found with the same priority as the service to insert, in
@@ -425,7 +425,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
             // the above index to that service's index and otherwise setting
             // the above index to just after the set of same priority services.
             if (below === above) {
-                for (i -= 1; i >= 0 && services[i].priority === insert.priority; i -= 1);
+                for (i -= 1; i >= 0 && services[i].priority === insert.priority; i -= 1) {}
                 for (i += 1; i < above; i += 1) {
                     if (services[i] === insert || services[i].priority !== insert.priority) {
                         above = i;
@@ -964,7 +964,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
     /**
      * Fetch the value of a data object's property, possibly asynchronously.
      *
-     * Subclasses should overrride this method to make any
+     * Subclasses should override this method to make any
      * [fetchData()]{@link DataService#fetchData} call necessary
      * to get the requested data. The subclass implementations of
      * this method should make no network requests except through
@@ -972,7 +972,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
      * implementation of this method makes no calls at all and instead
      * immediately returns [a fulfilled promise]{@link DataService#nullPromise}.
      *
-     * This method should be overridded but never called directly:
+     * This method should be overridden but never called directly:
      * [getObjectProperties()]{@link DataService#getObjectProperties} should be
      * called instead as that method handles the caching, fetch aggregation, and
      * [data trigger]{@link DataTrigger} updating that is necessary. That method
@@ -1066,21 +1066,24 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
                     stream.selector = DataSelector.withTypeAndCriteria(type);
                 }
                 // Get the data from raw data.
-                if (service) {
-                    service.fetchRawData(stream);
-                    if (offline) {
-                        stream.then(function () {
-                            offline.didFetchData(stream);
-                        });
+                try {
+                    if (service) {
+                        service.fetchRawData(stream);
+                        if (offline) {
+                            stream.then(function () {
+                                offline.didFetchData(stream);
+                            });
+                        }
+                    } else if (offline) {
+                        offline.fetchData(selector, stream);
+                    } else {
+                        throw new Error("Can't fetch data of unknown type -", type.typeName + "/" + type.uuid);
                     }
-                } else if (offline) {
-                    offline.fetchData(selector, stream);
-                } else {
-                    console.warn("Can't fetch data of unknown type -", type.typeName + "/" + type.uuid);
-                    stream.dataDone();
+                } catch (e) {
+                    stream.dataError(e);
                 }
-                // Return the passed in or created stream.
             }
+                // Return the passed in or created stream.
             return stream;
         }
     },
@@ -1272,7 +1275,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
     },
 
     /**
-     * Returns the list of DataServices a sevice accepts to provide
+     * Returns the list of DataServices a service accepts to provide
      * authorization on its behalf. If an array has multiple
      * authorizationServices, the final choice will be up to the App user
      * regarding which one to use. This array is expected to return moduleIds,
@@ -1436,7 +1439,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
     },
 
     /**
-     * A read-only reference to the applicatin's main service.
+     * A read-only reference to the application's main service.
      *
      * Applications typically have one and only one main service to which all
      * requests for data are sent. This service can in turn delegate management
