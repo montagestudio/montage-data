@@ -1083,7 +1083,7 @@ var DataService = exports.DataService = Montage.specialize(/** @lends DataServic
                     stream.dataError(e);
                 }
             }
-                // Return the passed in or created stream.
+            // Return the passed in or created stream.
             return stream;
         }
     },

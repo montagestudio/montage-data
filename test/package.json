@@ -8,6 +8,8 @@
     ],
     "name": "montage-data-tests",
     "version": "1.0.0-alpha.1",
+    "license": "BSD-3-Clause",
+    "author": "Montage Studio, inc. (http://montagestudio.com/)",
     "repository": {
         "type": "git",
         "url": "montagestudio/montage-data-tests"

@@ -1,6 +1,6 @@
 var Component = require("montage/ui/component").Component;
 
-exports.Run = Component.specialize(/** @lends Run.prototype */ {
+exports.Index = Component.specialize(/** @lends Index.prototype */ {
 
     hasTemplate: {
         value: false
