@@ -11,6 +11,7 @@
 *.xcodeproj
 .idea
 atlassian-ide-plugin.xml
+.*.swp
 
 # Build and test generated files that shouldn't be committed.
 /.watch.log
