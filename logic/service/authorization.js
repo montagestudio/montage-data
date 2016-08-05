@@ -8,7 +8,7 @@ var Montage = require("montage").Montage;
  * @class
  * @extends external:Montage
  */
-var Authorization = exports.Authorization = Montage.specialize(/** @lends AuthorizationManager.prototype */{
+var Authorization = exports.Authorization = Montage.specialize(/** @lends AuthorizationManager.prototype */ {
 
 });
 

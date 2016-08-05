@@ -18,7 +18,7 @@ var Montage = require("montage").Montage,
  * @class
  * @extends external:Montage
  */
-AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.prototype */{
+AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.prototype */ {
 
     constructor: {
         value: function () {

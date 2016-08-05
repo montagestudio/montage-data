@@ -18,7 +18,7 @@ var Montage = require("montage").Montage,
  */
 exports.DataTrigger = function () {};
 
-exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototype */{
+exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototype */ {
 
     /**
      * The constructor function for all trigger instances.
@@ -345,7 +345,7 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
 
 });
 
-Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */{
+Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */ {
 
     /**
      * @method

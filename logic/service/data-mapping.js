@@ -13,7 +13,7 @@ var Montage = require("montage").Montage;
  * @class
  * @extends external:Montage
  */
-exports.DataMapping = Montage.specialize(/** @lends DataMapping.prototype */{
+exports.DataMapping = Montage.specialize(/** @lends DataMapping.prototype */ {
 
     /**
      * Convert raw data to data objects of an appropriate type.

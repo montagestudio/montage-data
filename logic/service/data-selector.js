@@ -7,7 +7,7 @@ var Montage = require("montage").Montage;
  * @class
  * @extends external:Montage
  */
-exports.DataSelector = Montage.specialize(/** @lends DataSelector.prototype */{
+exports.DataSelector = Montage.specialize(/** @lends DataSelector.prototype */ {
 
     /**
      * The type of the data object to retrieve.

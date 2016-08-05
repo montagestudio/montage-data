@@ -23,7 +23,7 @@ var DataService = require("logic/service/data-service").DataService,
  * @class
  * @extends DataService
  */
-exports.RawDataService = DataService.specialize(/** @lends RawDataService.prototype */{
+exports.RawDataService = DataService.specialize(/** @lends RawDataService.prototype */ {
 
     /***************************************************************************
      * Initializing

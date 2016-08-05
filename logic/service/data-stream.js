@@ -35,7 +35,7 @@ var DataProvider = require("logic/service/data-provider").DataProvider,
  * @extends DataProvider
  *
  */
-exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */{
+exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */ {
 
     /***************************************************************************
      * Basic properties
