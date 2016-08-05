@@ -1,25 +1,18 @@
-var DataService = require("montage-data/logic/service/data-service").DataService,
+var RawDataService = require("montage-data/logic/service/raw-data-service").RawDataService,
     DataStream = require("montage-data/logic/service/data-stream").DataStream,
-    DataObjectDescriptor = require("montage-data/logic/model/data-object-descriptor").DataObjectDescriptor,
-    RawDataService = require("montage-data/logic/service/raw-data-service").RawDataService;
+    DataObjectDescriptor = require("montage-data/logic/model/data-object-descriptor").DataObjectDescriptor;
 
-describe("A DataService", function() {
+describe("A RawDataService", function() {
 
     it("can be created", function () {
-        expect(new DataService()).toBeDefined();
+        expect(new RawDataService()).toBeDefined();
     });
 
     it("never has any parent and is always the root", function () {
-        var service = new DataService();
-
-        // Verify that the service initially has no parent and is the root.
+        var service = new RawDataService();
         expect(service.parentService).toBeUndefined();
         expect(service.rootService).toEqual(service);
-
-        // Try to set a parent.
-        service.parentService = new DataService();
-
-        // Verify that the service still has no parent and is the root.
+        service.parentService = new RawDataService();
         expect(service.parentService).toBeUndefined();
         expect(service.rootService).toEqual(service);
     });
@@ -64,7 +57,7 @@ describe("A DataService", function() {
         children[9].types = [];
 
         // Create a service with the desired children.
-        service = new DataService();
+        service = new RawDataService();
         children.forEach(function (child) { service.addChildService(child); });
 
         // Verify the initial parents, types, and type-to-child mapping.
@@ -306,7 +299,7 @@ describe("A DataService", function() {
     });
 
     it("has a fetchData() method", function () {
-        expect(new DataService().fetchData).toEqual(jasmine.any(Function));
+        expect(new RawDataService().fetchData).toEqual(jasmine.any(Function));
     });
 
     xit("has a fetchData() method that uses the passed in stream when one is specified", function () {
@@ -318,11 +311,59 @@ describe("A DataService", function() {
     xit("has a fetchData() method that sets its stream's selector", function () {
     });
 
+    xit("has a fetchData() method that calls the service's fetchRawData() when appropriate", function () {
+    });
+
+    xit("has a fetchData() xmethod that calls a child service's fetchRawData() when appropraite", function () {
+    });
+
     it("has a saveDataChanges() method", function () {
-        expect(new DataService().saveDataChanges).toEqual(jasmine.any(Function));
+        expect(new RawDataService().saveDataChanges).toEqual(jasmine.any(Function));
     });
 
     xit("has a saveDataChanges() method that needs to be further tested", function () {});
+
+    it("has a fetchRawData() method", function () {
+        expect(new RawDataService().fetchRawData).toEqual(jasmine.any(Function));
+    });
+
+    it("has a fetchRawData() method that fetches empty data by default", function (done) {
+        // Call fetchRawData() and verify the resulting stream's initial data.
+        var stream = new DataStream();
+        new RawDataService().fetchRawData(stream);
+        expect(stream.data).toEqual([]);
+        // Make sure the stream's promise is fulfilled with the same data.
+        stream.then(function (data) {
+            expect(data).toBe(stream.data);
+            expect(data).toEqual([]);
+            done();
+        });
+    });
+
+    it("has a addRawData() method", function () {
+        expect(new RawDataService().addRawData).toEqual(jasmine.any(Function));
+    });
+
+    xit("has a addRawData() method that maps the data it receives", function () {
+    });
+
+    xit("has a addRawData() method that calls the specified stream's addData() with the mapped data", function () {
+    });
+
+    xit("has a addRawData() method that needs to be further tested", function () {});
+
+    it("has a mapFromRawData() method", function () {
+        expect(new RawDataService().mapFromRawData).toEqual(jasmine.any(Function));
+    });
+
+    xit("has a mapFromRawData() method that needs to be further tested", function () {});
+
+    it("has a rawDataDone() method", function () {
+        expect(new RawDataService().rawDataDone).toEqual(jasmine.any(Function));
+    });
+
+    xit("has a rawDataDone() method that calls the specified stream's dataDone()", function () {
+    });
 
     xit("has a registerService() method that needs to be further tested", function () {});
 

@@ -107,21 +107,6 @@ exports.DataObjectDescriptor = ObjectDescriptor.specialize(/** @lends DataObject
 }, /** @lends DataObjectDescriptor */ {
 
     /**
-     * Used for [data services]{@link DataService} that manage all types of data
-     * object.
-     *
-     * @type {ObjectDescriptor}
-     */
-    ALL_TYPES: {
-        get: function () {
-            if (!exports.DataObjectDescriptor._ALL_TYPES) {
-                exports.DataObjectDescriptor._ALL_TYPES = new exports.DataObjectDescriptor();
-            }
-            return exports.DataObjectDescriptor._ALL_TYPES;
-        }
-    },
-
-    /**
      * Generates a getter function that will create and cache a data object
      * descriptor.
      *

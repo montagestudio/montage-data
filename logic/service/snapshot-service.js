@@ -1,7 +1,5 @@
-/**
- * @module logic/service/snapshot-service
- */
 var Montage = require("montage/core/core").Montage;
+
 /**
  * @class SnapshotService
  * @extends Montage

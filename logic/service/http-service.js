@@ -1,5 +1,4 @@
-// Note: Bluebird promises are used even if ECMAScript 6 promises are available.
-var DataService = require("logic/service/data-service").DataService,
+var RawDataService = require("logic/service/raw-data-service").RawDataService,
     DataSelector = require("logic/service/data-selector").DataSelector,
     Enumeration = require("logic/model/enumeration").Enumeration,
     Map = require("collections/map"),
@@ -14,9 +13,9 @@ var DataService = require("logic/service/data-service").DataService,
  * TODO: Restore @extends when parent class has been cleaned up to not provide
  * so many unnecessary properties and methods.
  *
- * @extends DataService
+ * @extends RawDataService
  */
-exports.HttpService = DataService.specialize(/** @lends HttpService.prototype */ {
+exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype */ {
 
     /***************************************************************************
      * Constants
