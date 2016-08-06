@@ -220,32 +220,15 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @method
      * @argument {DataStream} stream   - The stream to which the fetched data is
      *                                   being added.
-     * @argument {Array} rawData       - An array of objects whose properties'
+     * @argument {Array} rawDataArray  - An array of objects whose properties'
      *                                   values hold the raw data.
      * @argument {?} context           - The context value passed to the
      *                                   [addRawData()]{@link DataMapping#addRawData}
      *                                   call that is invoking this method.
      */
     addOfflineData: {
-        value: function (stream, rawData, context) {
+        value: function (stream, rawDataArray, context) {
             // Subclasses should override this to do something useful.
-        }
-    },
-
-    /**
-     * Provides a {@link IndexedDBDatabase} shared across all raw data services
-     * that can be used to persist data stored in
-     * [addOfflineData()]{@link RawDataService#addOfflineData} for use in
-     * [fetchOfflineData()]{@link RawDataService#fetchOfflineData}.
-     *
-     * @type {IndexedDBService}
-     */
-    offlineDatabase: {
-        get: function () {
-            if (!exports.RawDataService._offlineDatabase) {
-                exports.RawDataService._offlineDatabase = new IndexedDBService();
-            }
-            return exports.RawDataService._offlineDatabase;
         }
     },
 
@@ -315,6 +298,8 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
 
     /***************************************************************************
      * Handling raw data
+     *
+     * TODO [Charles/Benoit] Rename "raw data" to "records/record".
      *
      * Most of the methods overridden in RawDataService subclasses are here.
      */
@@ -390,7 +375,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @argument {DataStream} stream   - The stream to which the data objects
      *                                   corresponding to the raw data should be
      *                                   added.
-     * @argument {Array} rawData       - An array of objects whose properties'
+     * @argument {Array} rawDataArray  - An array of objects whose properties'
      *                                   values hold the raw data. This array
      *                                   will be modified by this method.
      * @argument {?} context           - A value that will be passed to
@@ -400,18 +385,20 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *                                   if it is provided.
      */
     addRawData: {
-        value: function (stream, rawData, context) {
+        value: function (stream, rawDataArray, context) {
             var i, n, object;
             // Give the service a chance to save the data for offline use.
-            this.addOfflineData(stream, rawData, context);
+            if (!this.isOffline) {
+                this.addOfflineData(stream, rawDataArray, context);
+            }
             // Convert the raw data to appropriate data objects. The conversion
             // will be done in place to avoid creating an extra array.
-            for (i = 0, n = rawData ? rawData.length : 0; i < n; i += 1) {
-                object = this.getDataObject(stream.selector.type, rawData[i], context);
-                this.mapFromRawData(object, rawData[i], context);
-                rawData[i] = object;
+            for (i = 0, n = rawDataArray ? rawDataArray.length : 0; i < n; i += 1) {
+                object = this.getDataObject(stream.selector.type, rawDataArray[i], context);
+                this.mapFromRawData(object, rawDataArray[i], context);
+                rawDataArray[i] = object;
             }
-            stream.addData(rawData);
+            stream.addData(rawDataArray);
         }
     },
 
