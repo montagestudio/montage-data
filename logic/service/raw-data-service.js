@@ -54,19 +54,6 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     },
 
     /***************************************************************************
-     * Handling offline
-     */
-
-    /*
-     * @type {boolean}
-     */
-    isOffline: {
-        get: function () {
-            return this.rootService.isOffline;
-        }
-    },
-
-    /***************************************************************************
      * Tracking data object changes
      */
 
@@ -107,23 +94,29 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * called directly by anyone other than this service's parent. Calls to the
      * root service should be made to initiate data fetches.
      *
-     * This method fetches raw data from a server or other source
-     * using the [fetchRawData()]{@link RawDataService#fetchRawData}
-     * method, gets or creates corresponding data objects using
-     * the [getDataObject()]{@link DataService#getDataObject}
-     * method, maps the raw data to those data objects using the
-     * [mapFromRawData()]{@link RawDataService#mapFromRawData} method,
-     * and then returns those objects in the specified stream or in a
-     * new stream created for that purpose.
+     * When online, this method fetches raw data from a server or other source
+     * using [fetchRawData()]{@link RawDataService#fetchRawData}, which should
+     * repeatedly call [addRawData()]{@link RawDataService#addRawData} to get or
+     * create objects corresponding to the raw data, map the raw data to those
+     * objects, and add them to the returned stream.
+     *
+     * When offline, this method calls
+     * [fetchOfflineData()]{@link RawDataService#fetchOfflineData}, which by
+     * default does nothing. Subclasses must override
+     * [fetchOfflineData()]{@link RawDataService#fetchOfflineData} or
+     * [isOffline]{@link RawDataService#isOffline} if they want to provide
+     * offline support.
      *
      * Subclasses should not override this method, they should instead
-     * override their [fetchRawData()]{@link RawDataService#fetchRawData} method
-     * and either their [mapFromRawData()]{@link RawDataService#mapFromRawData}
-     * method or their [mapping's]{@link RawDataService#mapping}
-     * [mapFromRawData()]{@link DataMapping#mapFromRawData} method.
+     * override their [fetchRawData()]{@link RawDataService#fetchRawData}
+     * method, their [fetchOfflineData()]{@link RawDataService#fetchOfflineData}
+     * method, their [mapFromRawData()]{@link RawDataService#mapFromRawData}
+     * method, their [mapping's]{@link RawDataService#mapping}
+     * [mapFromRawData()]{@link DataMapping#mapFromRawData} method, or several
+     * of these.
      *
      * @method
-     * @argument {DataSelector} selector - Defines what data should be returned.
+     * @argument {DataSelector} selector - Defines what data should be fetched.
      *                                     A [type]{@link DataObjectDescriptor}
      *                                     can be provided instead of a
      *                                     {@link DataSelector}, in which
@@ -131,11 +124,11 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *                                     [criteria]{@link DataSelector#criteria}
      *                                     will be created and used for the
      *                                     fetch.
-     * @argument {DataStream} stream     - The stream to which the provided data
-     *                                     should be added. If not stream is
+     * @argument {?DataStream} stream    - A stream to which the fetched data
+     *                                     can be added. If not stream is
      *                                     provided a stream will be created and
      *                                     returned by this method.
-     * @returns {DataStream} - The stream provided to or created by this method.
+     * @returns {DataStream} - The stream to which the fetched data was added.
      */
     fetchData: {
         value: function (selector, stream) {
@@ -146,6 +139,14 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             } else {
                 stream.selector = DataSelector.withTypeAndCriteria(selector);
             }
+            // Fetch the data with the passed in or created stream.
+            return this.isOffline ? this.fetchOfflineData(stream) :
+                                    this._fetchOnlineData(stream);
+        }
+    },
+
+    _fetchOnlineData: {
+        value: function (stream) {
             // Get the data from raw data.
             this.fetchRawData(stream);
             // Return the passed in or created stream.
@@ -154,10 +155,168 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     },
 
     /***************************************************************************
-     * Fetching and modifying raw data
+     * Handling offline
+     */
+
+    /*
+     * By default this returns the
+     * [root service's offline status]{@link DataService#isOffline}.
      *
-     * These methods should only be called by the raw data service itself. They
-     * are typically overridden by subclasses to implement a service.
+     * Subclasses that work the same way when offline as when online should
+     * override this to always return `false` so as to prevent calls to
+     * [fetchOfflineData()]{@link RawDataService#fetchOfflineData}.
+     *
+     * @type {boolean}
+     */
+    isOffline: {
+        get: function () {
+            return this.rootService.isOffline;
+        }
+    },
+
+    /**
+     * Fetch data when offline.
+     *
+     * The default implementation does nothing but return the passed in stream.
+     * This is appropriate for subclasses that do not support offline operation.
+     *
+     * Subclasses that work the same way when offline as when online should
+     * override their [isOffline]{@link RawDataService#isOffline} property to
+     * always return false so this method is never called.
+     *
+     * Subclasses that work offline and operate differently when offline than
+     * when online should override this method to handle the offline operation.
+     * Usually these subclasses will override their
+     * [addOfflineData()]{@link RawDataSource#addOfflineData} method to cache
+     * data when online that can be used by this method when offline.
+     *
+     * @method
+     * @argument {DataStream} stream - A stream to which the fetched data can
+     *                                 be added. This must not and will not be
+     *                                 undefined or null, and it will include a
+     *                                 selector specifying which data should be
+     *                                 fetched.
+     * @returns {DataStream} - The stream to which the fetched data was added.
+     */
+    fetchOfflineData: {
+        value: function (stream) {
+            // Subclasses should override this to do something useful.
+            return stream;
+        }
+    },
+
+    /**
+     * Called every time [addRawData()]{@link RawDataService#addRawData} is
+     * called while online to optionally cache that data for offline use.
+     *
+     * The default implementation does nothing. This is appropriate for
+     * subclasses that do not support offline operation or which operate the
+     * same way when offline as when online.
+     *
+     * Other subclasses may override this method to cache data fetched when
+     * online so [fetchOfflineData]{@link RawDataSource#fetchOfflineData} can
+     * use that data when offline.
+     *
+     * @method
+     * @argument {DataStream} stream   - The stream to which the fetched data is
+     *                                   being added.
+     * @argument {Array} rawData       - An array of objects whose properties'
+     *                                   values hold the raw data.
+     * @argument {?} context           - The context value passed to the
+     *                                   [addRawData()]{@link DataMapping#addRawData}
+     *                                   call that is invoking this method.
+     */
+    addOfflineData: {
+        value: function (stream, rawData, context) {
+            // Subclasses should override this to do something useful.
+        }
+    },
+
+    /**
+     * Provides a {@link IndexedDBDatabase} shared across all raw data services
+     * that can be used to persist data stored in
+     * [addOfflineData()]{@link RawDataService#addOfflineData} for use in
+     * [fetchOfflineData()]{@link RawDataService#fetchOfflineData}.
+     *
+     * @type {IndexedDBService}
+     */
+    offlineDatabase: {
+        get: function () {
+            if (!exports.RawDataService._offlineDatabase) {
+                exports.RawDataService._offlineDatabase = new IndexedDBService();
+            }
+            return exports.RawDataService._offlineDatabase;
+        }
+    },
+
+    /***************************************************************************
+     * Saving changed data objects
+     */
+
+    deleteDataObject: {
+        value: function (object) {
+            var data = {};
+            this.mapToRawData(object, data);
+            return this.deleteRawData(data, object);
+        }
+    },
+
+    saveDataObject: {
+        value: function (object) {
+            var data = {};
+            this.mapToRawData(object, data);
+            return this.saveRawData(data, object);
+        }
+    },
+
+    saveDataChanges: {
+        value: function () {
+            return this.rootService.saveDataChanges();
+        }
+    },
+
+    /***************************************************************************
+     * Managing data object property values
+     */
+
+    decacheObjectProperties: {
+        value: function (object, propertyNames) {
+            return this.rootService.decacheObjectProperties(object, propertyNames);
+        }
+    },
+
+    getObjectProperties: {
+        value: function (object, propertyNames) {
+            return this.rootService.getObjectProperties(object, propertyNames);
+        }
+    },
+
+    updateObjectProperties: {
+        value: function (object, propertyNames) {
+            return this.rootService.updateObjectProperties(object, propertyNames);
+        }
+    },
+
+    /**
+     * Fetch the value of a data object's property, possibly asynchronously.
+     *
+     * The default implementation of this method just return a fulfilled promise
+     * for `null`. Subclasses should override this method to perform any fetch
+     * or other operation required to get the requested data. The subclass
+     * implementations should only use calls to their
+     * [root service's]{@link DataService.rootService}
+     * [fetchData()]{@link DataService#fetchData} to fetch data.
+     */
+    fetchObjectProperty: {
+        value: function (object, propertyName) {
+            return this.nullPromise;
+        }
+    },
+
+    /***************************************************************************
+     * Handling raw data
+     *
+     * Most of the methods overridden in RawDataService subclasses are here.
      */
 
     /**
@@ -242,9 +401,11 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     addRawData: {
         value: function (stream, rawData, context) {
+            var i, n, object;
+            // Give the service a chance to save the data for offline use.
+            this.addOfflineData(stream, rawData, context);
             // Convert the raw data to appropriate data objects. The conversion
             // will be done in place to avoid creating an extra array.
-            var i, n, object;
             for (i = 0, n = rawData ? rawData.length : 0; i < n; i += 1) {
                 object = this.getDataObject(stream.selector.type, rawData[i], context);
                 this.mapFromRawData(object, rawData[i], context);
@@ -320,70 +481,6 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     rawDataDone: {
         value: function (stream) {
             stream.dataDone();
-        }
-    },
-
-    /***************************************************************************
-     * Saving changed data object
-     */
-
-    deleteDataObject: {
-        value: function (object) {
-            var data = {};
-            this.mapToRawData(object, data);
-            return this.deleteRawData(data, object);
-        }
-    },
-
-    saveDataObject: {
-        value: function (object) {
-            var data = {};
-            this.mapToRawData(object, data);
-            return this.saveRawData(data, object);
-        }
-    },
-
-    saveDataChanges: {
-        value: function () {
-            return this.rootService.saveDataChanges();
-        }
-    },
-
-    /***************************************************************************
-     * Obtaining data object property values
-     */
-
-    decacheObjectProperties: {
-        value: function (object, propertyNames) {
-            return this.rootService.decacheObjectProperties(object, propertyNames);
-        }
-    },
-
-    getObjectProperties: {
-        value: function (object, propertyNames) {
-            return this.rootService.getObjectProperties(object, propertyNames);
-        }
-    },
-
-    updateObjectProperties: {
-        value: function (object, propertyNames) {
-            return this.rootService.updateObjectProperties(object, propertyNames);
-        }
-    },
-
-    /**
-     * Fetch the value of a data object's property, possibly asynchronously.
-     *
-     * The default implementation of this method just return a fulfilled
-     * promise for `null`. Subclasses should override this method
-     * to perform any fetch or other operation required to get the
-     * requested data. The subclass implementations should only use
-     * calls to their [root service's]{@link DataService.rootService}
-     * [fetchData()]{@link DataService#fetchData} to fetch data.
-     */
-    fetchObjectProperty: {
-        value: function (object, propertyName) {
-            return this.nullPromise;
         }
     }
 

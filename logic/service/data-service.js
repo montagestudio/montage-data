@@ -339,132 +339,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Handling offline
-     */
-
-    /**
-     * Since root services are responsible for tracking offline status,
-     * subclasses whose instances will not be root services should override this
-     * property to return their root service's value for it.
-     *
-     * @type {boolean}
-     */
-    isOffline: {
-        get: function () {
-            var self = this;
-            if (this._isOffline === undefined) {
-                this._isOffline = !navigator.onLine;
-                window.addEventListener('online', function () { self._isOffline = true; });
-                window.addEventListener('offline', function () { self._isOffline = false; });
-            }
-            return this._isOffline;
-        }
-    },
-
-    /***************************************************************************
-     * Tracking data object
-     */
-
-    /**
-     * A set of the data objects created by this service or any other descendent
-     * of this service's [root service]{@link DataService#rootService} since
-     * [saveDataChanges()]{@link DataService#saveDataChanges} was last called,
-     * or since the root service was created if saveDataChanges() hasn't been
-     * called yet.
-     *
-     * Since root services are responsible for tracking data objects, subclasses
-     * whose instances will not be root services should override this property
-     * to return their root service's value for it.
-     *
-     * @type {Set.<Object>}
-     */
-    createdDataObjects: {
-        get: function () {
-            if (!this._createdDataObjects) {
-                this._createdDataObjects = new Set();
-            }
-            return this._createdDataObjects;
-        }
-    },
-
-    /**
-     * A set of the data objects managed by this service or any other descendent
-     * of this service's [root service]{@link DataService#rootService} that have
-     * been changed since [saveDataChanges()]{@link DataService#saveDataChanges}
-     * was last called, or since the root service was created if
-     * [saveDataChanges()]{@link DataService#saveDataChanges} hasn't been called
-     * yet.
-     *
-     * Since root services are responsible for tracking data objects, subclasses
-     * whose instances will not be root services should override this property
-     * to return their root service's value for it.
-     *
-     * @type {Set.<Object>}
-     */
-    changedDataObjects: {
-        get: function () {
-            var objects;
-            if (this._isRootService) {
-                this._changedDataObjects = this._changedDataObjects || new Set();
-                objects = this._changedDataObjects;
-            }
-            return objects;
-        }
-    },
-
-    /***************************************************************************
-     * Tracking data object types
-     */
-
-    /**
-     * Get the type of the specified data object.
-     *
-     * @private
-     * @method
-     * @argument {Object} object       - The object whose type is sought.
-     * @returns {DataObjectDescriptor} - The type of the object, or undefined if
-     * no type can be determined.
-     */
-    _getObjectType: {
-        value: function (object) {
-            var type = this._typeRegistry.get(object);
-            while (!type && object) {
-                if (object.constructor.TYPE instanceof DataObjectDescriptor) {
-                    type = object.constructor.TYPE;
-                } else {
-                    object = Object.getPrototypeOf(object);
-                }
-            }
-            return type;
-        }
-    },
-
-    /**
-     * Register the type of the specified data object if necessary.
-     *
-     * @private
-     * @method
-     * @argument {Object} object
-     * @argument {DataObjectDescriptor} type
-     */
-    _setObjectType: {
-        value: function (object, type) {
-            if (this._isRootService && this._getObjectType(object) !== type){
-                this._typeRegistry.set(object, type);
-            }
-        }
-    },
-
-    _typeRegistry: {
-        get: function () {
-            if (!this.__typeRegistry){
-                this.__typeRegistry = new WeakMap();
-            }
-            return this.__typeRegistry;
-        }
-    },
-
-    /***************************************************************************
      * Managing data object prototypes and their triggers
      */
 
@@ -523,6 +397,109 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 this.__dataObjectTriggers = new Map();
             }
             return this.__dataObjectTriggers;
+        }
+    },
+
+    /***************************************************************************
+     * Tracking data object types
+     */
+
+    /**
+     * Get the type of the specified data object.
+     *
+     * @private
+     * @method
+     * @argument {Object} object       - The object whose type is sought.
+     * @returns {DataObjectDescriptor} - The type of the object, or undefined if
+     * no type can be determined.
+     */
+    _getObjectType: {
+        value: function (object) {
+            var type = this._typeRegistry.get(object);
+            while (!type && object) {
+                if (object.constructor.TYPE instanceof DataObjectDescriptor) {
+                    type = object.constructor.TYPE;
+                } else {
+                    object = Object.getPrototypeOf(object);
+                }
+            }
+            return type;
+        }
+    },
+
+    /**
+     * Register the type of the specified data object if necessary.
+     *
+     * @private
+     * @method
+     * @argument {Object} object
+     * @argument {DataObjectDescriptor} type
+     */
+    _setObjectType: {
+        value: function (object, type) {
+            if (this._isRootService && this._getObjectType(object) !== type){
+                this._typeRegistry.set(object, type);
+            }
+        }
+    },
+
+    _typeRegistry: {
+        get: function () {
+            if (!this.__typeRegistry){
+                this.__typeRegistry = new WeakMap();
+            }
+            return this.__typeRegistry;
+        }
+    },
+
+    /***************************************************************************
+     * Tracking data object changes
+     */
+
+    /**
+     * A set of the data objects created by this service or any other descendent
+     * of this service's [root service]{@link DataService#rootService} since
+     * [saveDataChanges()]{@link DataService#saveDataChanges} was last called,
+     * or since the root service was created if saveDataChanges() hasn't been
+     * called yet.
+     *
+     * Since root services are responsible for tracking data objects, subclasses
+     * whose instances will not be root services should override this property
+     * to return their root service's value for it.
+     *
+     * @type {Set.<Object>}
+     */
+    createdDataObjects: {
+        get: function () {
+            if (!this._createdDataObjects) {
+                this._createdDataObjects = new Set();
+            }
+            return this._createdDataObjects;
+        }
+    },
+
+    /**
+     * A set of the data objects managed by this service or any other descendent
+     * of this service's [root service]{@link DataService#rootService} that have
+     * been changed since [saveDataChanges()]{@link DataService#saveDataChanges}
+     * was last called, or since the root service was created if
+     * [saveDataChanges()]{@link DataService#saveDataChanges} hasn't been called
+     * yet.
+     *
+     * Since root services are responsible for tracking data objects, subclasses
+     * whose instances will not be root services should override this property
+     * to return their root service's value for it.
+     *
+     * @type {Set.<Object>}
+     */
+    changedDataObjects: {
+        get: function () {
+            var objects;
+            if (this._isRootService) {
+                this._changedDataObjects = this._changedDataObjects || new Set();
+                objects = this._changedDataObjects;
+            }
+            return objects;
         }
     },
 
@@ -648,7 +625,35 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Saving changed data object
+     * Handling offline
+     */
+
+    /**
+     * Returns a value derived from and continuously updated with the value of
+     * [navigator.onLine]{@link https://developer.mozilla.org/en-US/docs/Web/API/NavigatorOnLine/onLine}.
+     *
+     * Root services are responsible for tracking offline status, and subclasses
+     * not designed to be root services should override this property to get
+     * it value from their root service.
+     *
+     * @type {boolean}
+     */
+    isOffline: {
+        get: function () {
+            var self = this;
+            if (this._isOffline === undefined) {
+                this._isOffline = !navigator.onLine;
+                window.addEventListener('online', function () { self._isOffline = true; });
+                window.addEventListener('offline', function () { self._isOffline = false; });
+            }
+            // Until offline is fully supported, prevent the service from
+            // ever thinking it's offline. TODO: Fix and remove this comment.
+            return false; // TODO: this._isOffline;
+        }
+    },
+
+    /***************************************************************************
+     * Saving changed data objects
      */
 
     /**
@@ -722,7 +727,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Obtaining data object property values
+     * Managing data object property values
      */
 
     /**
