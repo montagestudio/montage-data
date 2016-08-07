@@ -22,6 +22,7 @@ exports.Index = Component.specialize(/** @lends Index.prototype */ {
                     require("spec/enumeration"),
                     require("spec/http-service"),
                     require("spec/object-descriptor"),
+                    require("spec/offline-service"),
                     require("spec/property-descriptor"),
                     require("spec/raw-data-service")
                 ]);

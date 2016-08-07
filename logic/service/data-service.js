@@ -585,9 +585,14 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     /**
      * Fetch data from the service using its child services.
      *
-     * The data may be fetched asynchronously, in which case the data stream
-     * will be returned immediately but the stream's data will be fetched,
-     * registered, filled with data, and added to the stream at a later time.
+     * This method accept [types]{@link DataObjectDescriptor} as alternatives to
+     * [selectors]{@link DataSelector}, and its [stream]{DataStream} argument is
+     * optional, but when it calls its child services it will provide them with
+     * both a [selectors]{@link DataSelector} and a [stream]{DataStream}.
+     *
+     * The requested data may be fetched asynchronously, in which case the data
+     * stream will be returned immediately but the stream's data will be added
+     * to the stream at a later time.
      *
      * @method
      * @argument {DataSelector} selector - Defines what data should be returned.
@@ -598,25 +603,30 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      *                                     [criteria]{@link DataSelector#criteria}
      *                                     will be created and used for the
      *                                     fetch.
-     * @argument {DataStream} stream     - The stream to which the provided data
-     *                                     should be added. If not stream is
+     * @argument {?DataStream} stream    - The stream to which the provided data
+     *                                     should be added. If no stream is
      *                                     provided a stream will be created and
      *                                     returned by this method.
      * @returns {DataStream} - The stream provided to or created by this method.
      */
     fetchData: {
         value: function (selector, stream) {
-            var type = selector instanceof DataSelector ? selector.type : selector,
-                service = this.getChildServiceForType(type);
+            // Accept a type in lieu of a selector.
+            if (selector instanceof DataObjectDescriptor) {
+                selector = DataSelector.withTypeAndCriteria(selector)
+            }
+            // Set up the stream.
+            stream = stream || new DataStream();
+            stream.selector = selector;
             // Use a child service to fetch the data.
             try {
+                service = this.getChildServiceForType(selector.type)
                 if (service) {
-                    stream = service.fetchData(selector, stream);
+                    stream = service.fetchData(selector, stream) || stream;
                 } else {
-                    throw new Error("Can't fetch data of unknown type -", type.typeName + "/" + type.uuid);
+                    throw new Error("Can't fetch data of unknown type -", selector.type.typeName + "/" + selector.type.uuid);
                 }
             } catch (e) {
-                stream = stream || new DataStream();
                 stream.dataError(e);
             }
             // Return the passed in or created stream.
@@ -660,7 +670,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * Delete a data object.
      *
      * @method
-     * @argument {Object} object   - The object whose data should be saved.
+     * @argument {Object} object   - The object whose data should be deleted.
      * @returns {external:Promise} - A promise fulfilled when the object has
      * been deleted.
      */

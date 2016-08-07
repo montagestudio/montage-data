@@ -94,62 +94,43 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * called directly by anyone other than this service's parent. Calls to the
      * root service should be made to initiate data fetches.
      *
-     * When online, this method fetches raw data from a server or other source
-     * using [fetchRawData()]{@link RawDataService#fetchRawData}, which should
-     * repeatedly call [addRawData()]{@link RawDataService#addRawData} to get or
-     * create objects corresponding to the raw data, map the raw data to those
-     * objects, and add them to the returned stream.
+     * Subclasses should override this method to fetch the data objects
+     * requested by:
      *
-     * When offline, this method calls
-     * [fetchOfflineData()]{@link RawDataService#fetchOfflineData}, which by
-     * default does nothing. Subclasses must override
-     * [fetchOfflineData()]{@link RawDataService#fetchOfflineData} or
-     * [isOffline]{@link RawDataService#isOffline} if they want to provide
-     * offline support.
+     * 1. Fetching the raw records needed to generate the data object.
      *
-     * Subclasses should not override this method, they should instead
-     * override their [fetchRawData()]{@link RawDataService#fetchRawData}
-     * method, their [fetchOfflineData()]{@link RawDataService#fetchOfflineData}
-     * method, their [mapFromRawData()]{@link RawDataService#mapFromRawData}
-     * method, their [mapping's]{@link RawDataService#mapping}
-     * [mapFromRawData()]{@link DataMapping#mapFromRawData} method, or several
-     * of these.
+     * 2. Adding those records to the specified stream with calls to
+     * [addRawData()]{@link RawDataService#addRawData}.
+     *
+     * 3. Indicating that the fetching is done with a call to
+     * [rawDataDone()]{@link RawDataService#rawDataDone}.
+     *
+     * This method must be asynchronous and return as soon as possible even if
+     * it takes a while to obtain the raw records needed to generate the
+     * requested data objects. The data objects can be generated and added to
+     * the specified stream at any point after this method is called with calls
+     * to [addRawData()]{@link RawDataService#addRawData} and
+     * [rawDataDone()]{@link RawDataService#rawDataDone}.
+     *
+     * When offline, [isOffline]{@link RawDataService#isOffline} can be used in
+     * conjunction with an [OfflineService]{@link RawDataService#offlineService}
+     * to fetch the raw records used ot generate the requested data objects.
      *
      * @method
      * @argument {DataSelector} selector - Defines what data should be fetched.
-     *                                     A [type]{@link DataObjectDescriptor}
-     *                                     can be provided instead of a
-     *                                     {@link DataSelector}, in which
-     *                                     case a DataSelector with no
-     *                                     [criteria]{@link DataSelector#criteria}
-     *                                     will be created and used for the
-     *                                     fetch.
-     * @argument {?DataStream} stream    - A stream to which the fetched data
-     *                                     can be added. If not stream is
-     *                                     provided a stream will be created and
-     *                                     returned by this method.
-     * @returns {DataStream} - The stream to which the fetched data was added.
+     * @argument {DataStream} stream     - A stream to which the fetched data
+     *                                     can be added. Unlike for the
+     *                                     [superclass]{@link DataService#fetchData}
+     *                                     implementation of this method this
+     *                                     stream is required for this class.
+     * @returns {?DataStream} - The stream to which the fetched data objects
+     * were or will be added. An `undefined` or `null` value may be returned, in
+     * which case the calling parent should assume the fetched data objects were
+     * or will be added to the passed in stream.
      */
     fetchData: {
         value: function (selector, stream) {
-            // Set up the stream, accepting a type in lieu of a selector.
-            stream = stream || new DataStream();
-            if (selector instanceof DataSelector) {
-                stream.selector = selector;
-            } else {
-                stream.selector = DataSelector.withTypeAndCriteria(selector);
-            }
-            // Fetch the data with the passed in or created stream.
-            return this.isOffline ? this.fetchOfflineData(stream) :
-                                    this._fetchOnlineData(stream);
-        }
-    },
-
-    _fetchOnlineData: {
-        value: function (stream) {
-            // Get the data from raw data.
             this.fetchRawData(stream);
-            // Return the passed in or created stream.
             return stream;
         }
     },
@@ -171,37 +152,6 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     isOffline: {
         get: function () {
             return this.rootService.isOffline;
-        }
-    },
-
-    /**
-     * Fetch data when offline.
-     *
-     * The default implementation does nothing but return the passed in stream.
-     * This is appropriate for subclasses that do not support offline operation.
-     *
-     * Subclasses that work the same way when offline as when online should
-     * override their [isOffline]{@link RawDataService#isOffline} property to
-     * always return false so this method is never called.
-     *
-     * Subclasses that work offline and operate differently when offline than
-     * when online should override this method to handle the offline operation.
-     * Usually these subclasses will override their
-     * [addOfflineData()]{@link RawDataSource#addOfflineData} method to cache
-     * data when online that can be used by this method when offline.
-     *
-     * @method
-     * @argument {DataStream} stream - A stream to which the fetched data can
-     *                                 be added. This must not and will not be
-     *                                 undefined or null, and it will include a
-     *                                 selector specifying which data should be
-     *                                 fetched.
-     * @returns {DataStream} - The stream to which the fetched data was added.
-     */
-    fetchOfflineData: {
-        value: function (stream) {
-            // Subclasses should override this to do something useful.
-            return stream;
         }
     },
 
@@ -232,10 +182,33 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         }
     },
 
+    /**
+     * Subclasses that can benefit from [OfflineServices]{@link OfflineService}
+     * should override this to create if necessary, cache, and return an
+     * OfflineService configured for their needs.
+     *
+     * @type {OfflineService}
+     */
+    offlineService: {
+        value: undefined
+    },
+
     /***************************************************************************
      * Saving changed data objects
      */
 
+    /**
+     * Subclasses should override this method to delete a data object.
+     *
+     * The default implementation calls the deprecated
+     * [deleteRawData()]{@link RawDataService#deleteRawData} method, which does
+     * nothing by default.
+     *
+     * @method
+     * @argument {Object} object   - The object whose data should be deleted.
+     * @returns {external:Promise} - A promise fulfilled when the object has
+     * been deleted.
+     */
     deleteDataObject: {
         value: function (object) {
             var data = {};
@@ -244,6 +217,18 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         }
     },
 
+    /**
+     * Subclasses should override this method to save a data object.
+     *
+     * The default implementation calls the deprecated
+     * [saveRawData()]{@link RawDataService#saveRawData} method, which does
+     * nothing by default.
+     *
+     * @method
+     * @argument {Object} object   - The object whose data should be saved.
+     * @returns {external:Promise} - A promise fulfilled when all of the data in
+     * the changed object has been saved.
+     */
     saveDataObject: {
         value: function (object) {
             var data = {};
@@ -300,37 +285,14 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * Handling raw data
      *
      * TODO [Charles/Benoit] Rename "raw data" to "records/record".
-     *
-     * Most of the methods overridden in RawDataService subclasses are here.
      */
 
     /**
-     * Fetch the raw data of this service.
+     * Deprecated. Subclasses should override
+     * [fetchData()]{@link RawDataService#fetchData} instead of this method.
      *
-     * This method should never be called directly by users of this service.
-     * They should instead call [fetchData()]{@link RawDataService#fetchData}.
-     *
-     * This method should be overridden by service Subclasses to fetch their raw
-     * data and provide it to the specified stream with zero or more calls to
-     * [addRawData()]{@link RawDataService#addRawData} followed by one call to
-     * [rawDataDone()]{@link RawDataService#rawDataDone}.
-     *
-     * This method must be asynchronous and return as soon as
-     * possible even if it takes a while to obtain the raw data.
-     * The raw data can be provided to the service asynchronously
-     * using [addRawData()]{@link RawDataService#addRawData} and
-     * [rawDataDone()]{@link RawDataService#rawDataDone} at any
-     * point after this method is called, even after it returns.
-     *
-     * The default implementation of this method simply calls
-     * [rawDataDone()]{@link RawDataService#rawDataDone} immediately.
-     *
+     * @deprecated
      * @method
-     * @argument {DataStream} stream     - The stream to which the data objects
-     *                                     corresponding to the raw data should
-     *                                     be added. This stream contains
-     *                                     references to the selector defining
-     *                                     which raw data to fetch.
      */
     fetchRawData: {
         value: function (stream) {
@@ -338,7 +300,14 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         }
     },
 
-    // TODO: Document.
+    /**
+     * Deprecated. Subclasses should override
+     * [saveDataObject()]{@link RawDataService#saveDataObject} instead of this
+     * method.
+     *
+     * @deprecated
+     * @method
+     */
     saveRawData: {
         value: function (data, context) {
             // Subclasses must override this.
@@ -346,7 +315,14 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         }
     },
 
-    // TODO: Document.
+    /**
+     * Deprecated. Subclasses should override
+     * [deleteDataObject()]{@link RawDataService#deleteDataObject} instead of
+     * this method.
+     *
+     * @deprecated
+     * @method
+     */
     deleteRawData: {
         value: function (data, context) {
             // Subclasses must override this.
@@ -355,21 +331,22 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     },
 
     /**
-     * To be called by [fetchRawData()]{@link RawDataService#fetchRawData} when
-     * raw data is received. This method should never be called directly.
+     * To be called by [fetchData()]{@link RawDataService#fetchData} when raw
+     * data records are received. This method should never be called directly.
      *
      * This method creates and registers the data objects that
-     * will represent the raw data with repeated calls to
+     * will represent the raw records with repeated calls to
      * [getDataObject()]{@link DataService#getDataObject}, maps
      * the raw data to those objects with repeated calls to
      * [mapFromRawData()]{@link RawDataService#mapFromRawData},
      * and then adds those objects to the specified stream.
      *
-     * Subclasses should never need to override this method and they should
-     * instead override their [getDataObject()]{@link DataService#getDataObject}
-     * method and their [mapFromRawData()]{@link RawDataService#mapFromRawData}
-     * method or their [mapping]{@link RawDataService#mapping}'s
-     * [mapFromRawData()]{@link RawDataMapping#mapFromRawData} method.
+     * Subclasses should not override this method instead override their
+     * [getDataObject()]{@link DataService#getDataObject} method, their
+     * [mapFromRawData()]{@link RawDataService#mapFromRawData} method,
+     * their [mapping]{@link RawDataService#mapping}'s
+     * [mapFromRawData()]{@link RawDataMapping#mapFromRawData} method, or
+     * several of these.
      *
      * @method
      * @argument {DataStream} stream   - The stream to which the data objects

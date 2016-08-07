@@ -17,6 +17,7 @@
     "dependencies": {
         "bluebird": "~3.4.x",
         "collections": "~5.0.x",
+        "dexie": "~1.4.1",
         "montage": "~16.0.x"
     },
     "private": true
