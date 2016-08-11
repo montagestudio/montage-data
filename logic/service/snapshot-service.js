@@ -112,20 +112,18 @@ exports.SnapshotService = Montage.specialize(/** @lends SnapshotService# */ {
                 if (typeof a === "object" && typeof b === "object") {
                     result = !!a === !!b;
                     if (result) {
-                        var aKeys = Object.keys(a).sort(), aKey, aValue,
-                            bKeys = Object.keys(b).sort(), bKey, bValue;
+                        var aKeys = Object.keys(a).sort(), aValue,
+                            bKeys = Object.keys(b).sort(), bValue,
+                            key;
                         result = aKeys.filter(function(x) { return a[x] !== null }).length === bKeys.filter(function(x) { return b[x] !== null }).length;
                         if (result) {
-                            for (var i = 0, length = aKeys.length; i < length; i++) {
-                                aKey = aKeys[i];
-                                bKey = bKeys[i];
-                                if (aKey === bKey) {
-                                    aValue = a[aKey];
-                                    bValue = b[bKey];
-                                    if (!this._areSameValues(aValue, bValue)) {
-                                        result = false;
-                                        break;
-                                    }
+                            for (var i = 0, length = bKeys.length; i < length; i++) {
+                                key = bKeys[i];
+                                aValue = a[key];
+                                bValue = b[key];
+                                if (!this._areSameValues(aValue, bValue)) {
+                                    result = false;
+                                    break;
                                 }
                             }
                         }
