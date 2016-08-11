@@ -596,10 +596,10 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      *
      * @method
      * @argument {DataSelector} selector - Defines what data should be returned.
-     *                                     A [type]{@link DataObjectDescriptor}
-     *                                     can be provided instead of a
+     *                                     A type can be provided instead of a
      *                                     {@link DataSelector}, in which
-     *                                     case a DataSelector with no
+     *                                     case a DataSelector with the
+     *                                     specified type and no
      *                                     [criteria]{@link DataSelector#criteria}
      *                                     will be created and used for the
      *                                     fetch.
@@ -612,7 +612,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     fetchData: {
         value: function (selector, stream) {
             // Accept a type in lieu of a selector.
-            if (selector instanceof DataObjectDescriptor) {
+            if (!(selector instanceof DataSelector)) {
                 selector = DataSelector.withTypeAndCriteria(selector)
             }
             // Set up the stream.
