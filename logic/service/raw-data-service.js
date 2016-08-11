@@ -74,8 +74,8 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
 
     getDataObject: {
-        value: function (type, data, context) {
-            return this.rootService.getDataObject(type, data, context);
+        value: function (type, record, context) {
+            return this.rootService.getDataObject(type, record, context);
         }
     },
 
@@ -170,14 +170,14 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @method
      * @argument {DataStream} stream   - The stream to which the fetched data is
      *                                   being added.
-     * @argument {Array} rawDataArray  - An array of objects whose properties'
+     * @argument {Object} records      - An array of objects whose properties'
      *                                   values hold the raw data.
      * @argument {?} context           - The context value passed to the
      *                                   [addRawData()]{@link DataMapping#addRawData}
      *                                   call that is invoking this method.
      */
     addOfflineData: {
-        value: function (stream, rawDataArray, context) {
+        value: function (stream, records, context) {
             // Subclasses should override this to do something useful.
         }
     },
@@ -211,9 +211,9 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     deleteDataObject: {
         value: function (object) {
-            var data = {};
-            this.mapToRawData(object, data);
-            return this.deleteRawData(data, object);
+            var record = {};
+            this.mapToRawData(object, record);
+            return this.deleteRawData(record, object);
         }
     },
 
@@ -231,9 +231,9 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     saveDataObject: {
         value: function (object) {
-            var data = {};
-            this.mapToRawData(object, data);
-            return this.saveRawData(data, object);
+            var record = {};
+            this.mapToRawData(object, record);
+            return this.saveRawData(record, object);
         }
     },
 
@@ -309,7 +309,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @method
      */
     saveRawData: {
-        value: function (data, context) {
+        value: function (record, context) {
             // Subclasses must override this.
             return this.nullPromise;
         }
@@ -324,7 +324,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @method
      */
     deleteRawData: {
-        value: function (data, context) {
+        value: function (record, context) {
             // Subclasses must override this.
             return this.nullPromise;
         }
@@ -352,7 +352,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @argument {DataStream} stream   - The stream to which the data objects
      *                                   corresponding to the raw data should be
      *                                   added.
-     * @argument {Array} rawDataArray  - An array of objects whose properties'
+     * @argument {Array} records       - An array of objects whose properties'
      *                                   values hold the raw data. This array
      *                                   will be modified by this method.
      * @argument {?} context           - A value that will be passed to
@@ -362,20 +362,20 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *                                   if it is provided.
      */
     addRawData: {
-        value: function (stream, rawDataArray, context) {
+        value: function (stream, records, context) {
             var i, n, object;
             // Give the service a chance to save the data for offline use.
             if (!this.isOffline) {
-                this.addOfflineData(stream, rawDataArray, context);
+                this.addOfflineData(stream, records, context);
             }
             // Convert the raw data to appropriate data objects. The conversion
             // will be done in place to avoid creating an extra array.
-            for (i = 0, n = rawDataArray ? rawDataArray.length : 0; i < n; i += 1) {
-                object = this.getDataObject(stream.selector.type, rawDataArray[i], context);
-                this.mapFromRawData(object, rawDataArray[i], context);
-                rawDataArray[i] = object;
+            for (i = 0, n = records ? records.length : 0; i < n; i += 1) {
+                object = this.getDataObject(stream.selector.type, records[i], context);
+                this.mapFromRawData(object, records[i], context);
+                records[i] = object;
             }
-            stream.addData(rawDataArray);
+            stream.addData(records);
         }
     },
 
@@ -386,9 +386,9 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * to data objects, as in the following:
      *
      *     mapFromRawData: {
-     *         value: function (object, data) {
-     *             object.firstName = data.GIVEN_NAME;
-     *             object.lastName = data.FAMILY_NAME;
+     *         value: function (object, record) {
+     *             object.firstName = record.GIVEN_NAME;
+     *             object.lastName = record.FAMILY_NAME;
      *         }
      *     }
      *
@@ -401,21 +401,21 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @method
      * @argument {Object} object - An object whose properties must be set or
      *                             modified to represent the raw data.
-     * @argument {Object} data   - An object whose properties' values hold
+     * @argument {Object} record - An object whose properties' values hold
      *                             the raw data.
      * @argument {?} context     - A value that was passed in to the
      *                             [addRawData()]{@link RawDataService#addRawData}
      *                             call that invoked this method.
      */
     mapFromRawData: {
-        value: function (object, data, context) {
+        value: function (object, record, context) {
             var keys, i, n;
             if (this.mapping) {
-                this.mapping.mapFromRawData(object, data, context);
-            } else if (data) {
-                keys = Object.keys(data);
+                this.mapping.mapFromRawData(object, record, context);
+            } else if (record) {
+                keys = Object.keys(record);
                 for (i = 0, n = keys.length; i < n; i += 1) {
-                    object[keys[i]] = data[keys[i]];
+                    object[keys[i]] = record[keys[i]];
                 }
             }
         }
@@ -423,7 +423,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
 
     // TODO: Document.
     mapToRawData: {
-        value: function (object, data) {
+        value: function (object, record) {
             // TO DO: Provide a default mapping based on object.TYPE.
             // For now, subclasses must override this.
         }
