@@ -14,7 +14,6 @@ describe("A DataService", function() {
 
         // Create the service after resetting the main service.
         DataService.mainService = undefined;
-        console.log("==========================================");
         service = new DataService();
         service.NAME = "SERVICE";
         service.jasmineToString = function () { return "SERVICE"; };
