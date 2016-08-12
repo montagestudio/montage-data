@@ -8,11 +8,10 @@ var DataService = require("logic/service/data-service").DataService,
  * REST or other network services. Raw data services can therefore be considered
  * proxies for these REST or other services.
  *
- * Raw data services always have a parent service to which they mush be
- * [added]{@link DataService#addChildService}. These parent services are usually
- * plain [data services]{@link DataService} and often the application's
- * [main data service]{@link DataService.mainService}, and all calls to raw data
- * services must be routed through their parent services.
+ * Raw data services are usually the children of a
+ * [data service]{@link DataService} that often is the application's
+ * [main data service]{@link DataService.mainService}. All calls to raw data
+ * services that have parent services must be routed through those parents.
  *
  * Raw data service subclasses that implement their own constructor should call
  * this class' constructor at the beginning of their constructor implementation
@@ -36,7 +35,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     },
 
     /***************************************************************************
-     * Basic properties
+     * Basic Properties
      *
      * Private properties are defined where they are used, not here.
      */
@@ -54,7 +53,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     },
 
     /***************************************************************************
-     * Tracking data object changes
+     * Tracking Data Object Changes
      */
 
     createdDataObjects: {
@@ -70,7 +69,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     },
 
     /***************************************************************************
-     * Creating data objects
+     * Creating Data Objects
      */
 
     getDataObject: {
@@ -86,7 +85,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     },
 
     /***************************************************************************
-     * Fetching data objects
+     * Fetching Data Objects
      */
 
     /**
@@ -136,7 +135,95 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     },
 
     /***************************************************************************
-     * Handling offline
+     * Saving Changed Data Objects
+     */
+
+    /**
+     * Subclasses should override this method to delete a data object.
+     *
+     * The default implementation calls the deprecated
+     * [deleteRawData()]{@link RawDataService#deleteRawData} method, which does
+     * nothing by default.
+     *
+     * @method
+     * @argument {Object} object   - The object whose data should be deleted.
+     * @returns {external:Promise} - A promise fulfilled when the object has
+     * been deleted.
+     */
+    deleteDataObject: {
+        value: function (object) {
+            var record = {};
+            this.mapToRawData(object, record);
+            return this.deleteRawData(record, object);
+        }
+    },
+
+    /**
+     * Subclasses should override this method to save a data object.
+     *
+     * The default implementation calls the deprecated
+     * [saveRawData()]{@link RawDataService#saveRawData} method, which does
+     * nothing by default.
+     *
+     * @method
+     * @argument {Object} object   - The object whose data should be saved.
+     * @returns {external:Promise} - A promise fulfilled when all of the data in
+     * the changed object has been saved.
+     */
+    saveDataObject: {
+        value: function (object) {
+            var record = {};
+            this.mapToRawData(object, record);
+            return this.saveRawData(record, object);
+        }
+    },
+
+    saveDataChanges: {
+        value: function () {
+            return this.rootService.saveDataChanges();
+        }
+    },
+
+    /***************************************************************************
+     * Managing Data Object Property Values
+     */
+
+    decacheObjectProperties: {
+        value: function (object, propertyNames) {
+            return this.rootService.decacheObjectProperties(object, propertyNames);
+        }
+    },
+
+    getObjectProperties: {
+        value: function (object, propertyNames) {
+            return this.rootService.getObjectProperties(object, propertyNames);
+        }
+    },
+
+    updateObjectProperties: {
+        value: function (object, propertyNames) {
+            return this.rootService.updateObjectProperties(object, propertyNames);
+        }
+    },
+
+    /**
+     * Fetch the value of a data object's property, possibly asynchronously.
+     *
+     * The default implementation of this method just return a fulfilled promise
+     * for `null`. Subclasses should override this method to perform any fetch
+     * or other operation required to get the requested data. The subclass
+     * implementations should only use calls to their
+     * [root service's]{@link DataService.rootService}
+     * [fetchData()]{@link DataService#fetchData} to fetch data.
+     */
+    fetchObjectProperty: {
+        value: function (object, propertyName) {
+            return this.nullPromise;
+        }
+    },
+
+    /***************************************************************************
+     * Handling Offline
      */
 
     /*
@@ -194,97 +281,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     },
 
     /***************************************************************************
-     * Saving changed data objects
-     */
-
-    /**
-     * Subclasses should override this method to delete a data object.
-     *
-     * The default implementation calls the deprecated
-     * [deleteRawData()]{@link RawDataService#deleteRawData} method, which does
-     * nothing by default.
-     *
-     * @method
-     * @argument {Object} object   - The object whose data should be deleted.
-     * @returns {external:Promise} - A promise fulfilled when the object has
-     * been deleted.
-     */
-    deleteDataObject: {
-        value: function (object) {
-            var record = {};
-            this.mapToRawData(object, record);
-            return this.deleteRawData(record, object);
-        }
-    },
-
-    /**
-     * Subclasses should override this method to save a data object.
-     *
-     * The default implementation calls the deprecated
-     * [saveRawData()]{@link RawDataService#saveRawData} method, which does
-     * nothing by default.
-     *
-     * @method
-     * @argument {Object} object   - The object whose data should be saved.
-     * @returns {external:Promise} - A promise fulfilled when all of the data in
-     * the changed object has been saved.
-     */
-    saveDataObject: {
-        value: function (object) {
-            var record = {};
-            this.mapToRawData(object, record);
-            return this.saveRawData(record, object);
-        }
-    },
-
-    saveDataChanges: {
-        value: function () {
-            return this.rootService.saveDataChanges();
-        }
-    },
-
-    /***************************************************************************
-     * Managing data object property values
-     */
-
-    decacheObjectProperties: {
-        value: function (object, propertyNames) {
-            return this.rootService.decacheObjectProperties(object, propertyNames);
-        }
-    },
-
-    getObjectProperties: {
-        value: function (object, propertyNames) {
-            return this.rootService.getObjectProperties(object, propertyNames);
-        }
-    },
-
-    updateObjectProperties: {
-        value: function (object, propertyNames) {
-            return this.rootService.updateObjectProperties(object, propertyNames);
-        }
-    },
-
-    /**
-     * Fetch the value of a data object's property, possibly asynchronously.
-     *
-     * The default implementation of this method just return a fulfilled promise
-     * for `null`. Subclasses should override this method to perform any fetch
-     * or other operation required to get the requested data. The subclass
-     * implementations should only use calls to their
-     * [root service's]{@link DataService.rootService}
-     * [fetchData()]{@link DataService#fetchData} to fetch data.
-     */
-    fetchObjectProperty: {
-        value: function (object, propertyName) {
-            return this.nullPromise;
-        }
-    },
-
-    /***************************************************************************
-     * Handling raw data
-     *
-     * TODO [Charles/Benoit] Rename "raw data" to "records/record".
+     * Handling Raw Data
      */
 
     /**

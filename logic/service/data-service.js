@@ -46,8 +46,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
 
     constructor: {
         value: function DataService() {
-            if (!exports.DataService.mainService) {
-                exports.DataService.registerService(this);
+            exports.DataService.registerService(this);
+            if (exports.DataService.mainService === this) {
                 if (this.providesAuthorization) {
                     exports.DataService.authorizationManager.registerAuthorizationService(this);
                 }
@@ -99,12 +99,16 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
 
     /**
-     * Parent of this service.
+     * A read-only reference to the parent of this service.
      *
-     * [Plain data services]{@link DataService} cannot have a parent but
-     * [raw data services]{@link RawDataService} must have parents, which must
-     * be defined by [adding]{@link DataService#addChildService} those raw data
-     * services as children of those parents.
+     * This value is modified by calls to
+     * [addChildService()]{@link DataService#addChildService} and
+     * [removeChildService()]{@link DataService#removeChildService} and cannot
+     * be modified directly.
+     *
+     * Data services that have no parents are assumed to be
+     * [root services]{@link DataService#rootService}, and usually only the
+     * [main services]{@link DataService#mainService} is a root service.
      *
      * @type {DataService}
      */
@@ -118,10 +122,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * Convenience read-only reference to the root of the service tree
      * containing this service. For most applications this will be the
      * [main service]{@link DataService.mainService}.
-     *
-     * [Plain data services]{@link DataService} can only be root services but
-     * [raw data services]{@link RawDataService} must always have parents and
-     * cannot be root services.
      *
      * @type {DataService}
      */
@@ -143,26 +143,31 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * @argument {RawDataService} service
      */
     addChildService: {
-        value: function (service) {
-            var types = service.types,
-                services, type, i, n;
+        value: function (child) {
+            var types = child.types,
+                children, type, i, n;
+            // If the new child service already has a parent, remove it from
+            // that parent.
+            if (child._parentService) {
+                child._parentService.removeChildService(child);
+            }
             // Add the new child service to the services array of each of its
             // types or to the "all types" service array identified by the
             // `null` type, and add each of the new child's types to the array
             // of child types if they're not already there.
             for (i = 0, n = types && types.length || 1; i < n; i += 1) {
                 type = types && types.length && types[i] || null;
-                services = this._childServiceMap.get(type) || [];
-                services.push(service);
-                if (services.length === 1) {
-                    this._childServiceMap.set(type, services);
+                children = this._childServiceMap.get(type) || [];
+                children.push(child);
+                if (children.length === 1) {
+                    this._childServiceMap.set(type, children);
                     if (type) {
                         this._childServiceTypes.push(type);
                     }
                 }
             }
             // Set the new child service's parent.
-            service._parentService = this;
+            child._parentService = this;
         }
     },
 
@@ -179,9 +184,9 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * @argument {RawDataService} service
      */
     removeChildService: {
-        value: function (service) {
-            var types = service.types,
-                type, services, index, i, n;
+        value: function (child) {
+            var types = child.types,
+                type, chidren, index, i, n;
             // Remove the child service from the services array of each of its
             // types or from the "all types" service array identified by the
             // `null` type, or remove a type altogether if its service array
@@ -190,10 +195,10 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             // remove.
             for (i = 0, n = types && types.length || 1; i < n; i += 1) {
                 type = types && types.length && types[i] || null;
-                services = this._childServiceMap.get(type);
-                index = services ? services.indexOf(service) : -1;
-                if (index >= 0 && services.length > 1) {
-                    services.splice(index, 1);
+                chidren = this._childServiceMap.get(type);
+                index = chidren ? chidren.indexOf(child) : -1;
+                if (index >= 0 && chidren.length > 1) {
+                    chidren.splice(index, 1);
                 } else if (index === 0) {
                     this._childServiceMap.delete(type);
                     index = type ? this._childServiceTypes.indexOf(type) : -1;
@@ -203,8 +208,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 }
             }
             // Clear the service parent if appropriate.
-            if (service._parentService === this) {
-                service._parentService = undefined;
+            if (child._parentService === this) {
+                child._parentService = undefined;
             }
         }
     },
@@ -241,7 +246,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /**
-     * Private settable parent service pointer.
+     * Private settable parent service reference.
      *
      * This property should not be modified outside of
      * [addChildService()]{@link DataService#addChildService} and
@@ -613,18 +618,18 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: function (selector, stream) {
             // Accept a type in lieu of a selector.
             if (!(selector instanceof DataSelector)) {
-                selector = DataSelector.withTypeAndCriteria(selector)
+                selector = DataSelector.withTypeAndCriteria(selector);
             }
             // Set up the stream.
             stream = stream || new DataStream();
             stream.selector = selector;
             // Use a child service to fetch the data.
             try {
-                service = this.getChildServiceForType(selector.type)
+                service = this.getChildServiceForType(selector.type);
                 if (service) {
                     stream = service.fetchData(selector, stream) || stream;
                 } else {
-                    throw new Error("Can't fetch data of unknown type -", selector.type.typeName + "/" + selector.type.uuid);
+                    throw new Error("Can't fetch data of unknown type - " + selector.type.typeName + "/" + selector.type.uuid);
                 }
             } catch (e) {
                 stream.dataError(e);
@@ -1025,23 +1030,30 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
 
     /**
-     * A read-only reference to the application's main service.
+     * A reference to the application's main service.
      *
      * Applications typically have one and only one main service to which all
      * data requests are sent. This service can in turn delegate handling of
      * different types of data to child services specialized for each type.
      *
-     * For this property to be correctly set
-     * [registerService()]{@link DataService.registerService} must be called at
-     * least once with a service that is either the main service or a descendent
-     * of the main service.
+     * This property will be set correctly if
+     * [registerService()]{@link DataService.registerService} is called at least
+     * once with a service that is either the main service or a descendent of
+     * it. Since `registerService()` is called by de default
+     * [data service constructor]{@link DataService}, that will usually happen
+     * automatically.
      *
      * @type {DataService}
      */
     mainService: {
         get: function () {
-            this._mainService = this._mainService && this._mainService.rootService;
+            if (this._mainService && this._mainService.parentService) {
+                this._mainService = this._mainService.rootService;
+            }
             return this._mainService;
+        },
+        set: function (service) {
+            this._mainService = service;
         }
     },
 
@@ -1064,18 +1076,10 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     registerService: {
         value: function (service) {
-            this._mainService = service;
+            if (!this.mainService) {
+                this.mainService = service;
+            }
         }
-    },
-
-    /**
-     * A private read-only reference to the application's main service.
-     *
-     * @private
-     * @type {DataService}
-     */
-    _mainService: {
-        value: undefined
     },
 
     /***************************************************************************
