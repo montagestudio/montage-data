@@ -404,6 +404,12 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *                             [addRawData()]{@link RawDataService#addRawData}
      *                             call that invoked this method.
      */
+
+/* TODO
+charles: 
+`mapRawDataToHazard()`, `mapHazardToRawData()`, `mapRawDataToObject()`, et `mapObjectToRawData()` seraient clair et grammatically correct.
+*/
+
     mapFromRawData: {
         value: function (object, record, context) {
             var keys, i, n;
