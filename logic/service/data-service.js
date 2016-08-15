@@ -166,6 +166,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                     }
                 }
             }
+            // Add the new child to this service's children set.
+            this._childServices.add(child);
             // Set the new child service's parent.
             child._parentService = this;
         }
@@ -207,6 +209,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                     }
                 }
             }
+            // Remove the child from this service's children set.
+            this._childServices.delete(child);
             // Clear the service parent if appropriate.
             if (child._parentService === this) {
                 child._parentService = undefined;
@@ -303,6 +307,15 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 this.__childServiceTypes = [];
             }
             return this.__childServiceTypes;
+        }
+    },
+
+    _childServices: {
+        get: function() {
+            if (!this.__childServices) {
+                this.__childServices = new Set();
+            }
+            return this.__childServices;
         }
     },
 
@@ -667,6 +680,27 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
+    offlineOperations: {
+        get: function () {
+            var children = this._childServices,
+                allOperations, childOperations, i, n;
+            for (i = 0, n = children.length; i < n; i += 1) {
+                childOperations = children[i].offlineOperations;
+                if (childOperations && childOperations.length) {
+                    allOperations = allOperations || [];
+                    allOperations.push.apply(allOperations, childOperations);
+                }
+            }
+            return allOperations || this.emptyArray;
+        }
+    },
+
+    performOfflineOperations: {
+        value: function(operations) {
+            // Subclasses must override this.
+        }
+    },
+
     /***************************************************************************
      * Saving changed data objects
      */
@@ -944,6 +978,10 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     /***************************************************************************
      * Utilities
      */
+
+    emptyArray: {
+        value: []
+    },
 
     /**
      * A function that does nothing but returns null, useful for terminating
