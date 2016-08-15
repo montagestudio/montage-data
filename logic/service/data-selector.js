@@ -28,6 +28,9 @@ exports.DataSelector = Montage.specialize(/** @lends DataSelector.prototype */ {
      *
      * @type {Object}
      */
+    _criteria: {
+        value: undefined
+    },
     criteria: {
         get: function () {
             if (!this._criteria) {
@@ -38,6 +41,16 @@ exports.DataSelector = Montage.specialize(/** @lends DataSelector.prototype */ {
         set: function (criteria) {
             this._criteria = criteria;
         }
+    },
+
+    /**
+     * An array of SortOrdering objects which combined in order describe how .
+     * data ordered after being selected.
+     * move to sortings
+     * @type {Object}
+     */
+    sortOrderings: {
+        value: undefined
     }
 
 }, {
