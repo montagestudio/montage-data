@@ -259,12 +259,9 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *                                   being added.
      * @argument {Object} records      - An array of objects whose properties'
      *                                   values hold the raw data.
-     * @argument {?} context           - The context value passed to the
-     *                                   [addRawData()]{@link DataMapping#addRawData}
-     *                                   call that is invoking this method.
      */
     addOfflineData: {
-        value: function (stream, records, context) {
+        value: function (stream, records) {
             // Subclasses should override this to do something useful.
         }
     },
@@ -360,18 +357,22 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     addRawData: {
         value: function (stream, records, context) {
-            var i, n, object;
-            // Give the service a chance to save the data for offline use.
-            if (!this.isOffline) {
-                this.addOfflineData(stream, records, context);
+            var offline, object, i, n;
+            // Record fetched raw data for offline use if appropriate.
+            offline = !this.isOffline && this._offlineRecords.get(stream);
+            if (offline) {
+                offline.push.apply(offline, records);
+            } else if (!this.isOffline) {
+                this._offlineRecords.set(stream, records.slice())
             }
             // Convert the raw data to appropriate data objects. The conversion
-            // will be done in place to avoid creating an extra array.
+            // will be done in place to avoid creating an unnecessary array.
             for (i = 0, n = records ? records.length : 0; i < n; i += 1) {
                 object = this.getDataObject(stream.selector.type, records[i], context);
                 this.mapFromRawData(object, records[i], context);
                 records[i] = object;
             }
+            // Add the converted data to the stream.
             stream.addData(records);
         }
     },
@@ -395,6 +396,10 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * The default implementation of this method copies the properties defined
      * by the raw data object to the data object.
      *
+     * @todo [Charles]: Rename mapping methods to `mapRawDataToObject()` and
+     * `mapObjectToRawData()`, overridable by type name with methods like
+     * `mapRawDataToHazard()` and `mapHazardToRawData()`.
+     *
      * @method
      * @argument {Object} object - An object whose properties must be set or
      *                             modified to represent the raw data.
@@ -404,12 +409,6 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *                             [addRawData()]{@link RawDataService#addRawData}
      *                             call that invoked this method.
      */
-
-/* TODO
-charles: 
-`mapRawDataToHazard()`, `mapHazardToRawData()`, `mapRawDataToObject()`, et `mapObjectToRawData()` seraient clair et grammatically correct.
-*/
-
     mapFromRawData: {
         value: function (object, record, context) {
             var keys, i, n;
@@ -447,7 +446,31 @@ charles:
      */
     rawDataDone: {
         value: function (stream) {
+            // Record fetched raw data for offline use if appropriate.
+            var records = this._offlineRecords.get(stream);
+            if (records) {
+                this.addOfflineData(stream, records);
+                this._offlineRecords.delete(stream);
+            }
+            // Notify the stream that it's got all the data it needs.
             stream.dataDone();
+        }
+    },
+
+    /**
+     * Records in the process of being written to streams (before
+     * [rawDataDone()]{@link RawDataService#rawDataDone} is called), to be
+     * stored for offline use.
+     *
+     * @private
+     * @type {Object.<Stream, records>}
+     */
+    _offlineRecords: {
+        get: function () {
+            if (!this.__offlineRecords) {
+                this.__offlineRecords = new WeakMap();
+            }
+            return this.__offlineRecords;
         }
     }
 
