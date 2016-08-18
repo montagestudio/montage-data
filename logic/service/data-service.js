@@ -680,18 +680,20 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
-    offlineOperations: {
-        get: function () {
+    readOfflineOperations: {
+        get: function (array) {
             var children = this._childServices,
-                allOperations, childOperations, i, n;
+                promise, promises, i, n;
             for (i = 0, n = children.length; i < n; i += 1) {
-                childOperations = children[i].offlineOperations;
-                if (childOperations && childOperations.length) {
-                    allOperations = allOperations || [];
-                    allOperations.push.apply(allOperations, childOperations);
+                array = array || [];
+                promise = children[i].readOfflineOperations(array);
+                if (promise !== this.emptyArrayPromise) {
+                    promises = promises || [];
+                    promises.push(promise);
                 }
             }
-            return allOperations || this.emptyArray;
+            return promises ? Promise.all(promises).then(function () { return array; }) :
+                              this.emptyArrayPromise;
         }
     },
 
@@ -979,10 +981,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * Utilities
      */
 
-    emptyArray: {
-        value: []
-    },
-
     /**
      * A function that does nothing but returns null, useful for terminating
      * a promise chain that needs to return null, as in the following code:
@@ -1014,6 +1012,15 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 exports.DataService._nullPromise = Promise.resolve(null);
             }
             return exports.DataService._nullPromise;
+        }
+    },
+
+    emptyArrayPromise: {
+        get: function () {
+            if (!exports.DataService._emptyArrayPromise) {
+                exports.DataService._emptyArrayPromise = Promise.resolve([]);
+            }
+            return exports.DataService._emptyArrayPromise;
         }
     },
 
