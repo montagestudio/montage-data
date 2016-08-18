@@ -674,9 +674,12 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 window.addEventListener('online', function () { self._isOffline = true; });
                 window.addEventListener('offline', function () { self._isOffline = false; });
             }
-            // Until offline is fully supported, prevent the service from
-            // ever thinking it's offline. TODO: Fix and remove this comment.
-            return false; // TODO: this._isOffline;
+            return this._isOffline;
+        },
+        set: function (offline) {
+            if (offline !== this.isOffline) {
+                this._isOffline = offline;
+            }
         }
     },
 
