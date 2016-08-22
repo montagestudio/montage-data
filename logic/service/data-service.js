@@ -9,7 +9,12 @@ var Montage = require("montage").Montage,
     Map = require("collections/map"),
     Promise = require("bluebird"),
     Set = require("collections/set"),
-    WeakMap = require("collections/weak-map");
+    WeakMap = require("collections/weak-map"),
+    evaluate = require("frb/evaluate"),
+    parse = require("frb/parse"),
+    compile = require("frb/compile-evaluator"),
+    evaluate = require("frb/evaluate"),
+    Scope = require("frb/scope");
 
 /**
  * AuthorizationPolicyType
@@ -57,6 +62,12 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                     });
                 }
             }
+        }
+    },
+
+    isMainService: {
+        get: function () {
+            return (exports.DataService.mainService === this);
         }
     },
 
@@ -128,6 +139,12 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     rootService: {
         get: function () {
             return this.parentService ? this.parentService.rootService : this;
+        }
+    },
+
+    isRootService: {
+        get: function () {
+            return (this.rootService === this);
         }
     },
 
@@ -666,41 +683,177 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      *
      * @type {boolean}
      */
+    _isOffline: {
+        value: undefined
+    },
     isOffline: {
         get: function () {
             var self = this;
             if (this._isOffline === undefined) {
                 this._isOffline = !navigator.onLine;
-                window.addEventListener('online', function () { self._isOffline = true; });
-                window.addEventListener('offline', function () { self._isOffline = false; });
+                window.addEventListener('online', 
+                    function (event) { 
+                        self._isOffline = false;
+                    });
+                window.addEventListener('offline', 
+                    function (event) {
+                        self._isOffline = true; 
+                    });
             }
             return this._isOffline;
         },
         set: function (offline) {
             if (offline !== this.isOffline) {
                 this._isOffline = offline;
+                if(!this._isOffline && this.isRootService) {
+                    this._processOfflineToOnlineOperations();
+                }
             }
         }
     },
 
+    __compiledSortOfflineOperationExpression: {
+        value: undefined
+    },
+    _compiledSortOfflineOperationExpression: {
+        get:function() {
+            return this.__compiledSortOfflineOperationExpression 
+                    || (this.__compiledSortOfflineOperationExpression = compile(parse("sorted{lastModified}.reversed()")));
+        }
+    },
+     __sortOfflineOperationScope: {
+        value: undefined
+    },
+   _sortOfflineOperationScope: {
+        get:function() {
+            return this.__sortOfflineOperationScope
+                    || (this.__sortOfflineOperationScope = new Scope());
+        }
+    },
+
+    _processOfflineToOnlineOperations: {
+        value: function() {
+            /*
+            1) Fetch all operations at main service level
+                1.1) offlineOperations getter, on Data-Service, implemented by Raw Data Service. Default implementation is looping on childServices and collecting results of accessing offline operations on them
+            2) weakmap operation - > service
+            3) Sort operations by time
+            4) Walk array
+                forEarch:
+                    matching rawDataService performOfflineOperations: (if contiguous)
+            */
+            var self = this,
+                offlineOperations,
+                dataStream = dataStream || (new DataStream()),
+                i, countI, iOperation, iOperationService, j, iOperationBatch,
+                operationToService = new WeakMap();
+
+                this.readOfflineOperations(operationToService)
+                    .then(function (operations) {
+                        var offlineOperations = operations;
+
+
+                        /* Operations shape is:
+                            {
+                                dataID:
+                                type:
+                                lastFetched: Date("08-02-2016"),
+                                lastModified: Date("08-02-2016"),
+                                operation: "update"||"delete"
+                            }
+                        */
+
+                        //Sort operations by lastModified, descending
+                        self._sortOfflineOperationScope.value = offlineOperations;
+                        self._compiledSortOfflineOperationExpression(self._sortOfflineOperationScope);
+                        i = 0;
+                        countI = offlineOperations.length;
+                        while(i<countI) {
+                            iOperation = offlineOperations[i];
+                            iOperationService = operationToService.get(iOperation);
+                            iOperationBatch = [iOperation];
+                            j=i+1;
+                            while(operationToService.get(offlineOperations[j]) === iOperationService && j<countI) {
+                                iOperationBatch.push(offlineOperations[j]);
+                                j++;
+                            }
+
+                            iOperationService.performOfflineOperations(iOperationBatch).then(function(performedOperations) {
+                                iOperationService.deleteOfflineOperations(iOperationBatch);
+                            })
+                            .catch(function(error) {
+
+                            });
+        
+                            i += iOperationBatch.length;
+                        }
+
+                    });
+        }
+    },
+
+    /**
+     * Reads offline operations available through all children DataServices
+     *
+     * @method
+     * @argument {DataSelector} selector - Defines what data should be returned.
+     * @returns {DataStream} -  The stream to which the provided data
+     *                                     should be added.
+     * the changed object has been saved.
+     */
+
     readOfflineOperations: {
-        get: function (array) {
-            var children = this._childServices,
-                promise, promises, i, n;
-            for (i = 0, n = children.length; i < n; i += 1) {
-                array = array || [];
-                promise = children[i].readOfflineOperations(array);
-                if (promise !== this.emptyArrayPromise) {
-                    promises = promises || [];
-                    promises.push(promise);
-                }
+        value: function (operationMapToService) {
+            var childrenSet = this._childServices,
+                promise, promises, i, n,
+                childrenIterator = childrenSet.values(), childService, childServicePromise,
+                array;
+
+            while (childService = childrenIterator.next().value) {
+                childServicePromise =  new Promise(function (resolve, reject) {
+                    var dataService = childService;
+                    array = array || [];
+                    operationMapToService = operationMapToService || (new WeakMap());
+
+                    dataService.readOfflineOperations(operationMapToService)
+                    .then(function(childOperations) {
+                        if (childOperations && childOperations.length) {
+                            array.push.apply(array, childOperations);
+                            for(var j=0, countJ = childOperations.length;(j<countJ);j++) {
+                                operationMapToService.set(childOperations[j],dataService);
+                            }
+                        }
+                        resolve(childOperations);
+                    }).catch(function(e) {
+                        reject(e);
+                        console.error(e);
+                    });
+                    // if (promise !== this.emptyArrayPromise) {
+                    //     promises = promises || [];
+                    //     promises.push(promise);
+                    // }
+                });
+
+                promises = promises || [];
+                promises.push(childServicePromise);
             }
             return promises ? Promise.all(promises).then(function () { return array; }) :
-                              this.emptyArrayPromise;
+                                    this.emptyArrayPromise;
         }
     },
 
     performOfflineOperations: {
+        value: function(operations) {
+            // Subclasses must override this.
+            //loop
+            var constructor = this.constructor;
+            for (var i = 0, countI = operations.length; i < countI; i++) {
+                constructor.methodForOfflineOperation(operations[i]).call(this,operations[i]);
+            }
+        }
+    },
+
+    deleteOfflineOperations: {
         value: function(operations) {
             // Subclasses must override this.
         }
@@ -1140,6 +1293,36 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
 
     authorizationManager: {
         value: AuthorizationManager
+    },
+
+    _operationTypeToServiceMethod: {
+        value: new Map()
+    },
+    methodForOfflineOperation: {
+        value: function(operation) {
+            //Check if custom method per type
+            var operationType = operation.type,
+                iMethod = this._operationTypeToServiceMethod.get(operationType),
+                iMethodName;
+
+            if (iMethod === undefined) {
+                iCapitalizedType = operationType[0].toUpperCase();
+                iCapitalizedType += operationType.slice(1);
+                
+                iMethodName = "perform";
+                iMethodName += iCapitalizedType;
+                iMethodName += "OfflineOperation";
+
+                if (typeof(iMethod = this.prototype[iMethodName]) === "function") {
+                    this._operationTypeToServiceMethod.set(operationType,iMethod);
+                }
+                else {
+                    this._operationTypeToServiceMethod.set(operationType,this.prototype.performOfflineOperation);
+                }
+            }
+            return iMethod;
+        }
     }
+
 
 });

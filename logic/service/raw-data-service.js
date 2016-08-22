@@ -260,7 +260,8 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @argument {Object} records      - An array of objects whose properties'
      *                                   values hold the raw data.
      */
-    addOfflineData: {
+
+    writeOfflineData: {
         value: function (stream, records) {
             // Subclasses should override this to do something useful.
         }
@@ -357,6 +358,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     addRawData: {
         value: function (stream, records, context) {
+/* NEEDS CLEANUP: This was a temporary measure
             var offline, object, i, n;
             // Record fetched raw data for offline use if appropriate.
             offline = !this.isOffline && this._offlineRecords.get(stream);
@@ -364,6 +366,11 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
                 offline.push.apply(offline, records);
             } else if (!this.isOffline) {
                 this._offlineRecords.set(stream, records.slice())
+*/
+            var i, n, object;
+            // Give the service a chance to save the data for offline use.
+            if (!this.isOffline) {
+                this.writeOfflineData(stream, records, context);
             }
             // Convert the raw data to appropriate data objects. The conversion
             // will be done in place to avoid creating an unnecessary array.
@@ -424,6 +431,14 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     },
 
     // TODO: Document.
+    /*
+        Default would become:
+        mapRawDataToObject() and mapObjectToRawData()
+        Custom selectors could be built like this to encapsulate Type-specific conversion logic:
+        mapRawDataToHazard() and mapHazardToRawData()
+
+        The frawmework would assess if such a selector exists and call it first if it does before using the generic one
+    */
     mapToRawData: {
         value: function (object, record) {
             // TO DO: Provide a default mapping based on object.TYPE.
