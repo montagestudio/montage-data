@@ -44,12 +44,13 @@ exports.DataSelector = Montage.specialize(/** @lends DataSelector.prototype */ {
     },
 
     /**
-     * An array of SortOrdering objects which combined in order describe how .
-     * data ordered after being selected.
-     * move to sortings
-     * @type {Object}
+     * An array of DataOrdering objects which combined define the extected ordering .
+     * of data described by criteria
+     * @type {Array}
      */
-    sortOrderings: {
+
+    /* sortOrderings -> orderings */
+    orderings: {
         value: undefined
     }
 

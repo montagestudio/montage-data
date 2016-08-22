@@ -6,29 +6,7 @@ var Montage = require("montage").Montage;
 
 var ASCENDING = "ASCENDING",
     DESCENDING = "DESCENDING";
-/**
- * Naming context:
- * SortDescriptor -> https://developer.apple.com/library/mac/documentation/Cocoa/Reference/Foundation/Classes/NSSortDescriptor_Class/#//apple_ref/occ/instp/NSSortDescriptor/key
- * properties would be:
- *       expression frb
- *       ascending boolean
- * 
- * SortExpression - > https://cloud.google.com/appengine/docs/python/search/sortexpressionclass
- * 
- * properties would be:
- *       expression frb
- *       direction ASCENDING or DESCENDING
- * 
- * SortOrdering -> 
- *  http://mirror.informatimago.com/next/developer.apple.com/documentation/LegacyTechnologies/WebObjects/WebObjects_4.5/System/Library/Frameworks/EOControl.framework/Java/Classes/EOSortOrdering.html
- * http://mirror.informatimago.com/next/developer.apple.com/documentation/LegacyTechnologies/WebObjects/WebObjects_4.5/System/Library/Frameworks/EOControl.framework/Java/Classes/EOFetchSpecification.html#//apple_ref/java/instm/EOFetchSpecification/setSortOrderings
- *  DataSelector would have a sortOrderings array of SortOrdering.
- *  * properties would be:
- *       expression: frb
- *       direction: ASCENDING or DESCENDING or
- *       ascending: boolean
- * 
- *
+/*
  *
  *    var syntax = parse("a.b");
  *    var array = [{foo:"A",bar:"2"},{foo:"A",bar:"1"},{foo:"C",bar:"5"},{foo:"D",bar:"3"},{foo:"B",bar:"2"},{foo:"B",bar:"4"},{foo:"F",bar:"1"},{foo:"G",bar:"2"},{foo:"E",bar:"4"}];
@@ -46,7 +24,7 @@ var ASCENDING = "ASCENDING",
  * @class
  * @extends external:Montage
  */
-exports.SortOrdering = Montage.specialize(/** @lends DataSelector.prototype */ {
+exports.DataOrdering = Montage.specialize(/** @lends DataSelector.prototype */ {
 
     /**
      * The expression that describes the sorting. Internally 
@@ -68,7 +46,8 @@ exports.SortOrdering = Montage.specialize(/** @lends DataSelector.prototype */ {
 
 }, {
 
-    withExpressionOrder: {
+    /* -> withExpressionAndOrder */
+    withExpressionAndOrder: {
         value: function (expression, order) {
             var sortOrdering = new this();
             sortOrdering.expression = expression;
