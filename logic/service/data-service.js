@@ -846,10 +846,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: function(operations) {
             // Subclasses must override this.
             //loop
-            var constructor = this.constructor;
+            var constructor = this.constructor,
+                promises = [];
             for (var i = 0, countI = operations.length; i < countI; i++) {
-                constructor.methodForOfflineOperation(operations[i]).call(this,operations[i]);
+                promises.push(constructor.methodForOfflineOperation(operations[i]).call(this,operations[i]));
             }
+
+            return Promise.all(promises);
         }
     },
 

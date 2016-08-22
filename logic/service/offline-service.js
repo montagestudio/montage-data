@@ -63,7 +63,7 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                     newDbSchema = {};
 
                     //We automatically create an extra table that will track offline operations the record was last updated
-                    schemaDefinition = "++";
+                    schemaDefinition = "++id";
                     schemaDefinition += ",";
                     schemaDefinition += "dataID";
                     schemaDefinition += ",";
@@ -739,9 +739,6 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                 changesPropertyName = this.changesPropertyName,
                 operationPropertyName = this.operationPropertyName,
                 operationDeleteName = this.operationDeleteName;
-;
-
-
 
                 myDB.open().then(function (db) {
                     db.transaction('rw', table, operationTable, 
@@ -778,6 +775,42 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
 
             });
         }
-    }
+    },
 
+    deleteOfflineOperations: {
+        value: function (operations) {
+            var self = this;
+
+            if(!operations || operations.length === 0) return Promise.resolve();
+            
+            return new Promise(function (resolve, reject) {
+                var myDB = self._db,
+                operationTable = self.operationTable,
+                primaryKey = operationTable.schema.primKey.name,
+                deleteOperationPromises = [];
+
+                myDB.open().then(function (db) {
+                    db.transaction('rw', operationTable, 
+                        function () {
+                            //Make a clone of the array and create the record to track the online Last Updated date 
+                            for(var i=0, countI = operations.length, iOperation;i<countI;i++) {
+                                if((iOperation = operations[i])) {
+                                    deleteOperationPromises.push(operationTable.delete(iOperation[primaryKey], iOperation));
+                                }
+                            }
+                            return Dexie.Promise.all(deleteOperationPromises);
+
+                    }).then(function(value) {
+                        resolve();
+                        //console.log(table.name,": updateData for ",objects.length," objects succesfully",value);
+                    }).catch(function(e) {
+                        reject(e);
+                        // console.log("tableName:failed to addO ffline Data",e)
+                        console.error(table.name,": failed to updateData for ",objects.length," objects with error",e);
+                    });
+                });
+
+            });
+        }
+    }
 });
