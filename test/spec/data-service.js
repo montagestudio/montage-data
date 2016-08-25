@@ -134,14 +134,14 @@ describe("A DataService", function() {
         expect(children[7].types).toBeUndefined();
         expect(children[8].types).toBeNull();
         expect(children[9].types).toEqual([]);
-        expect(parent.getChildServiceForType(Types[0].TYPE)).toEqual(children[0]);
-        expect(parent.getChildServiceForType(Types[1].TYPE)).toEqual(children[2]);
-        expect(parent.getChildServiceForType(Types[2].TYPE)).toEqual(children[4]);
-        expect(parent.getChildServiceForType(Types[3].TYPE)).toEqual(children[7]);
-        expect(parent.getChildServiceForObject(objects[0])).toEqual(children[0]);
-        expect(parent.getChildServiceForObject(objects[1])).toEqual(children[2]);
-        expect(parent.getChildServiceForObject(objects[2])).toEqual(children[4]);
-        expect(parent.getChildServiceForObject(objects[3])).toEqual(children[7]);
+        expect(parent._getChildServiceForType(Types[0].TYPE)).toEqual(children[0]);
+        expect(parent._getChildServiceForType(Types[1].TYPE)).toEqual(children[2]);
+        expect(parent._getChildServiceForType(Types[2].TYPE)).toEqual(children[4]);
+        expect(parent._getChildServiceForType(Types[3].TYPE)).toEqual(children[7]);
+        expect(parent._getChildServiceForObject(objects[0])).toEqual(children[0]);
+        expect(parent._getChildServiceForObject(objects[1])).toEqual(children[2]);
+        expect(parent._getChildServiceForObject(objects[2])).toEqual(children[4]);
+        expect(parent._getChildServiceForObject(objects[3])).toEqual(children[7]);
 
         // Modify the children and verify the resulting service parent, types,
         // and type-to-child mapping.
@@ -169,14 +169,14 @@ describe("A DataService", function() {
         expect(children[7].types).toBeUndefined();
         expect(children[8].types).toBeNull();
         expect(children[9].types).toEqual([]);
-        expect(parent.getChildServiceForType(Types[0].TYPE)).toEqual(children[3]);
-        expect(parent.getChildServiceForType(Types[1].TYPE)).toEqual(children[2]);
-        expect(parent.getChildServiceForType(Types[2].TYPE)).toEqual(children[4]);
-        expect(parent.getChildServiceForType(Types[3].TYPE)).toEqual(children[7]);
-        expect(parent.getChildServiceForObject(objects[0])).toEqual(children[3]);
-        expect(parent.getChildServiceForObject(objects[1])).toEqual(children[2]);
-        expect(parent.getChildServiceForObject(objects[2])).toEqual(children[4]);
-        expect(parent.getChildServiceForObject(objects[3])).toEqual(children[7]);
+        expect(parent._getChildServiceForType(Types[0].TYPE)).toEqual(children[3]);
+        expect(parent._getChildServiceForType(Types[1].TYPE)).toEqual(children[2]);
+        expect(parent._getChildServiceForType(Types[2].TYPE)).toEqual(children[4]);
+        expect(parent._getChildServiceForType(Types[3].TYPE)).toEqual(children[7]);
+        expect(parent._getChildServiceForObject(objects[0])).toEqual(children[3]);
+        expect(parent._getChildServiceForObject(objects[1])).toEqual(children[2]);
+        expect(parent._getChildServiceForObject(objects[2])).toEqual(children[4]);
+        expect(parent._getChildServiceForObject(objects[3])).toEqual(children[7]);
 
         // Modify and verify some more.
         parent.removeChildService(children[3]);
@@ -202,14 +202,14 @@ describe("A DataService", function() {
         expect(children[7].types).toBeUndefined();
         expect(children[8].types).toBeNull();
         expect(children[9].types).toEqual([]);
-        expect(parent.getChildServiceForType(Types[0].TYPE)).toEqual(children[4]);
-        expect(parent.getChildServiceForType(Types[1].TYPE)).toEqual(children[2]);
-        expect(parent.getChildServiceForType(Types[2].TYPE)).toEqual(children[4]);
-        expect(parent.getChildServiceForType(Types[3].TYPE)).toEqual(children[7]);
-        expect(parent.getChildServiceForObject(objects[0])).toEqual(children[4]);
-        expect(parent.getChildServiceForObject(objects[1])).toEqual(children[2]);
-        expect(parent.getChildServiceForObject(objects[2])).toEqual(children[4]);
-        expect(parent.getChildServiceForObject(objects[3])).toEqual(children[7]);
+        expect(parent._getChildServiceForType(Types[0].TYPE)).toEqual(children[4]);
+        expect(parent._getChildServiceForType(Types[1].TYPE)).toEqual(children[2]);
+        expect(parent._getChildServiceForType(Types[2].TYPE)).toEqual(children[4]);
+        expect(parent._getChildServiceForType(Types[3].TYPE)).toEqual(children[7]);
+        expect(parent._getChildServiceForObject(objects[0])).toEqual(children[4]);
+        expect(parent._getChildServiceForObject(objects[1])).toEqual(children[2]);
+        expect(parent._getChildServiceForObject(objects[2])).toEqual(children[4]);
+        expect(parent._getChildServiceForObject(objects[3])).toEqual(children[7]);
 
         // Modify and verify some more. After the modification there will be no
         // more children for Types[0] so the first "all types" child should be
@@ -238,14 +238,14 @@ describe("A DataService", function() {
         expect(children[7].types).toBeUndefined();
         expect(children[8].types).toBeNull();
         expect(children[9].types).toEqual([]);
-        expect(parent.getChildServiceForType(Types[0].TYPE)).toEqual(children[7]);
-        expect(parent.getChildServiceForType(Types[1].TYPE)).toEqual(children[2]);
-        expect(parent.getChildServiceForType(Types[2].TYPE)).toEqual(children[5]);
-        expect(parent.getChildServiceForType(Types[3].TYPE)).toEqual(children[7]);
-        expect(parent.getChildServiceForObject(objects[0])).toEqual(children[7]);
-        expect(parent.getChildServiceForObject(objects[1])).toEqual(children[2]);
-        expect(parent.getChildServiceForObject(objects[2])).toEqual(children[5]);
-        expect(parent.getChildServiceForObject(objects[3])).toEqual(children[7]);
+        expect(parent._getChildServiceForType(Types[0].TYPE)).toEqual(children[7]);
+        expect(parent._getChildServiceForType(Types[1].TYPE)).toEqual(children[2]);
+        expect(parent._getChildServiceForType(Types[2].TYPE)).toEqual(children[5]);
+        expect(parent._getChildServiceForType(Types[3].TYPE)).toEqual(children[7]);
+        expect(parent._getChildServiceForObject(objects[0])).toEqual(children[7]);
+        expect(parent._getChildServiceForObject(objects[1])).toEqual(children[2]);
+        expect(parent._getChildServiceForObject(objects[2])).toEqual(children[5]);
+        expect(parent._getChildServiceForObject(objects[3])).toEqual(children[7]);
 
         // Modify and verify some more.
         parent.removeChildService(children[5]);
@@ -272,14 +272,14 @@ describe("A DataService", function() {
         expect(children[7].types).toBeUndefined();
         expect(children[8].types).toBeNull();
         expect(children[9].types).toEqual([]);
-        expect(parent.getChildServiceForType(Types[0].TYPE)).toEqual(children[8]);
-        expect(parent.getChildServiceForType(Types[1].TYPE)).toEqual(children[2]);
-        expect(parent.getChildServiceForType(Types[2].TYPE)).toEqual(children[8]);
-        expect(parent.getChildServiceForType(Types[3].TYPE)).toEqual(children[8]);
-        expect(parent.getChildServiceForObject(objects[0])).toEqual(children[8]);
-        expect(parent.getChildServiceForObject(objects[1])).toEqual(children[2]);
-        expect(parent.getChildServiceForObject(objects[2])).toEqual(children[8]);
-        expect(parent.getChildServiceForObject(objects[3])).toEqual(children[8]);
+        expect(parent._getChildServiceForType(Types[0].TYPE)).toEqual(children[8]);
+        expect(parent._getChildServiceForType(Types[1].TYPE)).toEqual(children[2]);
+        expect(parent._getChildServiceForType(Types[2].TYPE)).toEqual(children[8]);
+        expect(parent._getChildServiceForType(Types[3].TYPE)).toEqual(children[8]);
+        expect(parent._getChildServiceForObject(objects[0])).toEqual(children[8]);
+        expect(parent._getChildServiceForObject(objects[1])).toEqual(children[2]);
+        expect(parent._getChildServiceForObject(objects[2])).toEqual(children[8]);
+        expect(parent._getChildServiceForObject(objects[3])).toEqual(children[8]);
 
         // Modify and verify some more.
         parent.removeChildService(children[2]);
@@ -306,14 +306,14 @@ describe("A DataService", function() {
         expect(children[7].types).toBeUndefined();
         expect(children[8].types).toBeNull();
         expect(children[9].types).toEqual([]);
-        expect(parent.getChildServiceForType(Types[0].TYPE)).toEqual(children[9]);
-        expect(parent.getChildServiceForType(Types[1].TYPE)).toEqual(children[9]);
-        expect(parent.getChildServiceForType(Types[2].TYPE)).toEqual(children[9]);
-        expect(parent.getChildServiceForType(Types[3].TYPE)).toEqual(children[9]);
-        expect(parent.getChildServiceForObject(objects[0])).toEqual(children[9]);
-        expect(parent.getChildServiceForObject(objects[1])).toEqual(children[9]);
-        expect(parent.getChildServiceForObject(objects[2])).toEqual(children[9]);
-        expect(parent.getChildServiceForObject(objects[3])).toEqual(children[9]);
+        expect(parent._getChildServiceForType(Types[0].TYPE)).toEqual(children[9]);
+        expect(parent._getChildServiceForType(Types[1].TYPE)).toEqual(children[9]);
+        expect(parent._getChildServiceForType(Types[2].TYPE)).toEqual(children[9]);
+        expect(parent._getChildServiceForType(Types[3].TYPE)).toEqual(children[9]);
+        expect(parent._getChildServiceForObject(objects[0])).toEqual(children[9]);
+        expect(parent._getChildServiceForObject(objects[1])).toEqual(children[9]);
+        expect(parent._getChildServiceForObject(objects[2])).toEqual(children[9]);
+        expect(parent._getChildServiceForObject(objects[3])).toEqual(children[9]);
 
         // Modify and verify some more.
         parent.removeChildService(children[9]);
@@ -339,14 +339,14 @@ describe("A DataService", function() {
         expect(children[7].types).toBeUndefined();
         expect(children[8].types).toBeNull();
         expect(children[9].types).toEqual([]);
-        expect(parent.getChildServiceForType(Types[0].TYPE)).toBeNull();
-        expect(parent.getChildServiceForType(Types[1].TYPE)).toBeNull();
-        expect(parent.getChildServiceForType(Types[2].TYPE)).toBeNull();
-        expect(parent.getChildServiceForType(Types[3].TYPE)).toBeNull();
-        expect(parent.getChildServiceForObject(objects[0])).toBeNull();
-        expect(parent.getChildServiceForObject(objects[1])).toBeNull();
-        expect(parent.getChildServiceForObject(objects[2])).toBeNull();
-        expect(parent.getChildServiceForObject(objects[3])).toBeNull();
+        expect(parent._getChildServiceForType(Types[0].TYPE)).toBeNull();
+        expect(parent._getChildServiceForType(Types[1].TYPE)).toBeNull();
+        expect(parent._getChildServiceForType(Types[2].TYPE)).toBeNull();
+        expect(parent._getChildServiceForType(Types[3].TYPE)).toBeNull();
+        expect(parent._getChildServiceForObject(objects[0])).toBeNull();
+        expect(parent._getChildServiceForObject(objects[1])).toBeNull();
+        expect(parent._getChildServiceForObject(objects[2])).toBeNull();
+        expect(parent._getChildServiceForObject(objects[3])).toBeNull();
     });
 
     it("has a fetchData() method", function () {

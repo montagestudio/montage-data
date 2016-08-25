@@ -122,7 +122,7 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                         if (shouldUpgradeToNewVersion) {
                             //db.close();
                             //Add upgrade here
-                            console.log("newDbSchema:",newDbSchema);
+                            //console.log("newDbSchema:",newDbSchema);
                             db.version(db.verno+1).stores(newDbSchema);
                             //db.open();
                         }

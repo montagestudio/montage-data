@@ -4,16 +4,22 @@ var Montage = require("montage").Montage;
  * Maps raw data to data objects of a specific type.
  *
  * Currently services define their mapping by overriding their
- * [mapFromRawData()]{@link DataService#mapFromRawData} method or by using a
- * {@link DataMapping} subclass that overrides its
- * [mapFromRawData()]{@link DataMapping#mapFromRawData} method. In the future it
- * will be possible to define mappings declaratively through mapping descriptors
- * read from blueprint files.
+ * [mapRawDataToObject()]{@link DataService#mapRawDataToObject} and
+ * [mapObjectToRawData()]{@link DataService#mapObjectToRawData} methods or by
+ * using a {@link DataMapping} subclass that overrides its
+ * [mapRawDataToObject()]{@link DataMapping#mapRawDataToObject} and
+ * [mapRawDataToObject()]{@link DataMapping#mapRawDataToObject} methods. In the
+ * future it will be possible to define mappings declaratively through mapping
+ * descriptors read from blueprint files.
  *
  * @class
  * @extends external:Montage
  */
 exports.DataMapping = Montage.specialize(/** @lends DataMapping.prototype */ {
+
+    /***************************************************************************
+     * Mapping
+     */
 
     /**
      * Convert raw data to data objects of an appropriate type.
@@ -21,7 +27,7 @@ exports.DataMapping = Montage.specialize(/** @lends DataMapping.prototype */ {
      * Subclasses should override this method to map properties of the raw data
      * to data objects, as in the following:
      *
-     *     mapFromRawData: {
+     *     mapRawDataToObject: {
      *         value: function (object, data) {
      *             object.firstName = data.GIVEN_NAME;
      *             object.lastName = data.FAMILY_NAME;
@@ -40,8 +46,8 @@ exports.DataMapping = Montage.specialize(/** @lends DataMapping.prototype */ {
      *                             [addRawData()]{@link DataService#addRawData}
      *                             call that invoked this method.
      */
-    mapFromRawData: {
-        value: function (object, data, context) {
+    mapRawDataToObject: {
+        value: function (data, object, context) {
             var key;
             if (data) {
                 for (key in data) {
@@ -51,11 +57,37 @@ exports.DataMapping = Montage.specialize(/** @lends DataMapping.prototype */ {
         }
     },
 
-    // TODO: Document.
-    mapToRawData: {
+    /**
+     * @todo Document.
+     */
+    mapObjectToRawData: {
         value: function (object, data) {
             // TO DO: Provide a default mapping based on object.TYPE.
             // For now, subclasses must override this.
+        }
+    },
+
+    /***************************************************************************
+     * Deprecated
+     */
+
+    /**
+     * @todo Document deprecation in favor of
+     * [mapRawDataToObject()]{@link DataMapping#mapRawDataToObject}
+     */
+    mapFromRawData: {
+        value: function (object, record, context) {
+            this.mapRawDataToObject(record, object, context);
+        }
+    },
+
+    /**
+     * @todo Document deprecation in favor of
+     * [mapObjectToRawData()]{@link DataMapping#mapObjectToRawData}
+     */
+    mapToRawData: {
+        value: function (object, record) {
+            this.mapObjectToRawData(object, record);
         }
     }
 

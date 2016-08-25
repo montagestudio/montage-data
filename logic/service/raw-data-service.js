@@ -42,9 +42,10 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
 
     /**
      * If defined, used by
-     * [mapFromRawData()]{@link RawDataService#mapFromRawData} to map between
-     * the raw data on which this service is based and the typed data objects
-     * which this service provides and manages.
+     * [mapRawDataToObject()]{@link RawDataService#mapRawDataToObject} and
+     * [mapObjectToRawData()]{@link RawDataService#mapObjectToRawData} to map
+     * between the raw data on which this service is based and the typed data
+     * objects which this service provides and manages.
      *
      * @type {?DataMapping}
      */
@@ -153,7 +154,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     deleteDataObject: {
         value: function (object) {
             var record = {};
-            this.mapToRawData(object, record);
+            this.mapObjectToRawData(object, record);
             return this.deleteRawData(record, object);
         }
     },
@@ -173,7 +174,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     saveDataObject: {
         value: function (object) {
             var record = {};
-            this.mapToRawData(object, record);
+            this.mapObjectToRawData(object, record);
             return this.saveRawData(record, object);
         }
     },
@@ -227,12 +228,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
 
     /*
-     * By default this returns the
-     * [root service's offline status]{@link DataService#isOffline}.
-     *
-     * Subclasses that work the same way when offline as when online should
-     * override this to always return `false` so as to prevent calls to
-     * [fetchOfflineData()]{@link RawDataService#fetchOfflineData}.
+     * Returns the [root service's offline status]{@link DataService#isOffline}.
      *
      * @type {boolean}
      */
@@ -243,8 +239,9 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     },
 
     /**
-     * Called every time [addRawData()]{@link RawDataService#addRawData} is
-     * called while online to optionally cache that data for offline use.
+     * Called with all the data passed to
+     * [addRawData()]{@link RawDataService#addRawData} to allow caching of that
+     * data for offline use.
      *
      * The default implementation does nothing. This is appropriate for
      * subclasses that do not support offline operation or which operate the
@@ -260,7 +257,6 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @argument {Object} records      - An array of objects whose properties'
      *                                   values hold the raw data.
      */
-
     writeOfflineData: {
         value: function (stream, records) {
             // Subclasses should override this to do something useful.
@@ -333,15 +329,15 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * will represent the raw records with repeated calls to
      * [getDataObject()]{@link DataService#getDataObject}, maps
      * the raw data to those objects with repeated calls to
-     * [mapFromRawData()]{@link RawDataService#mapFromRawData},
+     * [mapRawDataToObject()]{@link RawDataService#mapRawDataToObject},
      * and then adds those objects to the specified stream.
      *
-     * Subclasses should not override this method instead override their
+     * Subclasses should not override this method and instead override their
      * [getDataObject()]{@link DataService#getDataObject} method, their
-     * [mapFromRawData()]{@link RawDataService#mapFromRawData} method,
+     * [mapRawDataToObject()]{@link RawDataService#mapRawDataToObject} method,
      * their [mapping]{@link RawDataService#mapping}'s
-     * [mapFromRawData()]{@link RawDataMapping#mapFromRawData} method, or
-     * several of these.
+     * [mapRawDataToObject()]{@link RawDataMapping#mapRawDataToObject} method,
+     * or several of these.
      *
      * @method
      * @argument {DataStream} stream   - The stream to which the data objects
@@ -353,30 +349,24 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @argument {?} context           - A value that will be passed to
      *                                   [getDataObject()]{@link DataMapping#getDataObject}
      *                                   and
-     *                                   [mapFromRawData()]{@link DataMapping#mapFromRawData}
+     *                                   [mapRawDataToObject()]{@link DataMapping#mapRawDataToObject}
      *                                   if it is provided.
      */
     addRawData: {
         value: function (stream, records, context) {
-/* NEEDS CLEANUP: This was a temporary measure
             var offline, object, i, n;
             // Record fetched raw data for offline use if appropriate.
-            offline = !this.isOffline && this._offlineRecords.get(stream);
+            offline = !this.isOffline && this._offlineRawData.get(stream);
             if (offline) {
                 offline.push.apply(offline, records);
             } else if (!this.isOffline) {
-                this._offlineRecords.set(stream, records.slice())
-*/
-            var i, n, object;
-            // Give the service a chance to save the data for offline use.
-            if (!this.isOffline) {
-                this.writeOfflineData(stream, records, context);
+                this._offlineRawData.set(stream, records.slice())
             }
             // Convert the raw data to appropriate data objects. The conversion
-            // will be done in place to avoid creating an unnecessary array.
+            // will be done in place to avoid creating any unnecessary array.
             for (i = 0, n = records ? records.length : 0; i < n; i += 1) {
                 object = this.getDataObject(stream.selector.type, records[i], context);
-                this.mapFromRawData(object, records[i], context);
+                this.mapRawDataToObject(records[i], object, context);
                 records[i] = object;
             }
             // Add the converted data to the stream.
@@ -390,7 +380,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * Subclasses should override this method to map properties of the raw data
      * to data objects, as in the following:
      *
-     *     mapFromRawData: {
+     *     mapRawDataToObject: {
      *         value: function (object, record) {
      *             object.firstName = record.GIVEN_NAME;
      *             object.lastName = record.FAMILY_NAME;
@@ -400,49 +390,42 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * Alternatively, subclasses can define a
      * [mapping]{@link DataService#mapping} to do this mapping.
      *
-     * The default implementation of this method copies the properties defined
-     * by the raw data object to the data object.
+     * The default implementation of this method uses the service's mapping if
+     * the service has one, and otherwise calls
+     * [mapFromRawData()]{@link RawDataService#mapFromRawData], whose default
+     * implementation does nothing.
      *
-     * @todo [Charles]: Rename mapping methods to `mapRawDataToObject()` and
-     * `mapObjectToRawData()`, overridable by type name with methods like
-     * `mapRawDataToHazard()` and `mapHazardToRawData()`.
+     * @todo Make this method overridable by type name with methods like
+     * `mapRawDataToHazard()` and `mapRawDataToProduct()`.
      *
      * @method
-     * @argument {Object} object - An object whose properties must be set or
-     *                             modified to represent the raw data.
      * @argument {Object} record - An object whose properties' values hold
      *                             the raw data.
+     * @argument {Object} object - An object whose properties must be set or
+     *                             modified to represent the raw data.
      * @argument {?} context     - A value that was passed in to the
      *                             [addRawData()]{@link RawDataService#addRawData}
      *                             call that invoked this method.
      */
-    mapFromRawData: {
-        value: function (object, record, context) {
+    mapRawDataToObject: {
+        value: function (record, object, context) {
             var keys, i, n;
             if (this.mapping) {
-                this.mapping.mapFromRawData(object, record, context);
+                this.mapping.mapRawDataToObject(record, object, context);
             } else if (record) {
-                keys = Object.keys(record);
-                for (i = 0, n = keys.length; i < n; i += 1) {
-                    object[keys[i]] = record[keys[i]];
-                }
+                this.mapFromRawData(object, record, context);
             }
         }
     },
 
-    // TODO: Document.
-    /*
-        Default would become:
-        mapRawDataToObject() and mapObjectToRawData()
-        Custom selectors could be built like this to encapsulate Type-specific conversion logic:
-        mapRawDataToHazard() and mapHazardToRawData()
-
-        The frawmework would assess if such a selector exists and call it first if it does before using the generic one
-    */
-    mapToRawData: {
+    /**
+     * @todo Document.
+     * @todo Make this method overridable by type name with methods like
+     * `mapHazardToRawData()` and `mapProductToRawData()`.
+     */
+    mapObjectToRawData: {
         value: function (object, record) {
-            // TO DO: Provide a default mapping based on object.TYPE.
-            // For now, subclasses must override this.
+            this.mapToRawData(record, object, context);
         }
     },
 
@@ -462,10 +445,10 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     rawDataDone: {
         value: function (stream) {
             // Record fetched raw data for offline use if appropriate.
-            var records = this._offlineRecords.get(stream);
-            if (records) {
-                this.addOfflineData(stream, records);
-                this._offlineRecords.delete(stream);
+            var offline = this._offlineRawData.get(stream);
+            if (offline) {
+                this.writeOfflineData(stream, offline);
+                this._offlineRawData.delete(stream);
             }
             // Notify the stream that it's got all the data it needs.
             stream.dataDone();
@@ -480,12 +463,40 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @private
      * @type {Object.<Stream, records>}
      */
-    _offlineRecords: {
+    _offlineRawData: {
         get: function () {
-            if (!this.__offlineRecords) {
-                this.__offlineRecords = new WeakMap();
+            if (!this.__offlineRawData) {
+                this.__offlineRawData = new WeakMap();
             }
-            return this.__offlineRecords;
+            return this.__offlineRawData;
+        }
+    },
+
+    __offlineRawData: {
+        value: undefined
+    },
+
+    /***************************************************************************
+     * Deprecated
+     */
+
+    /**
+     * @todo Document deprecation in favor of
+     * [mapRawDataToObject()]{@link RawDataService#mapRawDataToObject}
+     */
+    mapFromRawData: {
+        value: function (object, record, context) {
+            // Implemented by subclasses.
+        }
+    },
+
+    /**
+     * @todo Document deprecation in favor of
+     * [mapObjectToRawData()]{@link RawDataService#mapObjectToRawData}
+     */
+    mapToRawData: {
+        value: function (object, record) {
+            // Implemented by subclasses.
         }
     }
 

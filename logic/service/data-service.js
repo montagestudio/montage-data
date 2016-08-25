@@ -9,12 +9,7 @@ var Montage = require("montage").Montage,
     Map = require("collections/map"),
     Promise = require("bluebird"),
     Set = require("collections/set"),
-    WeakMap = require("collections/weak-map"),
-    evaluate = require("frb/evaluate"),
-    parse = require("frb/parse"),
-    compile = require("frb/compile-evaluator"),
-    evaluate = require("frb/evaluate"),
-    Scope = require("frb/scope");
+    WeakMap = require("collections/weak-map");
 
 /**
  * AuthorizationPolicyType
@@ -62,12 +57,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                     });
                 }
             }
-        }
-    },
-
-    isMainService: {
-        get: function () {
-            return (exports.DataService.mainService === this);
         }
     },
 
@@ -130,6 +119,20 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /**
+     * Private settable parent service reference.
+     *
+     * This property should not be modified outside of
+     * [addChildService()]{@link DataService#addChildService} and
+     * [removeChildService()]{@link DataService#removeChildService}.
+     *
+     * @private
+     * @type {DataService}
+     */
+    _parentService: {
+        value: undefined
+    },
+
+    /**
      * Convenience read-only reference to the root of the service tree
      * containing this service. For most applications this will be the
      * [main service]{@link DataService.mainService}.
@@ -139,12 +142,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     rootService: {
         get: function () {
             return this.parentService ? this.parentService.rootService : this;
-        }
-    },
-
-    isRootService: {
-        get: function () {
-            return (this.rootService === this);
         }
     },
 
@@ -168,23 +165,23 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             if (child._parentService) {
                 child._parentService.removeChildService(child);
             }
+            // Add the new child to this service's children set.
+            this._childServices.add(child);
             // Add the new child service to the services array of each of its
             // types or to the "all types" service array identified by the
             // `null` type, and add each of the new child's types to the array
             // of child types if they're not already there.
             for (i = 0, n = types && types.length || 1; i < n; i += 1) {
                 type = types && types.length && types[i] || null;
-                children = this._childServiceMap.get(type) || [];
+                children = this._childServicesByType.get(type) || [];
                 children.push(child);
                 if (children.length === 1) {
-                    this._childServiceMap.set(type, children);
+                    this._childServicesByType.set(type, children);
                     if (type) {
                         this._childServiceTypes.push(type);
                     }
                 }
             }
-            // Add the new child to this service's children set.
-            this._childServices.add(child);
             // Set the new child service's parent.
             child._parentService = this;
         }
@@ -214,12 +211,12 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             // remove.
             for (i = 0, n = types && types.length || 1; i < n; i += 1) {
                 type = types && types.length && types[i] || null;
-                chidren = this._childServiceMap.get(type);
+                chidren = this._childServicesByType.get(type);
                 index = chidren ? chidren.indexOf(child) : -1;
                 if (index >= 0 && chidren.length > 1) {
                     chidren.splice(index, 1);
                 } else if (index === 0) {
-                    this._childServiceMap.delete(type);
+                    this._childServicesByType.delete(type);
                     index = type ? this._childServiceTypes.indexOf(type) : -1;
                     if (index >= 0) {
                         this._childServiceTypes.splice(index, 1);
@@ -236,47 +233,25 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /**
-     * Get the first child service that can handle the specified object,
-     * or `null` if no such child service exists.
+     * A set of all child services of this service.
      *
-     * @private
-     * @method
-     * @argument {Object} object
-     * @returns {DataService}
-     */
-    getChildServiceForObject: {
-        value: function (object) {
-            return this.getChildServiceForType(this.rootService._getObjectType(object));
-        }
-    },
-
-    /**
-     * Get the first child service that can handle data of the specified type,
-     * or `null` if no such child service exists.
-     *
-     * @private
-     * @method
-     * @argument {DataObjectDescriptor} type
-     * @returns {DataService}
-     */
-    getChildServiceForType: {
-        value: function (type) {
-            var services = this._childServiceMap.get(type) || this._childServiceMap.get(null);
-            return services && services[0] || null;
-        }
-    },
-
-    /**
-     * Private settable parent service reference.
-     *
-     * This property should not be modified outside of
+     * The contents of this set should not be modified outside of
      * [addChildService()]{@link DataService#addChildService} and
      * [removeChildService()]{@link DataService#removeChildService}.
      *
      * @private
-     * @type {DataService}
+     * @type {Set<DataService>}
      */
-    _parentService: {
+    _childServices: {
+        get: function() {
+            if (!this.__childServices) {
+                this.__childServices = new Set();
+            }
+            return this.__childServices;
+        }
+    },
+
+    __childServices: {
         value: undefined
     },
 
@@ -297,15 +272,19 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * [removeChildService()]{@link DataService#removeChildService}.
      *
      * @private
-     * @type {Map<DataObjectDescriptor, Array<DataService>>}
+     * @type {Map<DataObjectDescriptor, Array.<DataService>>}
      */
-    _childServiceMap: {
+    _childServicesByType: {
         get: function() {
-            if (!this.__childServiceMap) {
-                this.__childServiceMap = new Map();
+            if (!this.__childServicesByType) {
+                this.__childServicesByType = new Map();
             }
-            return this.__childServiceMap;
+            return this.__childServicesByType;
         }
+    },
+
+    __childServicesByType: {
+        value: undefined
     },
 
     /**
@@ -316,7 +295,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * [removeChildService()]{@link DataService#removeChildService}.
      *
      * @private
-     * @type {Array<DataObjectDescriptor>}
+     * @type {Array.<DataObjectDescriptor>}
      */
     _childServiceTypes: {
         get: function() {
@@ -327,12 +306,38 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
-    _childServices: {
-        get: function() {
-            if (!this.__childServices) {
-                this.__childServices = new Set();
-            }
-            return this.__childServices;
+    __childServiceTypes: {
+        value: undefined
+    },
+
+    /**
+     * Get the first child service that can handle the specified object,
+     * or `null` if no such child service exists.
+     *
+     * @private
+     * @method
+     * @argument {Object} object
+     * @returns DataService
+     */
+    _getChildServiceForObject: {
+        value: function (object) {
+            return this._getChildServiceForType(this.rootService._getObjectType(object));
+        }
+    },
+
+    /**
+     * Get the first child service that can handle data of the specified type,
+     * or `null` if no such child service exists.
+     *
+     * @private
+     * @method
+     * @argument {DataObjectDescriptor} type
+     * @returns {Set.<DataService,number>}
+     */
+    _getChildServiceForType: {
+        value: function (type) {
+            var services = this._childServicesByType.get(type) || this._childServicesByType.get(null);
+            return services && services[0] || null;
         }
     },
 
@@ -472,7 +477,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     _setObjectType: {
         value: function (object, type) {
-            if (this._isRootService && this._getObjectType(object) !== type){
+            if (this._getObjectType(object) !== type){
                 this._typeRegistry.set(object, type);
             }
         }
@@ -529,13 +534,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     changedDataObjects: {
         get: function () {
-            var objects;
-            if (this._isRootService) {
-                this._changedDataObjects = this._changedDataObjects || new Set();
-                objects = this._changedDataObjects;
-            }
-            return objects;
+            this._changedDataObjects = this._changedDataObjects || new Set();
+            return this._changedDataObjects;
         }
+    },
+
+    _changedDataObjects: {
+        value: undefined
     },
 
     /***************************************************************************
@@ -655,7 +660,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             stream.selector = selector;
             // Use a child service to fetch the data.
             try {
-                service = this.getChildServiceForType(selector.type);
+                service = this._getChildServiceForType(selector.type);
                 if (service) {
                     stream = service.fetchData(selector, stream) || stream;
                 } else {
@@ -670,7 +675,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Handling offline
+     * Offline
      */
 
     /**
@@ -679,186 +684,272 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      *
      * Root services are responsible for tracking offline status, and subclasses
      * not designed to be root services should override this property to get
-     * it value from their root service.
+     * its value from their root service.
      *
      * @type {boolean}
      */
-    _isOffline: {
-        value: undefined
-    },
     isOffline: {
         get: function () {
             var self = this;
             if (this._isOffline === undefined) {
                 this._isOffline = !navigator.onLine;
-                window.addEventListener('online', 
-                    function (event) { 
-                        self._isOffline = false;
-                    });
-                window.addEventListener('offline', 
-                    function (event) {
-                        self._isOffline = true; 
-                    });
+                window.addEventListener('online', function (event) {
+                    self._isOffline = false;
+                });
+                window.addEventListener('offline', function (event) {
+                    self._isOffline = true;
+                });
             }
             return this._isOffline;
         },
         set: function (offline) {
             if (offline !== this.isOffline) {
                 this._isOffline = offline;
-                if(!this._isOffline && this.isRootService) {
-                    this._processOfflineToOnlineOperations();
+                if (!offline) {
+                    this._goOnline();
                 }
             }
         }
     },
 
-    __compiledSortOfflineOperationExpression: {
+    _isOffline: {
         value: undefined
-    },
-    _compiledSortOfflineOperationExpression: {
-        get:function() {
-            return this.__compiledSortOfflineOperationExpression 
-                    || (this.__compiledSortOfflineOperationExpression = compile(parse("sorted{lastModified}.reversed()")));
-        }
-    },
-     __sortOfflineOperationScope: {
-        value: undefined
-    },
-   _sortOfflineOperationScope: {
-        get:function() {
-            return this.__sortOfflineOperationScope
-                    || (this.__sortOfflineOperationScope = new Scope());
-        }
     },
 
-    _processOfflineToOnlineOperations: {
+    _goOnline: {
         value: function() {
-            /*
-            1) Fetch all operations at main service level
-                1.1) offlineOperations getter, on Data-Service, implemented by Raw Data Service. Default implementation is looping on childServices and collecting results of accessing offline operations on them
-            2) weakmap operation - > service
-            3) Sort operations by time
-            4) Walk array
-                forEarch:
-                    matching rawDataService performOfflineOperations: (if contiguous)
-            */
-            var self = this,
-                offlineOperations,
-                dataStream = dataStream || (new DataStream()),
-                i, countI, iOperation, iOperationService, j, iOperationBatch,
-                operationToService = new WeakMap();
+            var self = this;
+            this.readOfflineOperations().then(function (operations) {
+                operations.sort(this._compareOfflineOperations);
+                return self.performOfflineOperations(operations);
+            }).catch(function (e) {
+                console.error(e.stack);
+            });
+        }
+    },
 
-                this.readOfflineOperations(operationToService)
-                    .then(function (operations) {
-                        var offlineOperations = operations;
-
-
-                        /* Operations shape is:
-                            {
-                                dataID:
-                                type:
-                                lastFetched: Date("08-02-2016"),
-                                lastModified: Date("08-02-2016"),
-                                operation: "update"||"delete"
-                            }
-                        */
-
-                        //Sort operations by lastModified, descending
-                        self._sortOfflineOperationScope.value = offlineOperations;
-                        self._compiledSortOfflineOperationExpression(self._sortOfflineOperationScope);
-                        i = 0;
-                        countI = offlineOperations.length;
-                        while(i<countI) {
-                            iOperation = offlineOperations[i];
-                            iOperationService = operationToService.get(iOperation);
-                            iOperationBatch = [iOperation];
-                            j=i+1;
-                            while(operationToService.get(offlineOperations[j]) === iOperationService && j<countI) {
-                                iOperationBatch.push(offlineOperations[j]);
-                                j++;
-                            }
-
-                            iOperationService.performOfflineOperations(iOperationBatch).then(function(performedOperations) {
-                                iOperationService.deleteOfflineOperations(iOperationBatch);
-                            })
-                            .catch(function(error) {
-
-                            });
-        
-                            i += iOperationBatch.length;
-                        }
-
-                    });
+    _compareOfflineOperations: {
+        value: function(operation1, operation2) {
+            // TODO: Remove reference to `lastModified` once child services have
+            // been udpated to use `time` instead.
+            return operation1.lastModified < operation2.lastModified ?   -1 :
+                   operation1.lastModified > operation2.lastModified ?   1 :
+                   operation1.time < operation2.time ?                   -1 :
+                   operation1.time > operation2.time ?                   1 :
+                   operation1.index < operation2.index ?                 -1 :
+                   operation1.index > operation2.index ?                 1 :
+                                                                         0;
         }
     },
 
     /**
-     * Reads offline operations available through all children DataServices
+     * Reads all the offline operations recorded on behalf of this service.
+     *
+     * The default implementation aggregates this service children's offline
+     * operations, keeping track of which child service is responsible for each
+     * operation.
+     *
+     * Subclasses that provide offline support should override this method to
+     * return the operations that have been performed while offline.
      *
      * @method
-     * @argument {DataSelector} selector - Defines what data should be returned.
-     * @returns {DataStream} -  The stream to which the provided data
-     *                                     should be added.
-     * the changed object has been saved.
      */
-
     readOfflineOperations: {
-        value: function (operationMapToService) {
-            var childrenSet = this._childServices,
-                promise, promises, i, n,
-                childrenIterator = childrenSet.values(), childService, childServicePromise,
-                array;
-
-            while (childService = childrenIterator.next().value) {
-                childServicePromise =  new Promise(function (resolve, reject) {
-                    var dataService = childService;
+        value: function () {
+            // TODO: Get rid of the dummy WeakMap passed to children once the
+            // children's readOfflineOperations code has been updated to not
+            // expect it.
+            // This implementation avoids creating promises for services with no
+            // children or whose children don't have offline operations.
+            var dummy = new WeakMap(),
+                services = this._offlineOperationServices,
+                array, promises;
+            this._childServices.forEach(function (child) {
+                var promise = child.readOfflineOperations(dummy);
+                if (promise !== this.emptyArrayPromise) {
                     array = array || [];
-                    operationMapToService = operationMapToService || (new WeakMap());
-
-                    dataService.readOfflineOperations(operationMapToService)
-                    .then(function(childOperations) {
-                        if (childOperations && childOperations.length) {
-                            array.push.apply(array, childOperations);
-                            for(var j=0, countJ = childOperations.length;(j<countJ);j++) {
-                                operationMapToService.set(childOperations[j],dataService);
-                            }
+                    promises = promises || [];
+                    promises.push(promise.then(function(operations) {
+                        var i, n;
+                        for (i = 0, n = operations && operations.length; i < n; i += 1) {
+                            services.set(operations[i], child);
+                            array.push(operations[i]);
                         }
-                        resolve(childOperations);
-                    }).catch(function(e) {
-                        reject(e);
-                        console.error(e);
-                    });
-                    // if (promise !== this.emptyArrayPromise) {
-                    //     promises = promises || [];
-                    //     promises.push(promise);
-                    // }
-                });
-
-                promises = promises || [];
-                promises.push(childServicePromise);
-            }
+                        return null;
+                    }));
+                }
+            });
             return promises ? Promise.all(promises).then(function () { return array; }) :
-                                    this.emptyArrayPromise;
+                              this.emptyArrayPromise;
         }
     },
 
+    /**
+     * @private
+     * @type {Map<DataOperation, DataService>}
+     */
+    _offlineOperationServices: {
+        get:function() {
+            if (!this.__offlineOperationServices) {
+                this.__offlineOperationServices = new WeakMap();
+            }
+            return this.__offlineOperationServices;
+        }
+    },
+
+    __offlineOperationServices: {
+        value: undefined
+    },
+
+    /**
+     * Perform operations recorded while offline. This will be invoked when the
+     * service comes online after being offline.
+     *
+     * The default implementation delegates performance of each operation to
+     * the child service responsible for that operation, as determined by
+     * [readOfflineOperations()]{@link DataService#readOfflineOperations}. It
+     * will batch operations if several consecutive operations belong to the
+     * same child service.
+     *
+     * For each operation not handled by a child service, the default
+     * implemenation calls a method named `performFooOfflineOperation()`, if
+     * such a method exists in this service where `foo` is the operation's
+     * [data type]{@link DataOperation#dataType}. If no such method exists,
+     * [readOfflineOperation()]{@link DataService#readOfflineOperation} is
+     * called instead.
+     *
+     * Subclasses that provide offline support should implement these
+     * `performFooOfflineOperation()` methods or override the
+     * `readOfflineOperation()` method to perform each operation, or they can
+     * override this `performOfflineOperations()` method instead.
+     *
+     * Subclass overriding this method are responsible for
+     * [deleting]{@link DataService#deleteOfflineOperations} operations after
+     * they have been performed. Subclasses implementing
+     * `performFooOfflineOperation()` methods or overriding the
+     * `readOfflineOperation()` method are not.
+     *
+     * @method
+     * @argument {Array.<DataOperation>} - operations
+     * @returns {Promise} - A promise fulfilled with a null value when the
+     * operations have been performed, or rejected if a problem occured that
+     * should prevent following operations from being performed.
+     */
     performOfflineOperations: {
         value: function(operations) {
-            // Subclasses must override this.
-            //loop
-            var constructor = this.constructor,
-                promises = [];
-            for (var i = 0, countI = operations.length; i < countI; i++) {
-                promises.push(constructor.methodForOfflineOperation(operations[i]).call(this,operations[i]));
+            var self = this,
+                services = this._offlineOperationServices,
+                promise = this.nullPromise,
+                i, j, n;
+            // Perform each operation, batching if possible, and collecting the
+            // results in a chain of promises.
+            for (i = 0, n = operations.length; i < n; i = j) {
+                // Find the service responsible for this operation.
+                child = services.get(operations[i]);
+                // Find the end of a batch of operations for this service.
+                for (j = i + 1; j < n && child && services.get(operations[j]) === child; j += 1) {}
+                // Add the promise to perform this batch of operations to the
+                // end of the chain of promises to fulfill all operations.
+                promise = promise.then(function () {
+                    return child ? child.performOfflineOperations(operations.slice(i, j)) :
+                                   self._performAndDeleteOfflineOperation(operations[i])
+                });
             }
-
-            return Promise.all(promises);
+            // Return a promise for the sequential fulfillment of all operations.
+            return promise;
         }
     },
 
+    _performAndDeleteOfflineOperation: {
+        value: function(operation) {
+            return this._performTypedOfflineOperation(operation).then(function () {
+                return self.deleteOfflineOperations([operation]);
+            });
+        }
+    },
+
+    _performTypedOfflineOperation: {
+        value: function(operation) {
+            // TODO: Remove support for operation.type once all child services
+            // have been updated to provide an operation.dataType instead.
+            var type = operation.dataType || operation.type;
+                method = type && this._getOfflineOperationMethodName(type);
+            return typeof(method) === "function" ? method.call(this, operation) :
+                                                   this.performOfflineOperation(operation);
+        }
+    },
+
+    _getOfflineOperationMethodName: {
+        value: function(type) {
+            var name = this._offlineOperationMethodNames.get(type);
+            if (!name) {
+                name = "perform";
+                name += type[0].toUpperCase();
+                name += type.slice(1);
+                name += "OfflineOperation";
+                this._offlineOperationMethodNames.set(type, name);
+            }
+            return name;
+        }
+    },
+
+    _offlineOperationMethodNames: {
+        value: new Map()
+    },
+
+    /**
+     * Called from
+     * [performOfflineOperations()]{@link DataService#performOfflineOperations}
+     * to perform a particular operation when no more specific
+     * `performFooOfflineOperation()` method is available for that operation,
+     * where `Foo` is the operation's [data type]{@link DataOperation#dataType}.
+     *
+     * The default implementation does nothing.
+     *
+     * Subclass overriding this method do not need to
+     * [delete]{@link DataService#deleteOfflineOperations} the passed in
+     * operation after it has successfully been performed: The method calling
+     * this method will take care of that.
+     *
+     * @method
+     * @argument {DataOperation} operation
+     * @returns {Promise} - A promise fulfilled with a null value when the
+     * operation has been performed, or rejected if a problem occured that
+     * should prevent following operations from being performed.
+     */
+    performOfflineOperation: {
+        value: function(operation) {
+            // To be overridden by subclasses that use offline operations.
+            return this.nullPromise;
+        }
+    },
+
+    /**
+     * Delete operations recorded while offline.
+     *
+     * Services overriding the (plural)
+     * [performOfflineOperations()]{@link DataService#performOfflineOperations}
+     * method must invoke this method after each operation they perform is
+     * successfully performed.
+     *
+     * This method will be called automatically for services that perform
+     * operations by implementing a
+     * [performOfflineOperation()]{@link DataService#performOfflineOperation}
+     * or `performFooOfflineOperation()` methods (where `foo` is an operation
+     * [data type]{@link DataOperation#dataType}).
+     *
+     * Subclasses that provide offline operations support must override this
+     * method to delete the specified offline operations from their records.
+     *
+     * @method
+     * @argument {Array.<Object>} operations
+     * @returns {Promise} - A promise fulfilled with a null value when the
+     * operations have been deleted.
+     */
     deleteOfflineOperations: {
         value: function(operations) {
-            // Subclasses must override this.
+            // To be overridden by subclasses that use offline operations.
+            return this.nullPromise;
         }
     },
 
@@ -870,7 +961,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * Delete a data object.
      *
      * @method
-     * @argument {Object} object   - The object whose data should be deleted.
+     * @argument {Object} object - The object whose data should be deleted.
      * @returns {external:Promise} - A promise fulfilled when the object has
      * been deleted.
      */
@@ -885,7 +976,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * Save changes made to a data object.
      *
      * @method
-     * @argument {Object} object   - The object whose data should be saved.
+     * @argument {Object} object - The object whose data should be saved.
      * @returns {external:Promise} - A promise fulfilled when all of the data in
      * the changed object has been saved.
      */
@@ -922,7 +1013,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     _updateDataObject: {
         value: function (object, action) {
             var self = this,
-                service = action && this.getChildServiceForObject(object),
+                service = action && this._getChildServiceForObject(object),
                 promise = this.nullPromise;
             if (!action) {
                 self.createdDataObjects.delete(object);
@@ -1091,7 +1182,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     fetchObjectProperty: {
         value: function (object, propertyName) {
-            var service = this.getChildServiceForObject(object);
+            var service = this._getChildServiceForObject(object);
             return service ? service.fetchObjectProperty(object, propertyName) :
                              this.nullPromise;
         }
@@ -1174,6 +1265,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
+    _nullPromise: {
+        value: undefined
+    },
+
+    /**
+     * @todo Document.
+     */
     emptyArrayPromise: {
         get: function () {
             if (!exports.DataService._emptyArrayPromise) {
@@ -1181,6 +1279,10 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             }
             return exports.DataService._emptyArrayPromise;
         }
+    },
+
+    _emptyArrayPromise: {
+        value: undefined
     },
 
     /**
@@ -1296,36 +1398,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
 
     authorizationManager: {
         value: AuthorizationManager
-    },
-
-    _operationTypeToServiceMethod: {
-        value: new Map()
-    },
-    methodForOfflineOperation: {
-        value: function(operation) {
-            //Check if custom method per type
-            var operationType = operation.type,
-                iMethod = this._operationTypeToServiceMethod.get(operationType),
-                iMethodName;
-
-            if (iMethod === undefined) {
-                iCapitalizedType = operationType[0].toUpperCase();
-                iCapitalizedType += operationType.slice(1);
-                
-                iMethodName = "perform";
-                iMethodName += iCapitalizedType;
-                iMethodName += "OfflineOperation";
-
-                if (typeof(iMethod = this.prototype[iMethodName]) === "function") {
-                    this._operationTypeToServiceMethod.set(operationType,iMethod);
-                }
-                else {
-                    this._operationTypeToServiceMethod.set(operationType,this.prototype.performOfflineOperation);
-                }
-            }
-            return iMethod;
-        }
     }
-
 
 });
