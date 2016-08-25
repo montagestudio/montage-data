@@ -76,10 +76,8 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                     schemaDefinition += this.operationPropertyName;
                     schemaDefinition += ",";
                     schemaDefinition += this.changesPropertyName;
-
-                    //Add context
-
-
+                    schemaDefinition += ",";
+                    schemaDefinition += this.contextPropertyName;
                     newDbSchema[this.operationTableName] = schemaDefinition;
 
                     if (schema) {
@@ -164,28 +162,49 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
     /**
      * table/property/index name that tracks the date the record was last updated
      *
-     * @type {Date}
+     * @returns {String}
      */
     operationTableName: {
         value: "Operation"
     },
+    /**
+     * name of the schema property that stores the name of the type/object store 
+     * of the object the operation impacts
+     *
+     * @returns {String}
+     */
     typePropertyName: {
         value: "type"
     },
-    offlineOperationPrimaryKey: {
-        value: "primaryKey"
-    },
 
+    /**
+     * name of the schema property that stores the last time the operation's object 
+     * (dataID) was last fetched.
+     *
+     * @returns {String}
+     */
     lastFetchedPropertyName: {
         value: "lastFetched"
     },
 
+   /**
+     * name of the schema property that stores the last time the operation's  
+     * object was last modified.
+     *
+     * @returns {String}
+     */
     lastModifiedPropertyName: {
         value: "lastModified"
     },
 
+     /**
+     * name of the schema property that stores the type of operation:  
+     * This will be create or update or delete
+     *
+     * @returns {String}
+     */
     operationPropertyName: {
-        value: "operation" //This will be update or delete or create
+        value: "operation" 
     },
     operationCreateName: {
         value: "create"
@@ -197,13 +216,34 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
         value: "delete"
     },
 
+   /**
+     * name of the schema property that stores the  changes made to the object in this operation
+     *
+     * @returns {String}
+     */
     changesPropertyName: {
-        value: "changes" //This will be update or delete or create
+        value: "changes" //This contains 
     },
 
+    /**
+     * name of the schema property that stores the primary key of the object the operation impacts
+     *
+     * @returns {String}
+     */
     dataIDPropertyName: {
-        value: "dataID" //This will be update or delete or create
+        value: "dataID"
     },
+
+   /**
+     * name of the schema property that stores unstructured/custom data for a service 
+     * to stash what it may need for further use.
+     *
+     * @returns {String}
+     */
+    contextPropertyName: {
+        value: "context" 
+    },
+
 
     /* 
         returns all records, ordered by time, that reflect what hapened when offline.
@@ -580,7 +620,7 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
      * the changed object has been saved.
      */
     createData: {
-        value: function (objects, type) {
+        value: function (objects, type, context) {
             var self = this;
 
             return new Promise(function (resolve, reject) {
@@ -618,6 +658,7 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                                     iOperation[typePropertyName] = type;
                                     iOperation[changesPropertyName] = iRawData;
                                     iOperation[operationPropertyName] = operationCreateName;
+                                    iOperation.context = context;
 
                                     operations.push(iOperation);
                                 }
@@ -649,7 +690,7 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
      * objects has been saved.
      */
     updateData: {
-        value: function (objects, type) {
+        value: function (objects, type, context) {
             var self = this;
             if(!objects || objects.length === 0) return Dexie.Promise.resolve();
             
@@ -668,7 +709,7 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                 changesPropertyName = self.changesPropertyName,
                 operationPropertyName = self.operationPropertyName,
                 operationUpdateName = self.operationUpdateName;
-;
+
 
 
 
@@ -689,7 +730,8 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                                     iOperation[typePropertyName] = type;
                                     iOperation[changesPropertyName] = iRawData;
                                     iOperation[operationPropertyName] = operationUpdateName;
-                                    
+                                    iOperation.context = context;
+
                                     updateDataPromises.push(operationTable.put(iOperation));
                                 }
                             }
@@ -720,7 +762,7 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
      * the changed object has been saved.
      */
     deleteData: {
-        value: function (objects, type) {
+        value: function (objects, type, context) {
             var self = this;
             if(!objects || objects.length === 0) return Dexie.Promise.resolve();
             
@@ -756,6 +798,7 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                                     iOperation[typePropertyName] = type;
                                     // iOperation[changesPropertyName] = iRawData;
                                     iOperation[operationPropertyName] = operationDeleteName;
+                                    iOperation.context = context;
 
                                     updateDataPromises.push(operationTable.put(iPrimaryKey, iOperation));
                                 }
