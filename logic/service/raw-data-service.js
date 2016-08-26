@@ -425,7 +425,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     mapObjectToRawData: {
         value: function (object, record) {
-            this.mapToRawData(record, object, context);
+            this.mapToRawData(record, object);
         }
     },
 
