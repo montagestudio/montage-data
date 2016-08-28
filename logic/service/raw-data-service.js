@@ -252,13 +252,12 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * use that data when offline.
      *
      * @method
-     * @argument {DataStream} stream   - The stream to which the fetched data is
-     *                                   being added.
-     * @argument {Object} records      - An array of objects whose properties'
-     *                                   values hold the raw data.
+     * @argument {DataSelector} selector - Used to select the raw data.
+     * @argument {Object} records        - An array of objects whose properties'
+     *                                     values hold the raw data.
      */
     writeOfflineData: {
-        value: function (stream, records) {
+        value: function (selector, records) {
             // Subclasses should override this to do something useful.
         }
     },
@@ -447,7 +446,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             // Record fetched raw data for offline use if appropriate.
             var offline = this._offlineRawData.get(stream);
             if (offline) {
-                this.writeOfflineData(stream, offline);
+                this.writeOfflineData(stream.selector, offline);
                 this._offlineRawData.delete(stream);
             }
             // Notify the stream that it's got all the data it needs.
