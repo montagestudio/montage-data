@@ -512,7 +512,7 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
             }
 
             // 1) First we need to execute the equivalent of stream's selector to find what we have matching locally
-            this.fetchData(selector,rawDataStream).then(function (offlineSelectedRecords) {
+            return this.fetchData(selector,rawDataStream).then(function (offlineSelectedRecords) {
                 // 2) Loop on offline results and if we can't find it in the recent rawDataArray:
                 //    2.0) Remove the non-matching record so it doesn't show up in results 
                 //         if that query were immediatrely done next as offline.

@@ -252,13 +252,16 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * use that data when offline.
      *
      * @method
-     * @argument {DataSelector} selector - Used to select the raw data.
+     * @argument {DataSelector} selector - Defines the raw data selected.
      * @argument {Object} records        - An array of objects whose properties'
      *                                     values hold the raw data.
+     * @returns {external:Promise} - A promise fulfilled when the raw data has
+     * been saved.
      */
     writeOfflineData: {
         value: function (selector, records) {
             // Subclasses should override this to do something useful.
+            return this.nullPromise;
         }
     },
 
@@ -443,21 +446,25 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     rawDataDone: {
         value: function (stream) {
-            // Record fetched raw data for offline use if appropriate.
             var offline = this._offlineRawData.get(stream);
-            if (offline) {
-                this.writeOfflineData(stream.selector, offline);
+            if (!offline) {
+                stream.dataDone();
+            } else {
                 this._offlineRawData.delete(stream);
+                this.writeOfflineData(stream.selector, offline).then(function () {
+                    stream.dataDone();
+                    return null;
+                }).catch(function (e) {
+                    console.error(e, e.stack);
+                });
             }
-            // Notify the stream that it's got all the data it needs.
-            stream.dataDone();
         }
     },
 
     /**
      * Records in the process of being written to streams (before
-     * [rawDataDone()]{@link RawDataService#rawDataDone} is called), to be
-     * stored for offline use.
+     * [rawDataDone()]{@link RawDataService#rawDataDone} is called) and that
+     * need to be stored for offline use.
      *
      * @private
      * @type {Object.<Stream, records>}
