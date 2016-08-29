@@ -356,6 +356,9 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     addRawData: {
         value: function (stream, records, context) {
+
+            if(!records) return;
+
             var offline, object, i, n;
             // Record fetched raw data for offline use if appropriate.
             offline = !this.isOffline && this._offlineRawData.get(stream);
