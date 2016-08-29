@@ -648,7 +648,7 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                                 if((iRawData = objects[i])) {
 
                                     //Set offline uuid based primary key
-                                    iRawData[primaryKey] = iPrimaryKey = uuid();
+                                    iRawData[primaryKey] = iPrimaryKey = uuid.generate();
                                     clonedObjects.push(iRawData);
 
                                     //Create the record to track of last modified date
