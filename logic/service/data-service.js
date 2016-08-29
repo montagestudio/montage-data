@@ -61,7 +61,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Basic properties
+     * Basic Properties
      *
      * Private properties are defined where they are used, not here.
      */
@@ -95,7 +95,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Managing service hierarchies
+     * Service Hierarchy
      */
 
     /**
@@ -342,7 +342,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Authorizing
+     * Authorization
      */
 
     /**
@@ -379,7 +379,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Tracking data object types
+     * Data Object Types
      */
 
     /**
@@ -431,7 +431,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Managing data object prototypes and their triggers
+     * Data Object Triggers
      */
 
     /**
@@ -493,7 +493,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Managing data object property values
+     * Data Object Property Values
      */
 
     /**
@@ -693,7 +693,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Creating data objects
+     * Data Object Creation
      */
 
     /**
@@ -768,7 +768,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Tracking data object changes
+     * Data Object Changes
      */
 
     /**
@@ -819,7 +819,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Fetching data objects
+     * Fetching Data
      */
 
     /**
@@ -875,7 +875,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Saving changed data objects
+     * Saving Data
      */
 
     /**
@@ -949,7 +949,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Offline
+     * Working Offline
      */
 
     /**
@@ -1332,7 +1332,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
 }, /** @lends DataService */ {
 
     /***************************************************************************
-     * Managing service hierarchies
+     * Service Hierarchy
      */
 
     /**
@@ -1389,7 +1389,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Authorizing
+     * Authorization
      */
 
     "AuthorizationPolicyType": {
