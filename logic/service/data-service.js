@@ -1176,8 +1176,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     performOfflineOperations: {
         value: function(operations) {
-            var self = this,
-                services = this._offlineOperationServices,
+            var services = this._offlineOperationServices,
                 promise = this.nullPromise,
                 i, j, n;
             // Perform each operation, batching if possible, and collecting the
@@ -1189,18 +1188,28 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 for (j = i + 1; j < n && child && services.get(operations[j]) === child; j += 1) {}
                 // Add the promise to perform this batch of operations to the
                 // end of the chain of promises to fulfill all operations.
-                promise = promise.then(function () {
-                    return child ? child.performOfflineOperations(operations.slice(i, j)) :
-                                   self._performAndDeleteOfflineOperation(operations[i])
-                });
+                promise =
+                    this._performOfflineOperationsBatch(promise, child, operations, i, j);
             }
             // Return a promise for the sequential fulfillment of all operations.
             return promise;
         }
     },
 
+    _performOfflineOperationsBatch: {
+        value: function(promise, child, operations, start, end) {
+            var self = this;
+            return promise.then(function () {
+                return child ?
+                       child.performOfflineOperations(operations.slice(start, end)) :
+                       self._performAndDeleteOfflineOperation(operations[start]);
+            });
+        }
+    },
+
     _performAndDeleteOfflineOperation: {
         value: function(operation) {
+            var self = this;
             return this._performTypedOfflineOperation(operation).then(function () {
                 return self.deleteOfflineOperations([operation]);
             });
@@ -1212,7 +1221,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             // TODO: Remove support for operation.type once all child services
             // have been updated to provide an operation.dataType instead.
             var type = operation.dataType || operation.type;
-                method = type && this._getOfflineOperationMethodName(type);
+                method = type && this[this._getOfflineOperationMethodName(type)];
             return typeof(method) === "function" ? method.call(this, operation) :
                                                    this.performOfflineOperation(operation);
         }
