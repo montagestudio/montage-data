@@ -558,7 +558,6 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                 .then(function (db) {
                     self.operationTable.where("operation").anyOf("create","update","delete")
                     .toArray(function (offlineOperations) {
-                            //array.push.apply(array,offlineOperations);
                             resolve(offlineOperations);
                     }).catch(function(e) {
                             console.log(selector.type + ": performOfflineSelectorChanges failed",e);
