@@ -6,6 +6,7 @@ var RawDataService = require("logic/service/raw-data-service").RawDataService,
     DataOrdering = require("logic/model/data-ordering").DataOrdering,
     DESCENDING = DataOrdering.DESCENDING,
     evaluate = require("frb/evaluate"),
+    Map = require("collections/map"),
     Set = require("collections/set"),
     OfflineService;
 /**

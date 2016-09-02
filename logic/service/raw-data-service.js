@@ -1,6 +1,7 @@
 var DataService = require("logic/service/data-service").DataService,
     DataSelector = require("logic/service/data-selector").DataSelector,
-    DataStream = require("logic/service/data-stream").DataStream;
+    DataStream = require("logic/service/data-stream").DataStream,
+    WeakMap = require("collections/weak-map");
 
 /**
  * Provides data objects of certain types and manages changes to them based on
