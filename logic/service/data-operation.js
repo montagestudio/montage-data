@@ -149,18 +149,10 @@ exports.DataOperation = Montage.specialize(/** @lends DataOperation.prototype */
 
     Type: {
         value: {
-            CREATE: {
-                value: {isCreate: true}
-            },
-            READ: {
-                value: {isRead: true}
-            },
-            UPDATE: {
-                value: {isUpdate: true}
-            },
-            DELETE: {
-                value: {isDelete: true}
-            }
+            CREATE: {isCreate: true},
+            READ: {isRead: true},
+            UPDATE: {isUpdate: true},
+            DELETE: {isDelete: true}
         }
     }
 
