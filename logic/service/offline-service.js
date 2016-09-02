@@ -5,14 +5,16 @@ var RawDataService = require("logic/service/raw-data-service").RawDataService,
     uuid = require("montage/core/uuid"),
     DataOrdering = require("logic/model/data-ordering").DataOrdering,
     DESCENDING = DataOrdering.DESCENDING,
-    evaluate = require("frb/evaluate");
+    evaluate = require("frb/evaluate"),
+    Set = require("collections/set"),
+    OfflineService;
 /**
  * TODO: Document
  *
  * @class
  * @extends RawDataService
  */
-exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.prototype */ {
+exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends OfflineService.prototype */ {
 
     /***************************************************************************
      * Initializing
@@ -25,6 +27,9 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
     },
 
    _db : {
+        value: void 0
+    },
+   schema : {
         value: void 0
     },
 
@@ -59,74 +64,76 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                     shouldUpgradeToNewVersion = false, newDbSchema, 
                     schemaDefinition, tableIndexes, tablePrimaryKey;
 
+                this.schema = schema;
+
                 //db.open().then(function (db) {
-                    newDbSchema = {};
+                newDbSchema = {};
 
-                    //We automatically create an extra table that will track offline operations the record was last updated
-                    schemaDefinition = "++id";
-                    schemaDefinition += ",";
-                    schemaDefinition += "dataID";
-                    schemaDefinition += ",";
-                    schemaDefinition += this.typePropertyName;
-                    schemaDefinition += ",";
-                    schemaDefinition += this.lastFetchedPropertyName;
-                    schemaDefinition += ",";
-                    schemaDefinition += this.lastModifiedPropertyName;
-                    schemaDefinition += ",";
-                    schemaDefinition += this.operationPropertyName;
-                    schemaDefinition += ",";
-                    schemaDefinition += this.changesPropertyName;
-                    schemaDefinition += ",";
-                    schemaDefinition += this.contextPropertyName;
-                    newDbSchema[this.operationTableName] = schemaDefinition;
+                //We automatically create an extra table that will track offline operations the record was last updated
+                schemaDefinition = "++id";
+                schemaDefinition += ",";
+                schemaDefinition += "dataID";
+                schemaDefinition += ",";
+                schemaDefinition += this.typePropertyName;
+                schemaDefinition += ",";
+                schemaDefinition += this.lastFetchedPropertyName;
+                schemaDefinition += ",";
+                schemaDefinition += this.lastModifiedPropertyName;
+                schemaDefinition += ",";
+                schemaDefinition += this.operationPropertyName;
+                schemaDefinition += ",";
+                schemaDefinition += this.changesPropertyName;
+                schemaDefinition += ",";
+                schemaDefinition += this.contextPropertyName;
+                newDbSchema[this.operationTableName] = schemaDefinition;
 
-                    if (schema) {
+                if (schema) {
 
-                        for (table in schema) {
-                            tableSchema = schema[table];
-                            tableIndexes = tableSchema.indexes;
-                            tablePrimaryKey = tableSchema.primaryKey;
-                            dbTable = db[table];
-                            if (dbTable) {
-                                //That table is defined, now let's compare primaryKey and indexes
-                                dbSchema = dbTable.schema;
-                                if (dbSchema.primKey !== tablePrimaryKey) {
-                                    //Existing table has different primaryKey, needs new version
-                                    shouldUpgradeToNewVersion = true;
-                                }
-                                //test if indexes aren't the same.
-                                dbIndexes = dbSchema.indexes;
-                                if (dbIndexes !== tableSchema.indexes) {
-                                    //Existing table has different indexes, needs new version
-                                    shouldUpgradeToNewVersion = true;
-                                }
-
-
-                            } else {
-                                //That table doesn't exists, which means we need to update.
+                    for (table in schema) {
+                        tableSchema = schema[table];
+                        tableIndexes = tableSchema.indexes;
+                        tablePrimaryKey = tableSchema.primaryKey;
+                        dbTable = db[table];
+                        if (dbTable) {
+                            //That table is defined, now let's compare primaryKey and indexes
+                            dbSchema = dbTable.schema;
+                            if (dbSchema.primKey !== tablePrimaryKey) {
+                                //Existing table has different primaryKey, needs new version
                                 shouldUpgradeToNewVersion = true;
                             }
-                            if (shouldUpgradeToNewVersion) {
-                                //We automatically add an index for lastUpdatedPropertyName ("montage-online-last-updated")
-                                schemaDefinition = tablePrimaryKey;
-                                for(var i=0, iIndexName;(iIndexName = tableIndexes[i]);i++) {
-                                    if(iIndexName !== tablePrimaryKey) {
-                                        schemaDefinition += ",";
-                                        schemaDefinition +=  iIndexName;
-                                    }
-                                }
-                                newDbSchema[table] = schemaDefinition;
+                            //test if indexes aren't the same.
+                            dbIndexes = dbSchema.indexes;
+                            if (dbIndexes !== tableSchema.indexes) {
+                                //Existing table has different indexes, needs new version
+                                shouldUpgradeToNewVersion = true;
                             }
-                        }
 
+
+                        } else {
+                            //That table doesn't exists, which means we need to update.
+                            shouldUpgradeToNewVersion = true;
+                        }
                         if (shouldUpgradeToNewVersion) {
-                            //db.close();
-                            //Add upgrade here
-                            //console.log("newDbSchema:",newDbSchema);
-                            db.version(db.verno+1).stores(newDbSchema);
-                            //db.open();
+                            //We automatically add an index for lastUpdatedPropertyName ("montage-online-last-updated")
+                            schemaDefinition = tablePrimaryKey;
+                            for(var i=0, iIndexName;(iIndexName = tableIndexes[i]);i++) {
+                                if(iIndexName !== tablePrimaryKey) {
+                                    schemaDefinition += ",";
+                                    schemaDefinition +=  iIndexName;
+                                }
+                            }
+                            newDbSchema[table] = schemaDefinition;
                         }
                     }
+
+                    if (shouldUpgradeToNewVersion) {
+                        //db.close();
+                        //Add upgrade here
+                        //console.log("newDbSchema:",newDbSchema);
+                        db.version(db.verno+1).stores(newDbSchema);
+                        //db.open();
+                    }
+                }
                 //});
 
             }
@@ -347,9 +354,10 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                     which seems to be the only fetch for Hazards on load when offline.
                 */
                 db.open().then(function (db) {
+                    var table = self.tableNamed(selector.type);
+
                     if(whereProperties.length) {
-                        var table = self.tableNamed(selector.type),
-                            wherePromise,
+                        var wherePromise,
                             resultPromise,
                             whereProperty = whereProperties.shift(),
                             whereValue = criteria[whereProperty];
@@ -422,7 +430,7 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                                     expression += iExpression;
                                     expression += "}";
                                     if(iDataOrdering.order === DESCENDING) {
-                                        expression += ".reversed()"
+                                        expression += ".reversed()";
                                     }
                                 }
                                 results = evaluate(expression, results);
@@ -433,6 +441,13 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
 
                         });
 
+                    }
+                    else {
+                        table.toArray()
+                        .then(function(results) {
+                            stream.addData(results);
+                            stream.dataDone();
+                        });
                     }
 
                 }).catch('NoSuchDatabaseError', function(e) {
@@ -477,7 +492,7 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
             var self = this,
                 db = this._db,
                 tableName = selector.type,
-                table = db[tableName],
+                table = this.tableNamed(tableName),
                 lastUpdatedTable = this.operationTable,
                 clonedArray = [],
                 i,countI,iRawData, iLastUpdated,
@@ -609,6 +624,29 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
         }
     },
 
+    registerOfflinePrimaryKeyDependenciesForData: {
+        value: function(data, tableName, primaryKeyPropertyName) {
+
+            if(data.length === 0) return;
+
+            OfflineService.registerOfflinePrimaryKeyDependenciesForData(data, tableName, primaryKeyPropertyName, this);
+        }
+    },
+
+    //TODO
+    deleteOfflinePrimaryKeyDependenciesForData: {
+        value: function(data, tableName, primaryKeyPropertyName) {
+                        if(data.length === 0) return;
+
+            var tableSchema = this.schema[tableName],
+                //if we don't have a known list of foreign keys, we'll consider all potential candidate
+                foreignKeys = tableSchema.foreignKeys;
+
+
+            OfflineService.deleteOfflinePrimaryKeyDependenciesForData(data, tableName, primaryKeyPropertyName, foreignKeys);
+        }
+    },
+
     /**
      * Save new data passed in objects of type
      *
@@ -635,7 +673,8 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                 typePropertyName = self.typePropertyName,
                 changesPropertyName = self.changesPropertyName,
                 operationPropertyName = self.operationPropertyName,
-                operationCreateName = self.operationCreateName;
+                operationCreateName = self.operationCreateName,
+                primaryKeys = [];
 
 
                 myDB.open().then(function (db) {
@@ -648,6 +687,10 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
 
                                     //Set offline uuid based primary key
                                     iRawData[primaryKey] = iPrimaryKey = uuid.generate();
+
+                                    //keep track of primaryKeys:
+                                    primaryKeys.push(iPrimaryKey);
+
                                     clonedObjects.push(iRawData);
 
                                     //Create the record to track of last modified date
@@ -666,7 +709,22 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                             return Dexie.Promise.all([table.bulkAdd(clonedObjects),operationTable.bulkAdd(operations)]);
 
                         }).then(function(value) {
-                            resolve(objects.length);
+                            //Now write new offline primaryKeys
+                            OfflineService.writeOfflinePrimaryKeys(primaryKeys).then(function() {
+                                OfflineService.fetchOfflinePrimaryKeys().then(function(offlinePrimaryKeys) {
+                                    console.log(offlinePrimaryKeys);
+                                });
+
+                                //Once this succedded, we need to add our temporary primary keys bookeeping:
+                                //Register potential temporary primaryKeys
+                                self.registerOfflinePrimaryKeyDependenciesForData(objects, table.name, primaryKey);
+
+                                resolve(objects.length);
+                            })
+                            .catch(function(e) {
+                                reject(e);
+                                console.error(e);
+                            });
                             //console.log("tableName: added Offline Data, ",objects.length," objects");
                         }).catch(function(e) {
                             reject(e);
@@ -737,6 +795,11 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                             return Dexie.Promise.all(updateDataPromises);
 
                         }).then(function(value) {
+                            //Once this succedded, we need to add our temporary primary keys bookeeping:
+                            //Register potential temporary primaryKeys
+                            self.registerOfflinePrimaryKeyDependenciesForData(objects, table.name, primaryKey);
+
+
                             resolve(clonedObjects);
                             //console.log(table.name,": updateData for ",objects.length," objects succesfully",value);
                         }).catch(function(e) {
@@ -805,6 +868,12 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
                             return Dexie.Promise.all(updateDataPromises);
 
                         }).then(function(value) {
+
+                                //Once this succedded, we need to add our temporary primary keys bookeeping:
+                                //Register potential temporary primaryKeys
+                                self.deleteOfflinePrimaryKeyDependenciesForData(objects);
+
+
                             resolve(clonedObjects);
                             //console.log(table.name,": updateData for ",objects.length," objects succesfully",value);
                         }).catch(function(e) {
@@ -855,4 +924,250 @@ exports.OfflineService = RawDataService.specialize(/** @lends OfflineService.pro
             });
         }
     }
-});
+},
+    {
+        __offlinePrimaryKeyDB: {
+            value:null
+        },
+        _offlinePrimaryKeyDB: {
+            get: function() {
+                if(!this.__offlinePrimaryKeyDB) {
+                    var db = this.__offlinePrimaryKeyDB = new Dexie("OfflinePrimaryKeys"),
+                        primaryKeysTable = db["PrimaryKeys"];
+
+                    if(!primaryKeysTable) {
+                        /*   PrimaryKeys has offlinePrimaryKey and a property "dependencies" that contains an array of 
+                            {
+                                offlinePrimaryKey:"uuid-1111-4444-5555",
+                                dependencies:[
+                                    {
+                                        tableName:"BlahTable", 
+                                        primaryKey:"uuid-1233-3455", 
+                                        foreignKeyName:"foo_ID"
+                                    }
+                                ]
+                            }
+                                This tells us that the primaryKey "uuid-1111-4444-5555" appears as a foreignKey named "foo_ID" of the record in "BlahTable" that has the primaryKey value of "uuid-1233-3455" 
+                        */
+
+                        var newDbSchema = {
+                            PrimaryKeys: "offlinePrimaryKey,dependencies.tableName, dependencies.primaryKey, dependencies.foreignKeyName"
+                        };
+                        db.version(db.verno+1).stores(newDbSchema);
+                    }
+
+                }
+                return this.__offlinePrimaryKeyDB;
+            }
+        },
+        _primaryKeysTable: {
+            value:null
+        },
+
+        primaryKeysTable: {
+            get: function() {
+                return this._primaryKeysTable || (this._primaryKeysTable = this._offlinePrimaryKeyDB.PrimaryKeys);
+            }
+        },
+
+        writeOfflinePrimaryKey: {
+            value: function(aPrimaryKey) {
+                return this.writeOfflinePrimaryKeys([aPrimaryKey]);
+            }
+        },
+
+        writeOfflinePrimaryKeys: {
+            value: function(primaryKeys) {
+                var db = this._offlinePrimaryKeyDB,
+                    table = this.primaryKeysTable,
+                    primaryKeysRecords = [],
+                    self = this;
+
+                for(var i=0, countI = primaryKeys.length, iRawData, iPrimaryKey;i<countI;i++) {
+                    primaryKeysRecords.push({
+                        offlinePrimaryKey: primaryKeys[i]
+                    })
+                }
+                return new Promise(function (resolve, reject) {
+                    var i, iPrimaryKey,
+                        _offlinePrimaryKeys = self._offlinePrimaryKeys;
+
+                    table.bulkAdd(primaryKeysRecords)
+                    .then(function(lastKey) {
+                        self.fetchOfflinePrimaryKeys()
+                        .then(function(offlinePrimaryKeys) {
+
+                            //Update local cache:
+                            for(i=0;(iPrimaryKey = primaryKeys[i]);i++) {
+                                offlinePrimaryKeys.add(iPrimaryKey.offlinePrimaryKey,primaryKeysRecords[i]);
+                            }
+                            resolve(lastKey);
+                        });
+                    })
+                    .catch(function(e){
+                        console.error("deleteOfflinePrimaryKeys failed",e);
+                        reject(e);
+                    });
+
+                });
+            }
+        },
+
+        registerOfflinePrimaryKeyDependenciesForData: {
+            value: function(data, tableName, primaryKeyPropertyName, service) {
+
+                if(data.length === 0) return;
+
+                var keys = Object.keys(data[0]),
+                    i, iData, countI,
+                    j, jProperty, jPropertyValue, jPrimaryKey,
+                    offlineService = OfflineService,
+                    tableSchema = service.schema[tableName],
+                    //if we don't have a known list of foreign keys, we'll consider all potential candidate
+                    foreignKeys = tableSchema.foreignKeys,
+                    updatedRecord, updatedRecords
+                    self = this;
+
+                if(!foreignKeys) {
+                    foreignKeys = tableSchema._computedForeignKeys 
+                                    || (tableSchema._computedForeignKeys = new Set(keys));
+                }
+
+                //We need the cache populated from storage before we can do this:
+                this.fetchOfflinePrimaryKeys()
+                    .then(function(offlinePrimaryKeys) {
+
+                        for(i=0, countI = data.length;(i<countI);i++) {
+                            iData = data[i];
+                            for(j=0;(jProperty = keys[j]);j++) {
+                                if(foreignKeys.has(jProperty)) {
+                                    jPrimaryKey = iData[primaryKeyPropertyName];
+                                    jPropertyValue = iData[jProperty];
+                                    if(updatedRecord = self.addPrimaryKeyDependency(jPropertyValue, tableName,jPrimaryKey,jProperty)) {
+                                        updatedRecords = updatedRecords || [];
+                                        updatedRecords.push(updatedRecord);
+                                    }
+                                }
+                            }
+                        }
+
+
+                        if(updatedRecords && updatedRecords.length) {
+                            //We need to save:
+                            this.primaryKeysTable.bulkPut(updatedRecords)
+                            .then(function(lastKey) {
+                                console.log("Updated  offline primaryKeys dependencies" + lastKey); // Will be 100000.
+                            }).catch(Dexie.BulkError, function (e) {
+                                console.error (e);
+                            });
+
+                        }
+                });
+            }
+        },
+
+        deleteOfflinePrimaryKeyDependenciesForData: {
+            value: function(data, tableName, primaryKeyPropertyName, tableForeignKeys) {
+                
+            }
+        },
+
+       /**
+        * this assumes this._offlinePrimaryKeys has already been fetched    
+        * @returns {Object} - if we found a record to uypdate, returns it
+        * otherwise returns null
+        */
+
+        addPrimaryKeyDependency: {
+            value: function(aPrimaryKey, tableName, tablePrimaryKey, tableForeignKey) {
+
+                if(this._offlinePrimaryKeys.has(aPrimaryKey)) {
+                    var aPrimaryKeyRecord = this._offlinePrimaryKeys.get(aPrimaryKey),
+                        dependencies = aPrimaryKeyRecord.dependencies,
+                        i, iDependency, found = false,
+                        primaryKeysRecord;
+
+                    //Now we search for a match... whish we could use an in-memory
+                    //compound-index...
+                    for(i=0;(iDependency = dependencies[i]);i++) {
+                        if( iDependency.tableName === tableName
+                            && iDependency.primaryKey === tablePrimaryKey
+                            && iDependency.foreignKeyName === tableForeignKey) {
+                                found = true;
+                                break;
+                            }
+                    }
+                    if(!found) {
+                        primaryKeysRecord = {
+                            tableName:tableName, 
+                            primaryKey:tablePrimaryKey, 
+                            foreignKeyName:tableForeignKey
+                        };
+                        dependencies.push(primaryKeysRecord);
+                        return aPrimaryKeyRecord;
+                    }
+                    return null;
+                }
+            }
+        },
+
+        /**
+         * caches the primary keys only
+         */
+
+        _offlinePrimaryKeys: {
+            value: null
+        },        
+        _offlinePrimaryKeysPromise: {
+            value: null
+        },
+        fetchOfflinePrimaryKeys: {
+            value: function() {
+                if(!this._offlinePrimaryKeys) {
+                    var _offlinePrimaryKeys = this._offlinePrimaryKeys = new Map(),
+                        self = this;
+                    return new Promise(function (resolve, reject) {
+                        self._offlinePrimaryKeyDB.PrimaryKeys.each(function (item, cursor) {
+                            _offlinePrimaryKeys.set(item.offlinePrimaryKey,item);
+                         })
+                         .then(function() {
+                             resolve(_offlinePrimaryKeys);
+                         })
+                         .catch(function(e){
+                             console.error("fetchOfflinePrimaryKeys failed",e);
+                             reject(e);
+                         });
+                    });
+                }
+                else {
+                    if(!this._offlinePrimaryKeysPromise) {
+                        this._offlinePrimaryKeysPromise = Promise.resolve(this._offlinePrimaryKeys);
+                    }
+                    return this._offlinePrimaryKeysPromise;
+                }
+            }
+        },
+        deleteOfflinePrimaryKeys: {
+            value: function (primaryKeys) {
+                var self = this,
+                    _offlinePrimaryKeys = this._offlinePrimaryKeys;
+
+                if(!primaryKeys || primaryKeys.length === 0) return Promise.resolve();
+            
+                return new Promise(function (resolve, reject) {
+                    self._offlinePrimaryKeyDB.PrimaryKeys.bulkDelete(primaryKeys)
+                    .then(function() {
+                        //Update local cache:
+                        for(var i=0, iPrimaryKey;(iPrimaryKey = primaryKeys[i]);i++) {
+                            _offlinePrimaryKeys.delete(iPrimaryKey.offlinePrimaryKey);
+                        }
+                        resolve();
+                    })
+                    .catch(function(e){
+                        console.error("deleteOfflinePrimaryKeys failed",e);
+                        reject(e);
+                    });
+                })
+            }
+        }
+    });

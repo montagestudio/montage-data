@@ -1060,7 +1060,11 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             var self = this;
             this.readOfflineOperations().then(function (operations) {
                 operations.sort(this._compareOfflineOperations);
-                return self.performOfflineOperations(operations);
+                return self.performOfflineOperations(operations)
+                        .then(function() {
+                            //Delete offline primaryKeys:
+                            //OfflineService.deleteOfflinePrimaryKeys()...
+                        });
             }).catch(function (e) {
                 console.error(e.stack);
             });
