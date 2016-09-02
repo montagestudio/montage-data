@@ -357,20 +357,17 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     addRawData: {
         value: function (stream, records, context) {
-
-            if(!records) return;
-
             var offline, object, i, n;
             // Record fetched raw data for offline use if appropriate.
-            offline = !this.isOffline && this._offlineRawData.get(stream);
+            offline = records && !this.isOffline && this._offlineRawData.get(stream);
             if (offline) {
                 offline.push.apply(offline, records);
-            } else if (!this.isOffline) {
+            } else if (records && !this.isOffline) {
                 this._offlineRawData.set(stream, records.slice())
             }
             // Convert the raw data to appropriate data objects. The conversion
             // will be done in place to avoid creating any unnecessary array.
-            for (i = 0, n = records ? records.length : 0; i < n; i += 1) {
+            for (i = 0, n = records && records.length; i < n; i += 1) {
                 object = this.getDataObject(stream.selector.type, records[i], context);
                 this.mapRawDataToObject(records[i], object, context);
                 records[i] = object;
