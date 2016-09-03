@@ -367,53 +367,59 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                                 //db.table1.where("key1").between(8,12).and(function (x) { return x.key2 >= 3 && x.key2 < 18; }).toArray();
 
 
-                                if(Array.isArray(whereValue)) {
-                                    wherePromise = table
-                                                    .where(whereProperty)
-                                                    .anyOf(whereValue);
-                                }
-                                else {
-                                    wherePromise = table
-                                                    .where(whereProperty)
-                                                    .equals(whereValue);
-                                }
+                            if(Array.isArray(whereValue)) {
+                                wherePromise = table
+                                                .where(whereProperty)
+                                                .anyOf(whereValue);
+                            }
+                            else {
+                                wherePromise = table
+                                                .where(whereProperty)
+                                                .equals(whereValue);
+                            }
 
-                                resultPromise = wherePromise
-                                                .and(function (aRecord) {
-                                                    var result = true;
-                                                    for(var i=0, iKey, iValue, iKeyMatchValue;(iKey = whereProperties[i]);i++) {
-                                                        iValue = criteria[iKey];
-                                                        iKeyMatchValue = false;
-                                                        if(Array.isArray(iValue)) {
-                                                            iOrValue = false;
-                                                            for(var j=0, jValue;(jValue = iValue[j]);j++) {
-                                                                if(aRecord[iKey] === jValue) {
-                                                                    if(!iKeyMatchValue) iKeyMatchValue = true;
-                                                                }
+                            resultPromise = wherePromise
+                                            .and(function (aRecord) {
+                                                var result = true;
+                                                for(var i=0, iKey, iValue, iKeyMatchValue;(iKey = whereProperties[i]);i++) {
+                                                    iValue = criteria[iKey];
+                                                    iKeyMatchValue = false;
+                                                    if(Array.isArray(iValue)) {
+                                                        iOrValue = false;
+                                                        for(var j=0, jValue;(jValue = iValue[j]);j++) {
+                                                            if(aRecord[iKey] === jValue) {
+                                                                if(!iKeyMatchValue) iKeyMatchValue = true;
                                                             }
-                                                        }
-                                                        else {
-                                                            if(aRecord[iKey] !== iValue) {
-                                                                iKeyMatchValue = false;
-                                                            }
-                                                            else {
-                                                                iKeyMatchValue = true;
-                                                            }
-                                                        }
-
-                                                        if(!(result = result && iKeyMatchValue)) {
-                                                            break;
                                                         }
                                                     }
-                                                    return result;
-                                                });
+                                                    else {
+                                                        if(aRecord[iKey] !== iValue) {
+                                                            iKeyMatchValue = false;
+                                                        }
+                                                        else {
+                                                            iKeyMatchValue = true;
+                                                        }
+                                                    }
+
+                                                    if(!(result = result && iKeyMatchValue)) {
+                                                        break;
+                                                    }
+                                                }
+                                                return result;
+                                            });
+                        }
+                        else {
+                            if(Array.isArray(whereValue)) {
+                                resultPromise = table
+                                                .where(whereProperty)
+                                                .anyOf(whereValue);
                             }
                             else {
                                 resultPromise = table
                                                 .where(whereProperty)
-                                                .equals(criteria[whereProperty]);
-
+                                                .equals(whereValue);
                             }
+                        }
                         resultPromise.toArray(function(results) {
                             //Creates an infinite loop, we don't need what's there
                             //self.addRawData(stream, results);
