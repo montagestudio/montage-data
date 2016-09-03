@@ -1062,7 +1062,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 operations.sort(this._compareOfflineOperations);
                 return self.performOfflineOperations(operations);
             }).catch(function (e) {
-                console.error(e.stack);
+                console.error(e);
             });
         }
     },
@@ -1229,8 +1229,9 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
 
     _getOfflineOperationMethodName: {
         value: function(type) {
-            var name = this._offlineOperationMethodNames.get(type);
-            if (!name) {
+            var isString = typeof type === "string",
+                name = isString && this._offlineOperationMethodNames.get(type);
+            if (isString && !name) {
                 name = "perform";
                 name += type[0].toUpperCase();
                 name += type.slice(1);

@@ -69,7 +69,7 @@ exports.DataOperation = Montage.specialize(/** @lends DataOperation.prototype */
      *
      * This is initialized when an operation is created to a number that is
      * zero when the application starts up and then automatically incremented.
-     * That will provide an appropriate value for this property, and if this
+     * This will provide an appropriate value for this property, and if this
      * value is then changed, care should be taken to ensure it is changed to a
      * value that also satisfies the conditions above.
      *
