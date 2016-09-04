@@ -7,7 +7,6 @@ var RawDataService = require("logic/service/raw-data-service").RawDataService,
     DESCENDING = DataOrdering.DESCENDING,
     evaluate = require("frb/evaluate"),
     Map = require("collections/map"),
-    Set = require("collections/set"),
     OfflineService;
 /**
  * TODO: Document
@@ -774,9 +773,6 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                 operationPropertyName = self.operationPropertyName,
                 operationUpdateName = self.operationUpdateName;
 
-
-
-
                 myDB.open().then(function (db) {
                     db.transaction('rw', table, operationTable, 
                         function () {
@@ -1026,8 +1022,8 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                 if(data.length === 0) return;
 
                 var keys = Object.keys(data[0]),
-                    i, iData, countI,
-                    j, jProperty, jPropertyValue, jPrimaryKey,
+                    i, iData, countI, iPrimaryKey,
+                    j, jForeignKey, jForeignKeyValue,
                     offlineService = OfflineService,
                     tableSchema = service.schema[tableName],
                     //if we don't have a known list of foreign keys, we'll consider all potential candidate
@@ -1037,7 +1033,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
 
                 if(!foreignKeys) {
                     foreignKeys = tableSchema._computedForeignKeys 
-                                    || (tableSchema._computedForeignKeys = new Set(keys));
+                                    || (tableSchema._computedForeignKeys = keys);
                 }
 
                 //We need the cache populated from storage before we can do this:
@@ -1046,11 +1042,12 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
 
                         for(i=0, countI = data.length;(i<countI);i++) {
                             iData = data[i];
-                            for(j=0;(jProperty = keys[j]);j++) {
-                                if(foreignKeys.has(jProperty)) {
-                                    jPrimaryKey = iData[primaryKeyPropertyName];
-                                    jPropertyValue = iData[jProperty];
-                                    if(updatedRecord = self.addPrimaryKeyDependency(jPropertyValue, tableName,jPrimaryKey,jProperty)) {
+                            iPrimaryKey = iData[primaryKeyPropertyName];
+                            for(j=0;(jForeignKey = foreignKeys[j]);j++) {
+                                jForeignKeyValue = iData[jForeignKey];
+                                //if we have a value in this foreignKey:
+                                if(jForeignKeyValue) {
+                                    if(updatedRecord = self.addPrimaryKeyDependency(jForeignKeyValue, tableName,iPrimaryKey,jForeignKey)) {
                                         updatedRecords = updatedRecords || [];
                                         updatedRecords.push(updatedRecord);
                                     }
@@ -1061,7 +1058,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
 
                         if(updatedRecords && updatedRecords.length) {
                             //We need to save:
-                            this.primaryKeysTable.bulkPut(updatedRecords)
+                            self.primaryKeysTable.bulkPut(updatedRecords)
                             .then(function(lastKey) {
                                 console.log("Updated  offline primaryKeys dependencies" + lastKey); // Will be 100000.
                             }).catch(Dexie.BulkError, function (e) {
@@ -1096,20 +1093,26 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
 
                     //Now we search for a match... whish we could use an in-memory
                     //compound-index...
-                    for(i=0;(iDependency = dependencies[i]);i++) {
-                        if( iDependency.tableName === tableName
-                            && iDependency.primaryKey === tablePrimaryKey
-                            && iDependency.foreignKeyName === tableForeignKey) {
-                                found = true;
-                                break;
-                            }
+                    if(dependencies) {
+                        for(i=0;(iDependency = dependencies[i]);i++) {
+                            if( iDependency.tableName === tableName
+                                && iDependency.primaryKey === tablePrimaryKey
+                                && iDependency.foreignKeyName === tableForeignKey) {
+                                    found = true;
+                                    break;
+                                }
+                        }
                     }
+      
                     if(!found) {
                         primaryKeysRecord = {
                             tableName:tableName, 
                             primaryKey:tablePrimaryKey, 
                             foreignKeyName:tableForeignKey
                         };
+                        if(!dependencies) {
+                            dependencies = aPrimaryKeyRecord.dependencies = [];
+                        }
                         dependencies.push(primaryKeysRecord);
                         return aPrimaryKeyRecord;
                     }
