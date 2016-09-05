@@ -362,12 +362,6 @@ describe("A DataService", function() {
     xit("has a fetchData() method that sets its stream's selector", function () {
     });
 
-    it("has a saveDataChanges() method", function () {
-        expect(new DataService().saveDataChanges).toEqual(jasmine.any(Function));
-    });
-
-    xit("has a saveDataChanges() method that needs to be further tested", function () {});
-
     xit("has a registerService() method that needs to be further tested", function () {});
 
     xit("has a mainService class variable that needs to be further tested", function () {});

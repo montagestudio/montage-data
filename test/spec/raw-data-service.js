@@ -331,12 +331,6 @@ describe("A RawDataService", function() {
     xit("has a fetchData() xmethod that calls a child service's fetchRawData() when appropraite", function () {
     });
 
-    it("has a saveDataChanges() method", function () {
-        expect(new RawDataService().saveDataChanges).toEqual(jasmine.any(Function));
-    });
-
-    xit("has a saveDataChanges() method that needs to be further tested", function () {});
-
     it("has a fetchRawData() method", function () {
         expect(new RawDataService().fetchRawData).toEqual(jasmine.any(Function));
     });

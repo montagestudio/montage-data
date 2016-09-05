@@ -50,7 +50,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
 
     constructor: {
         value: function DataService() {
-            exports.DataService.mainService = this;
+            exports.DataService.mainService = exports.DataService.mainService || this;
             this._initializeAuthorization();
             this._initializeOffline();
         }
@@ -535,11 +535,11 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
 
     /**
-     * @todo Rename and document API and implementation.
-     *
      * Since root services are responsible for triggerring data objects fetches,
      * subclasses whose instances will not be root services should override this
      * method to call their root service's implementation of it.
+     *
+     * @todo Rename and document API and implementation.
      *
      * @method
      */
@@ -812,9 +812,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     /**
      * A set of the data objects created by this service or any other descendent
      * of this service's [root service]{@link DataService#rootService} since
-     * [saveDataChanges()]{@link DataService#saveDataChanges} was last called,
-     * or since the root service was created if saveDataChanges() hasn't been
-     * called yet.
+     * that root service's data was last saved, or since the root service was
+     * created if that service's data hasn't been saved yet.
      *
      * Since root services are responsible for tracking data objects, subclasses
      * whose instances will not be root services should override this property
@@ -834,10 +833,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     /**
      * A set of the data objects managed by this service or any other descendent
      * of this service's [root service]{@link DataService#rootService} that have
-     * been changed since [saveDataChanges()]{@link DataService#saveDataChanges}
-     * was last called, or since the root service was created if
-     * [saveDataChanges()]{@link DataService#saveDataChanges} hasn't been called
-     * yet.
+     * been changed since that root service's data was last saved, or since the
+     * root service was created if that service's data hasn't been saved yet
      *
      * Since root services are responsible for tracking data objects, subclasses
      * whose instances will not be root services should override this property
@@ -866,25 +863,30 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * This method accept [types]{@link DataObjectDescriptor} as alternatives to
      * [selectors]{@link DataSelector}, and its [stream]{DataStream} argument is
      * optional, but when it calls its child services it will provide them with
-     * both a [selectors]{@link DataSelector} and a [stream]{DataStream}.
+     * a [selector]{@link DataSelector}, it provide them with a
+     * [stream]{DataStream}, creating one if necessary, and the stream will
+     * include a reference to the selector. Also, if a child service's
+     * implementation of this method return `undefined` or `null`, this method
+     * will return the stream passed in to the call to that child.
      *
      * The requested data may be fetched asynchronously, in which case the data
      * stream will be returned immediately but the stream's data will be added
      * to the stream at a later time.
      *
      * @method
-     * @argument {DataSelector} selector - Defines what data should be returned.
-     *                                     A type can be provided instead of a
-     *                                     {@link DataSelector}, in which
-     *                                     case a DataSelector with the
-     *                                     specified type and no
-     *                                     [criteria]{@link DataSelector#criteria}
-     *                                     will be created and used for the
-     *                                     fetch.
-     * @argument {?DataStream} stream    - The stream to which the provided data
-     *                                     should be added. If no stream is
-     *                                     provided a stream will be created and
-     *                                     returned by this method.
+     * @argument {DataSelector|DataObjectDescriptor}
+     *           selector              - Defines what data should be returned. A
+     *                                   [type]{@link DataOjectDescriptor} can
+     *                                   be provided instead of a
+     *                                   {@link DataSelector}, in which case a
+     *                                   `DataSelector` with the specified type
+     *                                   and no
+     *                                   [criteria]{@link DataSelector#criteria}
+     *                                   will be created and used for the fetch.
+     * @argument {?DataStream} stream  - The stream to which the provided data
+     *                                   should be added. If no stream is
+     *                                   provided a stream will be created and
+     *                                   returned by this method.
      * @returns {DataStream} - The stream provided to or created by this method.
      */
     fetchData: {
@@ -942,30 +944,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     saveDataObject: {
         value: function (object) {
             return this._updateDataObject(object, "saveDataObject");
-        }
-    },
-
-    /**
-     * Save all the changes that were made to any of the objects managed by this
-     * service since those objects were fetched. Note that objects fetched by a
-     * child service will be managed by that service's root service, not by the
-     * child service itself.
-     *
-     * Since root services are responsible for tracking data changes, subclasses
-     * whose instances will not be root services should override this method to
-     * call their root service's implementation of it.
-     *
-     * This is not yet implemented: It currently does nothing but return a
-     * promise that is already fulfilled.
-     *
-     * @method
-     * @returns {external:Promise} - A promise fulfilled when all of the changed
-     * data has been saved.
-     */
-    saveDataChanges: {
-        value: function () {
-            // TODO.
-            return this.nullPromise;
         }
     },
 
@@ -1413,11 +1391,15 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     /**
      * A reference to the application's main service.
      *
-     * Applications typically have one and only one main service to which all
-     * data requests are sent. That service can in turn delegate handling of
-     * different types of data to child services specialized for each type.
+     * Applications typically have one and only one
+     * [root service]{@link DataService#rootService} to which all data requests
+     * are sent, and this is called the application's main service. That service
+     * can in turn delegate handling of different types of data to child
+     * services specialized by type.
      *
-     * This property will be set automatically.
+     * This property will be set automatically if the {@link DataService}
+     * constructor is called and if the first service created is either the
+     * main service or a descendent of the main service.
      *
      * @type {DataService}
      */
