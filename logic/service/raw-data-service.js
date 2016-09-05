@@ -318,16 +318,19 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * when offline.
      *
      * @method
-     * @argument {Object} records         - An array of objects whose
-     *                                      properties' values hold the raw
-     *                                      data.
-     * @argument {?DataSelector} selector - Defines the raw data selected.
+     * @argument {Object} records  - An array of objects whose properties' values
+     *                               hold the raw data.
+     * @argument {?DataSelector} selector
+     *                             - Describes how the raw data was selected.
+     * @argument {?} context       - The value that was passed in to the
+     *                               [rawDataDone()]{@link RawDataService#rawDataDone}
+     *                               call that invoked this method.
      * @returns {external:Promise} - A promise fulfilled when the raw data has
      * been saved. The promise's fulfillment value is not significant and will
      * usually be `null`.
      */
     writeOfflineData: {
-        value: function (records, selector) {
+        value: function (records, selector, context) {
             // Subclasses should override this to do something useful.
             return this.nullPromise;
         }
@@ -358,17 +361,17 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * or several of these.
      *
      * @method
-     * @argument {DataStream} stream   - The stream to which the data objects
-     *                                   corresponding to the raw data should be
-     *                                   added.
-     * @argument {Array} records       - An array of objects whose properties'
-     *                                   values hold the raw data. This array
-     *                                   will be modified by this method.
-     * @argument {?} context           - A value that will be passed to
-     *                                   [getDataObject()]{@link DataMapping#getDataObject}
-     *                                   and
-     *                                   [mapRawDataToObject()]{@link DataMapping#mapRawDataToObject}
-     *                                   if it is provided.
+     * @argument {DataStream} stream
+     *                           - The stream to which the data objects created
+     *                             from the raw data should be added.
+     * @argument {Array} records - An array of objects whose properties'
+     *                             values hold the raw data. This array
+     *                             will be modified by this method.
+     * @argument {?} context     - An arbitrary value that will be passed to
+     *                             [getDataObject()]{@link RawDataService#getDataObject}
+     *                             and
+     *                             [mapRawDataToObject()]{@link RawDataService#mapRawDataToObject}
+     *                             if it is provided.
      */
     addRawData: {
         value: function (stream, records, context) {
@@ -404,15 +407,18 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @argument {DataStream} stream - The stream to which the data objects
      *                                 corresponding to the raw data have been
      *                                 added.
+     * @argument {?} context         - An arbitrary value that will be passed to
+     *                                 [writeOfflineData()]{@link RawDataService#writeOfflineData}
+     *                                 if it is provided.
      */
     rawDataDone: {
-        value: function (stream) {
+        value: function (stream, context) {
             var offline = this._streamRawData.get(stream);
             if (!offline) {
                 stream.dataDone();
             } else {
                 this._streamRawData.delete(stream);
-                this.writeOfflineData(offline, stream.selector).then(function () {
+                this.writeOfflineData(offline, stream.selector, context).then(function () {
                     stream.dataDone();
                     return null;
                 }).catch(function (e) {
@@ -504,7 +510,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *                             the raw data.
      * @argument {Object} object - An object whose properties must be set or
      *                             modified to represent the raw data.
-     * @argument {?} context     - A value that was passed in to the
+     * @argument {?} context     - The value that was passed in to the
      *                             [addRawData()]{@link RawDataService#addRawData}
      *                             call that invoked this method.
      */
