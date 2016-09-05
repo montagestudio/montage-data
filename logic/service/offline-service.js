@@ -493,7 +493,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
     //writeOfflineData/readOfflineOperatio
 
     writeOfflineData: {
-        value: function (selector, rawDataArray) {
+        value: function (rawDataArray, selector) {
 
             var self = this,
                 db = this._db,

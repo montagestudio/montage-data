@@ -137,8 +137,8 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @argument {DataSelector} selector - Defines what data should be fetched.
      *                                     Unlike for the
      *                                     [superclass]{@link DataService#fetchData}
-     *                                     implementation this argument's value
-     *                                     cannot be a
+     *                                     implementation of this method this
+     *                                     argument's value cannot be a
      *                                     [type]{@link DataObjectDescriptor}.
      * @argument {DataStream} stream     - A stream to which the fetched data
      *                                     can be added. Unlike for the
@@ -318,15 +318,16 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * when offline.
      *
      * @method
-     * @argument {DataSelector} selector - Defines the raw data selected.
-     * @argument {Object} records        - An array of objects whose properties'
-     *                                     values hold the raw data.
+     * @argument {Object} records         - An array of objects whose
+     *                                      properties' values hold the raw
+     *                                      data.
+     * @argument {?DataSelector} selector - Defines the raw data selected.
      * @returns {external:Promise} - A promise fulfilled when the raw data has
      * been saved. The promise's fulfillment value is not significant and will
      * usually be `null`.
      */
     writeOfflineData: {
-        value: function (selector, records) {
+        value: function (records, selector) {
             // Subclasses should override this to do something useful.
             return this.nullPromise;
         }
@@ -411,7 +412,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
                 stream.dataDone();
             } else {
                 this._streamRawData.delete(stream);
-                this.writeOfflineData(stream.selector, offline).then(function () {
+                this.writeOfflineData(offline, stream.selector).then(function () {
                     stream.dataDone();
                     return null;
                 }).catch(function (e) {
