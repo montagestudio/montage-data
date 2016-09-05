@@ -153,7 +153,9 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     fetchData: {
         value: function (selector, stream) {
+            stream.selector = this.mapSelectorToRawDataSelector(selector);
             this.fetchRawData(stream);
+            stream.selector = selector;
         }
     },
 
@@ -445,6 +447,32 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     /***************************************************************************
      * Mapping Raw Data
      */
+
+    /**
+     * Convert a selector for data ojects to a selector for raw data.
+     *
+     * The selector returned by this method will be the selector used by methods
+     * that deal with raw data, like
+     * [fetchRawData()]{@link RawDataService#fetchRawData]},
+     * [addRawData()]{@link RawDataService#addRawData]},
+     * [rawDataDone()]{@link RawDataService#rawDataDone]}, and
+     * [writeOfflineData()]{@link RawDataService#writeOfflineData]}. Any
+     * [stream]{@link DataStream} available to these methods will have their
+     * selector references temporarly replaced by references to the mapped
+     * selector returned by this method.
+     *
+     * The default implementation of this method returns the passed in selector.
+     *
+     * @method
+     * @argument {DataSelector} selector - A selector defining data objects to
+     *                                     select.
+     * @returns {DataSelector} - A selector defining raw data to select.
+     */
+    mapSelectorToRawDataSelector: {
+        value: function (selector) {
+            return selector;
+        }
+    },
 
     /**
      * Convert raw data to data objects of an appropriate type.
