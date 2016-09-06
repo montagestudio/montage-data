@@ -32,6 +32,9 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
    schema : {
         value: void 0
     },
+   name : {
+        value: void 0
+    },
 
    
      /**
@@ -64,6 +67,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                     shouldUpgradeToNewVersion = false, newDbSchema, 
                     schemaDefinition, tableIndexes, tablePrimaryKey;
 
+                this.name = name;
                 this.schema = schema;
 
                 //db.open().then(function (db) {
@@ -133,6 +137,8 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                         db.version(db.verno+1).stores(newDbSchema);
                         //db.open();
                     }
+
+                    OfflineService.registerOfflineService(this);
                 }
                 //});
 
@@ -613,6 +619,10 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
 
                 db.transaction('rw', table, operationTable, function () {
 
+                        if(offlineObjectsToClear.length) {
+                            debugger;
+                        }
+
                         return Dexie.Promise.all(
                             [table.bulkPut(clonedRawDataArray),
                             operationTable.bulkPut(clonedUpdateOperationArray),
@@ -691,11 +701,17 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                             for(var i=0, countI = objects.length, iRawData, iPrimaryKey;i<countI;i++) {
                                 if((iRawData = objects[i])) {
 
-                                    //Set offline uuid based primary key
-                                    iRawData[primaryKey] = iPrimaryKey = uuid.generate();
+                                    if(typeof iRawData[primaryKey] === "undefined"
+                                        || iRawData[primaryKey] === "") {
+                                        //Set offline uuid based primary key
+                                        iRawData[primaryKey] = iPrimaryKey = uuid.generate();
 
-                                    //keep track of primaryKeys:
-                                    primaryKeys.push(iPrimaryKey);
+                                        //keep track of primaryKeys:
+                                        primaryKeys.push(iPrimaryKey);
+                                    }
+                                    else {
+                                        console.log("### OfflineService createData ",type,": iRaData ",iRawData," already have a primaryKey[",primaryKey,"]");
+                                    }
 
                                     clonedObjects.push(iRawData);
 
@@ -725,7 +741,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                                 //Register potential temporary primaryKeys
                                 self.registerOfflinePrimaryKeyDependenciesForData(objects, table.name, primaryKey);
 
-                                resolve(objects.length);
+                                resolve(objects);
                             })
                             .catch(function(e) {
                                 reject(e);
@@ -743,6 +759,34 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
         }
     },
 
+    updatePrimaryKey: {
+        value: function (currentPrimaryKey, newPrimaryKey, type) {
+            
+            var myDB = this._db,
+            table = this.tableNamed(type),
+            primaryKeyProperty = table.schema.primKey.name,
+            record,
+            updateRecord = {};
+            
+            //because it's a primary key, we need to delete the record and re-create it...
+            //We fetch it first
+            return table.where(primaryKeyProperty).equals(currentPrimaryKey)
+                .first(function(record) {
+                    table.delete(currentPrimaryKey)
+                    .then(function() {
+                        //Assign the new one
+                        record[primaryKeyProperty] = newPrimaryKey;
+
+                        //Re-save
+                        return table.put(record);
+                    })
+                    .catch(function(e) {
+                            // console.log("tableName:failed to addO ffline Data",e)
+                            console.error(table.name,": failed to delete record with primaryKwy ",currentPrimaryKey,e);
+                        });
+                });
+        }
+    },
     /**
      * Save updates made to an array of existing data objects.
      *
@@ -926,9 +970,32 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
 
             });
         }
+    },
+    onlinePrimaryKeyForOfflinePrimaryKey: {
+        value: function(offlinePrimaryKey) {
+            return OfflineService.onlinePrimaryKeyForOfflinePrimaryKey(offlinePrimaryKey);
+        }
+    },
+    replaceOfflinePrimaryKey: {
+            value: function(offlinePrimaryKey,onlinePrimaryKey, type, service) {
+                return OfflineService.replaceOfflinePrimaryKey(offlinePrimaryKey,onlinePrimaryKey, type, service);
+            }
     }
 },
     {
+        _registeredOfflineServiceByName: {
+            value: new Map()
+        },
+        registerOfflineService: {
+            value: function(anOfflineService) {
+                this._registeredOfflineServiceByName.set(anOfflineService.name,anOfflineService);
+            }
+        },
+        registeredOfflineServiceNamed: {
+            value: function(anOfflineServiceName) {
+                return this._registeredOfflineServiceByName.get(anOfflineServiceName);
+            }
+        },
         __offlinePrimaryKeyDB: {
             value:null
         },
@@ -944,6 +1011,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                                 offlinePrimaryKey:"uuid-1111-4444-5555",
                                 dependencies:[
                                     {
+                                        serviceName: "AServiceName",
                                         tableName:"BlahTable", 
                                         primaryKey:"uuid-1233-3455", 
                                         foreignKeyName:"foo_ID"
@@ -954,7 +1022,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                         */
 
                         var newDbSchema = {
-                            PrimaryKeys: "offlinePrimaryKey,dependencies.tableName, dependencies.primaryKey, dependencies.foreignKeyName"
+                            PrimaryKeys: "offlinePrimaryKey,dependencies.serviceName, dependencies.tableName, dependencies.primaryKey, dependencies.foreignKeyName"
                         };
                         db.version(db.verno+1).stores(newDbSchema);
                     }
@@ -989,7 +1057,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                 for(var i=0, countI = primaryKeys.length, iRawData, iPrimaryKey;i<countI;i++) {
                     primaryKeysRecords.push({
                         offlinePrimaryKey: primaryKeys[i]
-                    })
+                    });
                 }
                 return new Promise(function (resolve, reject) {
                     var i, iPrimaryKey,
@@ -1028,7 +1096,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                     tableSchema = service.schema[tableName],
                     //if we don't have a known list of foreign keys, we'll consider all potential candidate
                     foreignKeys = tableSchema.foreignKeys,
-                    updatedRecord, updatedRecords
+                    updatedRecord, updatedRecords,
                     self = this;
 
                 if(!foreignKeys) {
@@ -1047,7 +1115,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                                 jForeignKeyValue = iData[jForeignKey];
                                 //if we have a value in this foreignKey:
                                 if(jForeignKeyValue) {
-                                    if(updatedRecord = self.addPrimaryKeyDependency(jForeignKeyValue, tableName,iPrimaryKey,jForeignKey)) {
+                                    if(updatedRecord = self.addPrimaryKeyDependency(jForeignKeyValue, tableName,iPrimaryKey,jForeignKey, service.name)) {
                                         updatedRecords = updatedRecords || [];
                                         updatedRecords.push(updatedRecord);
                                     }
@@ -1078,12 +1146,12 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
 
        /**
         * this assumes this._offlinePrimaryKeys has already been fetched    
-        * @returns {Object} - if we found a record to uypdate, returns it
+        * @returns {Object} - if we found a record to update, returns it
         * otherwise returns null
         */
 
         addPrimaryKeyDependency: {
-            value: function(aPrimaryKey, tableName, tablePrimaryKey, tableForeignKey) {
+            value: function(aPrimaryKey, tableName, tablePrimaryKey, tableForeignKey, serviceName) {
 
                 if(this._offlinePrimaryKeys.has(aPrimaryKey)) {
                     var aPrimaryKeyRecord = this._offlinePrimaryKeys.get(aPrimaryKey),
@@ -1106,9 +1174,10 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
       
                     if(!found) {
                         primaryKeysRecord = {
-                            tableName:tableName, 
-                            primaryKey:tablePrimaryKey, 
-                            foreignKeyName:tableForeignKey
+                            serviceName: serviceName,
+                            tableName: tableName, 
+                            primaryKey: tablePrimaryKey, 
+                            foreignKeyName: tableForeignKey
                         };
                         if(!dependencies) {
                             dependencies = aPrimaryKeyRecord.dependencies = [];
@@ -1120,7 +1189,68 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                 }
             }
         },
+        _offlinePrimaryKeyToOnlinePrimaryKey: {
+            value: new Map()
+        },
+        onlinePrimaryKeyForOfflinePrimaryKey: {
+            value: function(offlinePrimaryKey) {
+                return this._offlinePrimaryKeyToOnlinePrimaryKey.get(offlinePrimaryKey);
+            }
+        },
+        replaceOfflinePrimaryKey: {
+            value: function(offlinePrimaryKey,onlinePrimaryKey, type, service) {
+                var self = this;
+                //Update the central table used by DataService's performOfflineOperations 
+                //to update operations are they are processed
+                this._offlinePrimaryKeyToOnlinePrimaryKey.set(offlinePrimaryKey,onlinePrimaryKey);
 
+                //Update the stored primaryKey
+                service.offlineService.updatePrimaryKey(offlinePrimaryKey, onlinePrimaryKey, type)
+                .then(function() {
+                    //Now we need to update stored data as well and we need the cache populated from storage before we can do this:
+                    //We shouldn't just rely on the fact that the app will immediately refetch everything and things would be broken
+                    //if somehow the App would get offline again before a full refetch is done across every kind of data.
+                    self.fetchOfflinePrimaryKeys()
+                        .then(function(offlinePrimaryKeys) {
+
+                            if(offlinePrimaryKeys.has(offlinePrimaryKey)) {
+                                var aPrimaryKeyRecord = offlinePrimaryKeys.get(offlinePrimaryKey),
+                                    dependencies = aPrimaryKeyRecord.dependencies;
+
+                                if(dependencies) {
+                                    var i, iDependency, iOfflineService, iTableName, iPrimaryKey, iForeignKeyName, iUpdateRecord, updateArray = [];
+
+                                    for(i=0;(iDependency = dependencies[i]);i++) {
+                                        //The service that handles iTableName
+                                        iOfflineService = OfflineService.registeredOfflineServiceNamed(iDependency.serviceName);
+                                        iTableName = iDependency.tableName;
+                                        iPrimaryKey = iDependency.primaryKey;
+                                        iForeignKeyName = iDependency.foreignKeyName;
+
+                                        iUpdateRecord = {};
+                                        updateArray[0] = iUpdateRecord;
+                                        iUpdateRecord[iOfflineService.schema[iTableName].primaryKey] = iPrimaryKey;
+                                        iUpdateRecord[iForeignKeyName] = onlinePrimaryKey;
+                                        iOfflineService.updateData(updateArray, iTableName, null);
+
+                                    
+                                    }
+                                }
+
+                            }
+
+                        });
+
+                })
+                .catch(function(e){
+                    console.error("updatePrimaryKey failed",e);
+                    reject(e);
+                });
+
+
+
+            }
+        },
         /**
          * caches the primary keys only
          */

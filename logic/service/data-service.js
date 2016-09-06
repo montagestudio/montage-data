@@ -1156,14 +1156,18 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: function(operations) {
             var services = this._offlineOperationServices,
                 promise = this.nullPromise,
-                i, j, n;
+                child,
+                i, j, n, jOperation, jOperationChanges, jService, jOperationType, jTableSchema, jForeignKeys,
+                OfflineService = OfflineService,
+                k, countK, kForeignKey,kOnlinePrimaryKey;
+
             // Perform each operation, batching if possible, and collecting the
             // results in a chain of promises.
             for (i = 0, n = operations.length; i < n; i = j) {
                 // Find the service responsible for this operation.
                 child = services.get(operations[i]);
                 // Find the end of a batch of operations for this service.
-                for (j = i + 1; j < n && child && services.get(operations[j]) === child; j += 1) {}
+                for (j = i + 1; j < n && child && (jService = services.get((jOperation = operations[j]))) === child; j += 1) {}
                 // Add the promise to perform this batch of operations to the
                 // end of the chain of promises to fulfill all operations.
                 promise =
@@ -1187,7 +1191,32 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
 
     _performAndDeleteOfflineOperation: {
         value: function(operation) {
-            var self = this;
+            //Before we perform an operation, we need to look a foreignKeys in jOperation changes to update if needed before performing the operation
+            //if we don't have a known list of foreign keys, we'll consider all potential candidate
+            var self = this,
+                operationType = operation.type,
+                tableSchema, foreignKeys,
+                k, countK, kOnlinePrimaryKey;
+
+            if(this.offlineService) {
+                tableSchema = this.offlineService.schema[operationType];
+                foreignKeys = tableSchema.foreignKeys;
+            }
+
+            if(!foreignKeys) {
+                foreignKeys = tableSchema._computedForeignKeys 
+                                || (tableSchema._computedForeignKeys = Object.keys(operation.changes));
+            }
+
+            for(k=0, countK = foreignKeys.length;k<countK;k++) {
+                kForeignKey = foreignKeys[k];
+                //If a previous operation resulted in an online primaryKey replacing an offline one, 
+                //we update the operation's changes accordingly
+                if((kOnlinePrimaryKey = this.onlinePrimaryKeyForOfflinePrimaryKey(operation.changes[kForeignKey]))) {
+                    operation.changes[kForeignKey] = kOnlinePrimaryKey;
+                }
+            }
+
             return this._performTypedOfflineOperation(operation).then(function () {
                 return self.deleteOfflineOperations([operation]);
             });
@@ -1248,6 +1277,15 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: function(operation) {
             // To be overridden by subclasses that use offline operations.
             return this.nullPromise;
+        }
+    },
+
+    // To be overridden by subclasses as necessary
+    onlinePrimaryKeyForOfflinePrimaryKey: {
+        value: function(offlinePrimaryKey) {
+            return this.offlineService 
+                        ? this.offlineService.onlinePrimaryKeyForOfflinePrimaryKey(offlinePrimaryKey)
+                        : null;
         }
     },
 
