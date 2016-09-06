@@ -619,10 +619,6 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
 
                 db.transaction('rw', table, operationTable, function () {
 
-                        if(offlineObjectsToClear.length) {
-                            debugger;
-                        }
-
                         return Dexie.Promise.all(
                             [table.bulkPut(clonedRawDataArray),
                             operationTable.bulkPut(clonedUpdateOperationArray),
