@@ -787,8 +787,9 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
      * Save updates made to an array of existing data objects.
      *
      * @method
-     * @argument {Object} objects   - objects whose data should be updated.
+     * @argument {Array} objects   - objects whose data should be updated.
      * @argument {String} type   - type of objects, likely to mean a "table" in storage 
+     * @argument {Object} context   - an object that will be associated with operations 
      * @returns {external:Promise} - A promise fulfilled when all of the data in
      * objects has been saved.
      */
@@ -1224,10 +1225,13 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                                         iForeignKeyName = iDependency.foreignKeyName;
 
                                         iUpdateRecord = {};
-                                        updateArray[0] = iUpdateRecord;
+                                        // updateArray[0] = iUpdateRecord;
                                         iUpdateRecord[iOfflineService.schema[iTableName].primaryKey] = iPrimaryKey;
                                         iUpdateRecord[iForeignKeyName] = onlinePrimaryKey;
-                                        iOfflineService.updateData(updateArray, iTableName, null);
+                                        iOfflineService.tableNamed(iTableName).update(iPrimaryKey, iUpdateRecord);
+                                        //Using updateData creates offlineOperations we don't want here, hence direct use of table:
+                                        //This is internal to OfflineService and descendants.
+                                        // iOfflineService.updateData(updateArray, iTableName, null);
 
                                     
                                     }
