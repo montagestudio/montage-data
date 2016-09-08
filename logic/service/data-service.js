@@ -1004,39 +1004,57 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     isOffline: {
         get: function () {
-            // Takes the initial isOffline value from the navigator state, and
-            // calls goOnline() if the navigator is online because the navigator
-            // may have been offline when the application was last run.
             if (this._isOffline === undefined) {
-                this._isOffline = navigator.onLine ? false : true;
-                if (!this._isOffline) {
-                    this._goOnline();
-                }
+                // Determine the initial value from the navigator state and call
+                // the public setter so _goOnline() is invoked if appropriate.
+                this.isOffline = !navigator.onLine;
             }
             return this._isOffline;
         },
         set: function (offline) {
-            // Calls goOnline() when going from offline to online, but doesn't
-            // call goOnline() when going from an undefined offline state to
-            // online. This allows isOffline to be set to true at application
-            // startup for testing.
-            if (this._isOffline && !offline) {
-                this._isOffline = false;
-                this._goOnline();
-            } else {
+            var self = this;
+            if (this._willBeOffline === null) {
+                // _goOnline() just finished, set _isOffline to the desired
+                // value and clear the "just finished" flag in _willBeOffline.
                 this._isOffline = offline ? true : false;
+                this._willBeOffline = undefined;
+            } else if (this._willBeOffline !== undefined) {
+                // _goOnline() is in progress, just record the future value.
+                this._willBeOffline = offline ? true : false;
+            } else if (this._isOffline === false) {
+                // Already online and not starting up, no need for _goOnline().
+                this._isOffline = offline ? true : false;
+            } else if (!offline) {
+                // Going from offline to online, or starting up online, so
+                // assume we were last offline, call _goOnline(), and only
+                // change the value  when that's done.
+                this._isOffline = true;
+                this._willBeOffline = false;
+                this._goOnline().then(function () {
+                    var offline = self._willBeOffline;
+                    self._willBeOffline = null;
+                    self.isOffline = offline;
+                    return null;
+                });
             }
         }
     },
 
     _isOffline: {
+        // `undefined` on startup, otherwise always `true` or `false`.
+        value: undefined
+    },
+
+    _willBeOffline: {
+        // `true` or `false` while _goOnline() is in progress, `null` just after
+        // it's done, `undefined` otherwise.
         value: undefined
     },
 
     _goOnline: {
         value: function() {
             var self = this;
-            this.readOfflineOperations().then(function (operations) {
+            return this.readOfflineOperations().then(function (operations) {
                 operations.sort(this._compareOfflineOperations);
                 return self.performOfflineOperations(operations);
             }).catch(function (e) {
