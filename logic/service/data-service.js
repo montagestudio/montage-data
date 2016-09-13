@@ -531,7 +531,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Data Object Property Values
+     * Data Object Properties
      */
 
     /**

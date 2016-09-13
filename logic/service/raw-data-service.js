@@ -36,7 +36,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     },
 
     /***************************************************************************
-     * Data Object Property Values
+     * Data Object Properties
      */
 
     decacheObjectProperties: {
