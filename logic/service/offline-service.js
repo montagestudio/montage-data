@@ -1194,6 +1194,13 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                 return this._offlinePrimaryKeyToOnlinePrimaryKey.get(offlinePrimaryKey);
             }
         },
+
+        /*
+        * Returns a promise resolved when onlinePrimaryKey has replaced offlinePrimaryKey
+        * both in memory and in IndexedDB
+        * @type {Promise}
+        */
+
         replaceOfflinePrimaryKey: {
             value: function(offlinePrimaryKey,onlinePrimaryKey, type, service) {
                 var self = this;
@@ -1202,12 +1209,12 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                 this._offlinePrimaryKeyToOnlinePrimaryKey.set(offlinePrimaryKey,onlinePrimaryKey);
 
                 //Update the stored primaryKey
-                service.offlineService.updatePrimaryKey(offlinePrimaryKey, onlinePrimaryKey, type)
+                return service.offlineService.updatePrimaryKey(offlinePrimaryKey, onlinePrimaryKey, type)
                 .then(function() {
                     //Now we need to update stored data as well and we need the cache populated from storage before we can do this:
                     //We shouldn't just rely on the fact that the app will immediately refetch everything and things would be broken
                     //if somehow the App would get offline again before a full refetch is done across every kind of data.
-                    self.fetchOfflinePrimaryKeys()
+                    return self.fetchOfflinePrimaryKeys()
                         .then(function(offlinePrimaryKeys) {
 
                             if(offlinePrimaryKeys.has(offlinePrimaryKey)) {
@@ -1228,7 +1235,8 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                                         // updateArray[0] = iUpdateRecord;
                                         iUpdateRecord[iOfflineService.schema[iTableName].primaryKey] = iPrimaryKey;
                                         iUpdateRecord[iForeignKeyName] = onlinePrimaryKey;
-                                        iOfflineService.tableNamed(iTableName).update(iPrimaryKey, iUpdateRecord);
+                                        
+                                        return iOfflineService.tableNamed(iTableName).update(iPrimaryKey, iUpdateRecord);
                                         //Using updateData creates offlineOperations we don't want here, hence direct use of table:
                                         //This is internal to OfflineService and descendants.
                                         // iOfflineService.updateData(updateArray, iTableName, null);
