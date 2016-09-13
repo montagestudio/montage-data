@@ -516,7 +516,6 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     mapRawDataToObject: {
         value: function (record, object, context) {
-            var keys, i, n;
             if (this.mapping) {
                 this.mapping.mapRawDataToObject(record, object, context);
             } else if (record) {
