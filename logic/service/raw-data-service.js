@@ -77,6 +77,13 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
 
     /***************************************************************************
      * Data Object Creation
+     *
+     * If there were no mapping available in the app for this record giving use
+     * a type/class/condtructor, we should create one ourselves matching what we know.
+     * For a REST service it would be the name of the Entity. Otherwise we should be able
+     * to treat by ip domain, a type based on concatenation of all keys returned,
+     * which would define the "shape"
+     *
      */
 
     getDataObject: {
