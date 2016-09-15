@@ -965,7 +965,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
-     * Working Offline
+     * Offline
      */
 
     _initializeOffline: {

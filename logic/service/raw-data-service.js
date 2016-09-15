@@ -297,7 +297,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     },
 
     /***************************************************************************
-     * Working Offline
+     * Offline
      */
 
     /*
