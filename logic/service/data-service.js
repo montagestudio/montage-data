@@ -1042,7 +1042,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
 
     _isOffline: {
         // `undefined` on startup, otherwise always `true` or `false`.
-        value: undefined
+        value: false
     },
 
     _willBeOffline: {
@@ -1096,10 +1096,10 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             // expect it.
             // This implementation avoids creating promises for services with no
             // children or whose children don't have offline operations.
-            var dummy = new WeakMap(),
+            var self = this,
+                dummy = new WeakMap(),
                 services = this._offlineOperationServices,
-                array, promises,
-                self = this;
+                array, promises;
             this.childServices.forEach(function (child) {
                 var promise = child.readOfflineOperations(dummy);
                 if (promise !== self.emptyArrayPromise) {
