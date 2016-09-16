@@ -1098,10 +1098,11 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             // children or whose children don't have offline operations.
             var dummy = new WeakMap(),
                 services = this._offlineOperationServices,
-                array, promises;
+                array, promises,
+                self = this;
             this.childServices.forEach(function (child) {
                 var promise = child.readOfflineOperations(dummy);
-                if (promise !== this.emptyArrayPromise) {
+                if (promise !== self.emptyArrayPromise) {
                     array = array || [];
                     promises = promises || [];
                     promises.push(promise.then(function(operations) {
@@ -1222,13 +1223,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             }
 
             if(!foreignKeys) {
-                foreignKeys = tableSchema._computedForeignKeys 
+                foreignKeys = tableSchema._computedForeignKeys
                                 || (tableSchema._computedForeignKeys = Object.keys(operation.changes));
             }
 
             for(k=0, countK = foreignKeys.length;k<countK;k++) {
                 kForeignKey = foreignKeys[k];
-                //If a previous operation resulted in an online primaryKey replacing an offline one, 
+                //If a previous operation resulted in an online primaryKey replacing an offline one,
                 //we update the operation's changes accordingly
                 if((kOnlinePrimaryKey = this.onlinePrimaryKeyForOfflinePrimaryKey(operation.changes[kForeignKey]))) {
                     operation.changes[kForeignKey] = kOnlinePrimaryKey;
@@ -1301,7 +1302,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     // To be overridden by subclasses as necessary
     onlinePrimaryKeyForOfflinePrimaryKey: {
         value: function(offlinePrimaryKey) {
-            return this.offlineService 
+            return this.offlineService
                         ? this.offlineService.onlinePrimaryKeyForOfflinePrimaryKey(offlinePrimaryKey)
                         : null;
         }
