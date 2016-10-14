@@ -313,8 +313,9 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
                 status = this._getValueStatus(object) || {};
             if (!status.promise) {
                 this._setValueStatus(object, status);
-                status.promise = new Promise(function (resolve) {
+                status.promise = new Promise(function (resolve, reject) {
                     status.resolve = resolve;
+                    status.reject = reject;
                     self._fetchObjectProperty(object);
                 });
             }
@@ -333,13 +334,25 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
         value: function (object) {
             var self = this;
             this._service.fetchObjectProperty(object, this._propertyName).then(function () {
-                var status = self._getValueStatus(object);
-                self._setValueStatus(object, null);
-                if (status) {
-                    status.resolve(null);
-                }
-                return null;
+                return self._fulfillObjectPropertyFetch(object);
+            }).catch(function (error) {
+                console.error(error);
+                return self._fulfillObjectPropertyFetch(object, error);
             });
+        }
+    },
+
+    _fulfillObjectPropertyFetch: {
+        value: function (object, error) {
+            var status = this._getValueStatus(object);
+            this._setValueStatus(object, null);
+            if (status && !error) {
+                status.resolve(null);
+            } else if (status && error) {
+                console.error(error);
+                status.reject(error);
+            }
+            return null;
         }
     }
 
