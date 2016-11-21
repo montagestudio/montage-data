@@ -874,27 +874,26 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * to the stream at a later time.
      *
      * @method
-     * @argument {DataSelector|DataObjectDescriptor}
-     *           selector              - Defines what data should be returned. A
-     *                                   [type]{@link DataOjectDescriptor} can
-     *                                   be provided instead of a
-     *                                   {@link DataSelector}, in which case a
-     *                                   `DataSelector` with the specified type
-     *                                   and no
+     * @argument {DataObjectDescriptor|DataSelector}
+     *           typeOrSelector        - Defines what data should be returned.
+     *                                   If a [type]{@link DataOjectDescriptor}
+     *                                   is provided instead of a
+     *                                   {@link DataSelector}, a `DataSelector`
+     *                                   with the specified type and no
      *                                   [criteria]{@link DataSelector#criteria}
      *                                   will be created and used for the fetch.
      * @argument {?DataStream} stream  - The stream to which the provided data
      *                                   should be added. If no stream is
      *                                   provided a stream will be created and
      *                                   returned by this method.
-     * @returns {DataStream} - The stream provided to or created by this method.
+     * @returns {?DataStream} - The stream to which the fetched data objects
+     * were or will be added, whether this stream was provided to or created by
+     * this method.
      */
     fetchData: {
-        value: function (selector, stream) {
-            // Accept a type in lieu of a selector.
-            if (!(selector instanceof DataSelector)) {
-                selector = DataSelector.withTypeAndCriteria(selector);
-            }
+        value: function (typeOrSelector, stream) {
+            var type = typeOrSelector instanceof DataObjectDescriptor && typeOrSelector,
+                selector = type && DataSelector.withTypeAndCriteria(type) || typeOrSelector;
             // Set up the stream.
             stream = stream || new DataStream();
             stream.selector = selector;

@@ -1,4 +1,5 @@
 var DataService = require("logic/service/data-service").DataService,
+    DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
     DataSelector = require("logic/service/data-selector").DataSelector,
     DataStream = require("logic/service/data-stream").DataStream,
     WeakMap = require("collections/weak-map");
@@ -141,28 +142,31 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * [fetchRawData()]{@link RawDataService#fetchRawData}.
      *
      * @method
-     * @argument {DataSelector} selector - Defines what data should be fetched.
-     *                                     Unlike for the
-     *                                     [superclass]{@link DataService#fetchData}
-     *                                     implementation of this method this
-     *                                     argument's value cannot be a
-     *                                     [type]{@link DataObjectDescriptor}.
-     * @argument {DataStream} stream     - A stream to which the fetched data
-     *                                     can be added. Unlike for the
-     *                                     [superclass]{@link DataService#fetchData}
-     *                                     implementation of this method this
-     *                                     stream must be specified, and it must
-     *                                     have a reference to the selector.
+     * @argument {DataObjectDescriptor|DataSelector}
+     *           typeOrSelector        - Defines what data should be returned.
+     *                                   If a [type]{@link DataOjectDescriptor}
+     *                                   is provided instead of a
+     *                                   {@link DataSelector}, a `DataSelector`
+     *                                   with the specified type and no
+     *                                   [criteria]{@link DataSelector#criteria}
+     *                                   will be created and used for the fetch.
+     * @argument {?DataStream} stream  - The stream to which the provided data
+     *                                   should be added. If no stream is
+     *                                   provided a stream will be created and
+     *                                   returned by this method.
      * @returns {?DataStream} - The stream to which the fetched data objects
-     * were or will be added. An `undefined` or `null` value may be returned, in
-     * which case the calling parent should assume the fetched data objects were
-     * or will be added to the passed in stream.
+     * were or will be added, whether this stream was provided to or created by
+     * this method.
      */
     fetchData: {
-        value: function (selector, stream) {
+        value: function (typeOrSelector, stream) {
+            var type = typeOrSelector instanceof DataObjectDescriptor && typeOrSelector,
+                selector = type && DataSelector.withTypeAndCriteria(type) || typeOrSelector;
+            stream = stream || new DataStream();
             stream.selector = this.mapSelectorToRawDataSelector(selector);
             this.fetchRawData(stream);
             stream.selector = selector;
+            return stream;
         }
     },
 

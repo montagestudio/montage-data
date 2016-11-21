@@ -1,5 +1,6 @@
 // Note: Bluebird promises are used even if ECMAScript 6 promises are available.
 var DataProvider = require("logic/service/data-provider").DataProvider,
+    DataSelector = require("logic/service/data-selector").DataSelector,
     Promise = require("bluebird");
 
 /**
@@ -260,5 +261,20 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */ 
             delete this._resolve;
         }
     }
+
+}, /** @lends DataStream */ {
+
+    /**
+     * @todo Document.
+     */
+    withTypeOrSelector: {
+        value: function (typeOrSelector) {
+            var type = typeOrSelector instanceof DataObjectDescriptor && typeOrSelector,
+                selector = type && DataSelector.withTypeAndCriteria(type) || typeOrSelector,
+                stream = new this();
+            stream.selector = selector;
+            return stream;
+        }
+    },
 
 });
