@@ -102,14 +102,22 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
 
                 // TODO: Needs instantiation of services
 
-                Promise.all(authorizationServices).bind(self).then(function(authorizationServices) {
+                Promise.all(authorizationServices).bind(self).then(function(authorizationServicesExports) {
+                    var authorizationServices = [], i, countI, iService, authorizationPanels = [], iAuthorizationPanel, iAuthorizationPanelModuleId, iExport, exportSymbol;
+
+                    for(i=0, countI = authorizationServicesExports.length; i<countI; i++) {
+                        iExport = authorizationServicesExports[i];
+                        for(exportSymbol in iExport) {
+                            authorizationServices.push(new iExport[exportSymbol]);
+                        }
+                    }
+
                     // Now we have all the authorization DataServices, we're going to load their
                     // AuthenticationPanel:
-                    var i, countI, iService, authorizationPanels = [], iAuthorizationPanel, iAuthorizationPanelModuleId;
                     for(i=0, countI = authorizationServices.length; i<countI; i++) {
                         iService = authorizationServices[i];
                         iAuthorizationPanelModuleId = iService.authorizationPanel;
-                        iAuthorizationPanelModuleId = this.callDelegateMethod("authorizationManagerWillAuthorizeServiceWithPanel", this,iService,iAuthorizationPanelModuleId) || iAuthorizationPanelModuleId;
+                        iAuthorizationPanelModuleId = this.callDelegateMethod("authorizationManagerWillAuthorizeServiceWithPanelModuleId", this,iService,iAuthorizationPanelModuleId) || iAuthorizationPanelModuleId;
                         if(!iAuthorizationPanelModuleId) {
                             continue;
                         }
@@ -147,7 +155,9 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
                             //an exports, for now we take the first one.
                             for(var key in iAuthorizationPanelExport) {
                                 iAuthorizationPanelConstructor = iAuthorizationPanelExport[key];
-                                iAuthorizationPanel = new iAuthorizationPanelConstructor;
+                                //Give our delgate a chance to give us an existing instance of an AuthorizationPanel
+                                iAuthorizationPanel = this.callDelegateMethod("authorizationManagerWillInstanciateAuthorizeServicePanel", this,iService,iAuthorizationPanelConstructor);
+                                if(!iAuthorizationPanel) iAuthorizationPanel = new iAuthorizationPanelConstructor;
                                 var iAuthorizationPanelInfo = Montage.getInfoForObject(iAuthorizationPanel);
                                 // WEAKNESS: The FreeNAS service returned a moduleId of "/ui/sign-in.reel", which worked to load
                                 // but the info conained "ui/sign-in.reel", causing the lookup to fail. We need to be careful and
