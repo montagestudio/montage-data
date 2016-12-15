@@ -20,7 +20,9 @@ exports.AuthorizationManagerPanel = Component.specialize({
     },
     approveAuthorization: {
         value: function(authorization) {
-            application.applicationModal.hide(self);
+            if(application.applicationModal) {
+                application.applicationModal.hide(self);
+            }
             this._authorizationResolve(authorization);
         }
     },
@@ -44,7 +46,9 @@ exports.AuthorizationManagerPanel = Component.specialize({
                     self._authorizationResolve = resolve;
                     self._authorizationReject = reject;
                     // FIXME This is temporary shortcut for FreeNAS while we fix Montage's modal.
-                    application.applicationModal.show(self);
+                    if(application.applicationModal) {
+                        application.applicationModal.show(self);
+                    }
             });
             return authorizationPromise;
         }
