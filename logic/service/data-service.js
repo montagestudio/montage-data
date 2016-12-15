@@ -370,9 +370,26 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 exports.DataService.authorizationManager.registerAuthorizationService(this);
             }
             if (this.authorizationPolicy === AuthorizationPolicyType.UpfrontAuthorizationPolicy) {
-                exports.DataService.authorizationManager.authorizeService(this);
+                var self = this;
+                exports.DataService.authorizationManager.authorizeService(this)
+                .then(function(authorization) {
+                    self.authorization = authorization;
+                },
+                function(error) {
+                    console.log(error);
+                });
             }
         }
+    },
+
+    /**
+     * holds authorization object after a successfull authorization
+     *
+     * @type {Object}
+     */
+
+    authorization: {
+        value: undefined
     },
 
     /**
@@ -893,7 +910,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     fetchData: {
         value: function (typeOrSelector, stream) {
             var type = typeOrSelector instanceof DataObjectDescriptor && typeOrSelector,
-                selector = type && DataSelector.withTypeAndCriteria(type) || typeOrSelector;
+                selector = type && DataSelector.withTypeAndCriteria(type) || typeOrSelector,
+                service;
             // Set up the stream.
             stream = stream || new DataStream();
             stream.selector = selector;
