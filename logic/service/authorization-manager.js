@@ -156,7 +156,7 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
                             for(var key in iAuthorizationPanelExport) {
                                 iAuthorizationPanelConstructor = iAuthorizationPanelExport[key];
                                 //Give our delgate a chance to give us an existing instance of an AuthorizationPanel
-                                iAuthorizationPanel = this.callDelegateMethod("authorizationManagerWillInstanciateAuthorizeServicePanel", this,iService,iAuthorizationPanelConstructor);
+                                iAuthorizationPanel = this.callDelegateMethod("authorizationManagerWillInstantiateAuthorizeServicePanel", this,iService,iAuthorizationPanelConstructor);
                                 if(!iAuthorizationPanel) iAuthorizationPanel = new iAuthorizationPanelConstructor;
                                 var iAuthorizationPanelInfo = Montage.getInfoForObject(iAuthorizationPanel);
                                 // WEAKNESS: The FreeNAS service returned a moduleId of "/ui/sign-in.reel", which worked to load
