@@ -185,12 +185,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      *
      * @method
      * @argument {RawDataService} service
+     * @argument {Array} [types] Types to use instead of the child's types. 
      */
     addChildService: {
-        value: function (child) {
+        value: function (child, types) {
             if (child instanceof exports.DataService &&
                 child.constructor !== exports.DataService) {
-                this._addChildService(child);
+                this._addChildService(child, types);
             } else {
                 console.warn("Cannot add child -", child);
                 console.warn("Children must be instances of DataService subclasses.");
@@ -199,9 +200,9 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     _addChildService: {
-        value: function (child) {
-            var types = child.types,
-                children, type, i, n;
+        value: function (child, types) {
+            var children, type, i, n;
+            types = types || child.types;
             // If the new child service already has a parent, remove it from
             // that parent.
             if (child._parentService) {
@@ -230,6 +231,31 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /**
+     * Alternative to [addChildService()]{@link DataService#addChildService}.
+     * While addChildService is synchronous, registerChildService is asynchronous
+     * and may take a child whose [types]{@link DataService#types} property is
+     * a promise instead of an array.
+     * 
+     * This is useful for example if the child service does not know its types
+     * immediately, e.g. if it must fetch them from a .mjson descriptors file.
+     * 
+     * If the child's types is an array, it is guaranteed to behave exactly
+     * like addChildService.
+     * 
+     * @method
+     * @return {Promise}
+     */
+    registerChildService: {
+        value: function (child) {
+            var self = this;
+            return Promise.resolve(child.types)
+                .then(function (types) {
+                    return self.addChildService(child, types);
+                });
+        }
+    },
+
+    /**
      * Remove a raw data service as a child of this service and clear its parent
      * if that service is a child of this service.
      *
@@ -240,11 +266,12 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      *
      * @method
      * @argument {RawDataService} service
+     * @argument {Array} [types] Types to use instead of the child's types. 
      */
     removeChildService: {
-        value: function (child) {
-            var types = child.types,
-                type, chidren, index, i, n;
+        value: function (child, types) {
+            var type, chidren, index, i, n;
+            types = types || child.types;
             // Remove the child service from the services array of each of its
             // types or from the "all types" service array identified by the
             // `null` type, or remove a type altogether if its service array
@@ -271,6 +298,31 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             if (child._parentService === this) {
                 child._parentService = undefined;
             }
+        }
+    },
+
+    /**
+     * Alternative to [removeChildService()]{@link DataService#removeChildService}.
+     * While removeChildService is synchronous, unregisterChildService is asynchronous
+     * and may take a child whose [types]{@link DataService#types} property is
+     * a promise instead of an array.
+     * 
+     * This is useful for example if the child service does not know its types
+     * immediately, e.g. if it must fetch them from a .mjson descriptors file.
+     * 
+     * If the child's types is an array, it is guaranteed to behave exactly
+     * like removeChildService.
+     * 
+     * @method
+     * @return {Promise}
+     */
+    unregisterChildService: {
+        value: function (child) {
+            var self = this;
+            return Promise.resolve(child.types)
+                .then(function (types) {
+                    return self.removeChildService(child, types);
+                });
         }
     },
 
