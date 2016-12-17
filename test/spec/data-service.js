@@ -349,6 +349,52 @@ describe("A DataService", function() {
         expect(parent._getChildServiceForObject(objects[3])).toBeNull();
     });
 
+    it("can handle child services with an async types property using the register/unregister API", function (done) {
+        var parent, syncChild, asyncChild, type, registerPromises, unregisterPromises;
+
+        // Create a sample type
+        type = Function.noop;
+        type.TYPE = new DataObjectDescriptor();
+        type.TYPE.jasmineToString = function () { return "TYPE-" + this.id; };
+        type.TYPE.id = 1;
+
+        // Create the main service
+        parent = new RawDataService();
+        parent.NAME = "PARENT";
+        parent.jasmineToString = function () { return "PARENT"; };
+
+        // Create a child with regular sync types
+        syncChild = new RawDataService;
+        Object.defineProperty(syncChild, "types", {
+            get: function () {
+                return [type];
+            }
+        });
+
+        // Create a child with an async types property
+        asyncChild = new RawDataService;
+        Object.defineProperty(asyncChild, "types", {
+            get: function () {
+                return Promise.resolve([type]);
+            }
+        });
+
+        // Test that parent references are added and removed correctly
+        registerPromises = [syncChild, asyncChild].map(function (c) { parent.registerChildService(c); });
+        return Promise.all(registerPromises)
+            .then(function () {
+                expect(syncChild.parentService).toBe(parent);
+                expect(asyncChild.parentService).toBe(parent);
+                unregisterPromises = [syncChild, asyncChild].map(function (c) { parent.unregisterChildService(c); });
+                return Promise.all(unregisterPromises);
+            })
+            .then(function () {
+                expect(syncChild.parentService).toBeUndefined();
+                expect(asyncChild.parentService).toBeUndefined();
+                done();
+            });
+    });
+
     it("has a fetchData() method", function () {
         expect(new DataService().fetchData).toEqual(jasmine.any(Function));
     });
