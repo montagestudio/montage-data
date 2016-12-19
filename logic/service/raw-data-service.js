@@ -88,8 +88,8 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
 
     getDataObject: {
-        value: function (type, record, context) {
-            return this.rootService.getDataObject(type, record, context);
+        value: function (type, record, context, iDataIdentifier) {
+            return this.rootService.getDataObject(type, record, context, iDataIdentifier);
         }
     },
 
@@ -401,7 +401,8 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             for (i = 0, n = records && records.length; i < n; i += 1) {
                 iRecord = records[i];
                 iDataIdentifier = this.dataIdentifierForTypeRawData(streamSelectorType,iRecord);
-                object = this.getDataObject(streamSelectorType, iRecord, context);
+                //iDataIdentifier argument should be all we need later on
+                object = this.getDataObject(streamSelectorType, iRecord, context, iDataIdentifier);
                 this.mapRawDataToObject(iRecord, object, context);
                 records[i] = object;
                 this.recordSnapshot(iDataIdentifier,iRecord);

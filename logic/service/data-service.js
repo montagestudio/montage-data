@@ -828,9 +828,126 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * object of the specified type.
      */
     getDataObject: {
-        value: function (type, data, context) {
+        value: function (type, data, context, dataIdentifier) {
+            var dataObject, existingDataObject;
             // TODO [Charles]: Object uniquing.
-            return this._createDataObject(type);
+            if(this.isUniquing && dataIdentifier) {
+                existingDataObject = dataObject = this.objectForDataIdentifier(dataIdentifier);
+            }
+            if(!dataObject) {
+                dataObject = this._createDataObject(type);
+            }
+
+            if(this.isUniquing && !existingDataObject) {
+                this.recordDataIdentifierForObject(dataIdentifier,dataObject);
+                this.recordObjectForDataIdentifier(dataObject,dataIdentifier);
+            }
+            return dataObject;
+
+        }
+    },
+
+    isUniquing: {
+        value: false
+    },
+
+
+    __dataIdentifierByObject: {
+        value: null
+    },
+    _dataIdentifierByObject: {
+        get: function() {
+            return this.__objectsByDataIdentifier || (this.__objectsByDataIdentifier = new WeakMap());
+        }
+    },
+    /**
+     * Returns a unique object for a DataIdentifier
+     * [fetchObjectProperty()]{@link DataService#fetchObjectProperty} instead
+     * of this method. That method will be called by this method when needed.
+     *
+     * @method
+     * @argument {object} object         - The object whose property values are
+     *                                      being requested.
+     *
+     * @returns {DataIdentifier}        - An object's DataIdentifier
+     */
+
+     dataIdentifierForObject: {
+        value: function(object) {
+            return this._dataIdentifierByObject.get(object);
+        }
+    },
+
+    /**
+     * Records an object's DataIdentifier
+     *
+     * @method
+     * @argument {object} object                        - an Object.
+     * @argument {DataIdentifier} dataIdentifier        - The object whose property values are
+     */
+    recordDataIdentifierForObject: {
+        value: function(dataIdentifier, object) {
+            this._dataIdentifierByObject.set(object, dataIdentifier);
+        }
+    },
+
+    /**
+     * Remove an object's DataIdentifier
+     *
+     * @method
+     * @argument {object} object         - an object
+     */
+    removeDataIdentifierForObject: {
+        value: function(object) {
+            this._dataIdentifierByObject.delete(object);
+        }
+    },
+
+    __objectByDataIdentifier: {
+        value: null
+    },
+
+    _objectByDataIdentifier: {
+        get: function() {
+            return this.__objectByDataIdentifier || (this.__objectByDataIdentifier = new WeakMap());
+        }
+    },
+    /**
+     *  Returns a unique object for a DataIdentifier
+     * [fetchObjectProperty()]{@link DataService#fetchObjectProperty} instead
+     * of this method. That method will be called by this method when needed.
+     *
+     * @method
+     * @argument {object} object        - object
+     * @returns {DataIdentifier}        - object's DataIdentifier
+     */
+    objectForDataIdentifier: {
+        value: function(dataIdentifier) {
+            return this._objectByDataIdentifier.get(dataIdentifier)
+        }
+    },
+    /**
+     * Records an object's DataIdentifier
+     *
+     * @method
+     * @argument {DataIdentifier} dataIdentifier    - DataIdentifier
+     * @argument {object} object                    - object represented by dataIdentifier
+     */
+    recordObjectForDataIdentifier: {
+        value: function(object, dataIdentifier) {
+            this._objectByDataIdentifier.set(dataIdentifier, object);
+        }
+    },
+
+    /**
+     * Remove an object's DataIdentifier
+     *
+     * @method
+     * @argument {object} object         - an object
+     */
+    removeObjectForDataIdentifier: {
+        value: function(dataIdentifier) {
+            this._objectByDataIdentifier.delete(dataIdentifier);
         }
     },
 
