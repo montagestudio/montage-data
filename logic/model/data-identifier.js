@@ -1,15 +1,19 @@
 var Montage = require("montage").Montage;
 
 /**
- * This object represents a unique identifier to an object and has a URL representation,
- * which is conceptually aligned with the notion of resource:
- * It should have, in order:
+ * A DataIdentifier represents a universal identifier for an object managed by Montage Data.
+ * It provides the support for uniquing in a DataService. Wether an object extists in
+ * one or more local DataService in an Application or in a remote one, a DataIdentifier
+ * encapsulate the information needed to uniquely identify an object, like a primary key in a database.
+ * A DataIdentifier has a URL representation, which is conceptually aligned with the notion of resource:
+ * It should have:
  * - a host/source/origin: where the data come from. Automatically generated primary keys
  *  exists in only one environment - Dev, test, prod, etc...,
  * (a user's authorization (if any necessary) should be left to be resolved a client receiving the identifier,
  * only people authenticated and authorized would be able to get it and that happens at DataService level)
  * - a type
  * - a primary key. This could be a combination of property/value, but it needs to be serializable as a valid url
+ * Exact details are not exposed and may vary per specific DataService or RawDataService
  *
  * @class
  * @extends external:Montage
