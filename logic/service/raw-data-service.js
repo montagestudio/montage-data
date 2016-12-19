@@ -386,7 +386,9 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     addRawData: {
         value: function (stream, records, context) {
-            var offline, object, i, n;
+            var offline, object, i, n,
+                streamSelectorType = stream.selector.type,
+                iRecord, iDataIdentifier;
             // Record fetched raw data for offline use if appropriate.
             offline = records && !this.isOffline && this._streamRawData.get(stream);
             if (offline) {
@@ -397,14 +399,59 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             // Convert the raw data to appropriate data objects. The conversion
             // will be done in place to avoid creating any unnecessary array.
             for (i = 0, n = records && records.length; i < n; i += 1) {
-                object = this.getDataObject(stream.selector.type, records[i], context);
-                this.mapRawDataToObject(records[i], object, context);
+                iRecord = records[i];
+                iDataIdentifier = this.dataIdentifierForTypeRawData(streamSelectorType,iRecord);
+                object = this.getDataObject(streamSelectorType, iRecord, context);
+                this.mapRawDataToObject(iRecord, object, context);
                 records[i] = object;
+                this.recordSnapshot(iDataIdentifier,iRecord);
             }
             // Add the converted data to the stream.
             stream.addData(records);
         }
     },
+    //This should belong on the
+    //Gives us an indirection layer to deal with backward compatibility.
+    dataIdentifierForTypeRawData: {
+        value: function(type,rawData) {
+        }
+    },
+
+    /**
+     * Records the snapshot of the values of record known for a DataIdentifier
+     *
+     * @private
+     * @argument  {DataIdentifier} dataIdentifier
+     * @argument  {Object} rawData
+     */
+    recordSnapshot: {
+        value: function(dataIdentifier,rawData) {
+
+        }
+    },
+     /**
+     * Removes the snapshot of the values of record for the DataIdentifier argument
+     *
+     * @private
+     * @argument {DataIdentifier} dataIdentifier
+     */
+   removeSnapshot: {
+        value: function(dataIdentifier) {
+
+        }
+    },
+
+     /**
+     * Returns the snapshot associated with the DataIdentifier argument if available
+     *
+     * @private
+     * @argument {DataIdentifier} dataIdentifier
+     */
+   snapshotForDataIdentifier: {
+        value: function(dataIdentifier) {
+        }
+    },
+
 
     /**
      * To be called once for each [fetchData()]{@link RawDataService#fetchData}
