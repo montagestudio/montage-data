@@ -137,7 +137,6 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
 
                     }
                     Promise.all(authorizationPanels).bind(this).then(function(authorizationPanelExports) {
-                        console.log("loaded ",authorizationPanelExports);
                         var i,
                             countI,
                             iAuthorizationPanelExport,
@@ -156,7 +155,7 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
                             for(var key in iAuthorizationPanelExport) {
                                 iAuthorizationPanelConstructor = iAuthorizationPanelExport[key];
                                 //Give our delgate a chance to give us an existing instance of an AuthorizationPanel
-                                iAuthorizationPanel = this.callDelegateMethod("authorizationManagerWillInstantiateAuthorizeServicePanel", this,iService,iAuthorizationPanelConstructor);
+                                iAuthorizationPanel = this.callDelegateMethod("authorizationManagerWillInstantiateAuthorizationPanelForService", this,iAuthorizationPanelConstructor,iService);
                                 if(!iAuthorizationPanel) iAuthorizationPanel = new iAuthorizationPanelConstructor;
                                 var iAuthorizationPanelInfo = Montage.getInfoForObject(iAuthorizationPanel);
                                 // WEAKNESS: The FreeNAS service returned a moduleId of "/ui/sign-in.reel", which worked to load
@@ -169,7 +168,6 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
                                 authorizationPanels.push(iAuthorizationPanel);
                                 break;
                             }
-                            console.log("iAuthorizationPanel ",iAuthorizationPanel);
                             // Now that we have the type, we need to:
                             // 1. instantiate it
                             // 2. Put it in an array
@@ -190,7 +188,6 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
                                 mr.async(authorizationManagerPanelModuleId).bind(self).then(function (exports) {
                                         var AuthorizationManagerPanel = exports.AuthorizationManagerPanel;
                                         this.authorizationManagerPanel = new AuthorizationManagerPanel();
-                                        console.log("this.authorizationManagerPanel is ",this.authorizationManagerPanel);
                                         this.authorizationManagerPanel.authorizationPanels = authorizationPanels;
                                         resolve(this.authorizationManagerPanel);
                                     },function(error) {
@@ -202,16 +199,16 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
                             }
                         });
                         authorizationManagerPanelPromise.then(function(authorizationManagerPanel) {
-                            console.log("authorizationManagerPanel:",authorizationManagerPanel);
                             // Show in Modal.
                             authorizationManagerPanel.runModal().then(function(authorization) {
                                 resolve(authorization);
                             },
                             function(authorizatinError) {
                                 reject(authorizatinError);
+                            })
+                            .then(function() {
+                                self.callDelegateMethod("authorizationManagerDidAuthorizeService", self,aDataService);
                             });
-
-
                         });
 
                     });
