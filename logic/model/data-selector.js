@@ -7,7 +7,7 @@ var Montage = require("montage").Montage;
  * @class
  * @extends external:Montage
  */
-exports.DataSelector = Montage.specialize(/** @lends DataSelector.prototype */ {
+exports.DataSelector = exports.DataQuery= Montage.specialize(/** @lends DataSelector.prototype */ {
 
     /**
      * The type of the data object to retrieve.
@@ -65,6 +65,73 @@ exports.DataSelector = Montage.specialize(/** @lends DataSelector.prototype */ {
     _orderings: {
         value: undefined
     },
+
+    /**
+     * An object defining bindings that will be created on the array
+     * of the dataStream returned by DataService's fetchData. The bindings
+     * follow the same syntax as used for regular bindings, creating dynamic
+     * properties that array. Expressions on the right side starts by data as the
+     * source is automatically set to the DataStream used in a fetchData and
+     * DataStream's data property is an array containing the results.
+     *
+     * For example, if one would want the number of objects fetched, one would do:
+     *  aDataQuery.selectBindings = {
+     *      "count": {"<-": "data.length"
+     * };
+     *
+     *  aDataQuery.selectBindings = {
+     *      "averageAge": {"<-": "data.map{age}.average()"
+     * };
+     * will add on the array passed to the then function following a fetchData
+     * a property averageAge with the average of the property age of all object in the array
+     *
+     *   aDataQuery.selectBindings = {
+     *       "clothingByColor": {"<-": "data.group{color}"
+     *   };
+     *   mainService.fetchData(aDataQuery).then(function(results){
+     *   //assuming  results is [
+     *   //     {type: 'shirt', color: 'blue'},
+     *   //     {type: 'pants', color: 'red'},
+     *   //     {type: 'blazer', color: 'blue'},
+     *   //     {type: 'hat', color: 'red'}
+     *   // ];
+     *
+     *   expect(results.clothingByColor).toEqual([
+     *           ['blue', [
+     *           {type: 'shirt', color: 'blue'},
+     *           {type: 'blazer', color: 'blue'}
+     *       ]],
+     *       ['red', [
+     *           {type: 'pants', color: 'red'},
+     *           {type: 'hat', color: 'red'}
+     *       ]]
+     *   ]);
+     *  })
+     * Since it is a one-way binding, if a DataService is capable of live updating a query,
+     * the value these properties created on the array will stay current/updated over time.
+     *
+     * It is possible that a DataService may obtain the results of these properties from the
+     * server itself, which is preferred, as fetchData can returns objects in batches. These
+     * expressions should be built from the whole result set, not the current client view of that
+     * result set.
+     * @type {Object}
+     */
+
+    selectBindings: {
+        value: undefined
+    },
+
+
+    /**
+     * An object defining a list of expressions to resolve at the same time as the query.
+     * expressions are based on the content of results described by criteria. A common
+     * use is to preftch relationships off fetched objects.
+     * @type {Array}
+     */
+
+    prefetchExpressions: {
+        value: null
+    }
 
 }, /** @lends DataSelector */ {
 
