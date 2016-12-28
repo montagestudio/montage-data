@@ -185,7 +185,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      *
      * @method
      * @argument {RawDataService} service
-     * @argument {Array} [types] Types to use instead of the child's types. 
+     * @argument {Array} [types] Types to use instead of the child's types.
      */
     addChildService: {
         value: function (child, types) {
@@ -235,23 +235,45 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * While addChildService is synchronous, registerChildService is asynchronous
      * and may take a child whose [types]{@link DataService#types} property is
      * a promise instead of an array.
-     * 
+     *
      * This is useful for example if the child service does not know its types
      * immediately, e.g. if it must fetch them from a .mjson descriptors file.
-     * 
+     *
      * If the child's types is an array, it is guaranteed to behave exactly
      * like addChildService.
-     * 
+     *
      * @method
      * @return {Promise}
      */
+    __childServiceRegistrationPromise: {
+        value: null
+    },
+    _childServiceRegistrationPromise: {
+        get: function() {
+            return this.__childServiceRegistrationPromise || (this.__childServiceRegistrationPromise = Promise.resolve());
+        },
+        set: function(value) {
+            this.__childServiceRegistrationPromise = value;
+        }
+    },
     registerChildService: {
         value: function (child) {
-            var self = this;
-            return Promise.resolve(child.types)
-                .then(function (types) {
-                    return self.addChildService(child, types);
-                });
+            var self = this
+
+            if(!this._childServiceRegistrationPromise) {
+                this._childServiceRegistrationPromise = child.types;
+            }
+            //If a service loads it's types lazily, .types returns a promise,
+            //(TODO) which should become the norm
+            this._childServiceRegistrationPromise = this._childServiceRegistrationPromise
+            .then(function() {
+                return child.types;
+            })
+            .then(function (types) {
+                return self.addChildService(child, types);
+            });
+
+            return this._childServiceRegistrationPromise;
         }
     },
 
@@ -266,7 +288,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      *
      * @method
      * @argument {RawDataService} service
-     * @argument {Array} [types] Types to use instead of the child's types. 
+     * @argument {Array} [types] Types to use instead of the child's types.
      */
     removeChildService: {
         value: function (child, types) {
@@ -306,13 +328,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * While removeChildService is synchronous, unregisterChildService is asynchronous
      * and may take a child whose [types]{@link DataService#types} property is
      * a promise instead of an array.
-     * 
+     *
      * This is useful for example if the child service does not know its types
      * immediately, e.g. if it must fetch them from a .mjson descriptors file.
-     * 
+     *
      * If the child's types is an array, it is guaranteed to behave exactly
      * like removeChildService.
-     * 
+     *
      * @method
      * @return {Promise}
      */
@@ -423,17 +445,31 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             }
             if (this.authorizationPolicy === AuthorizationPolicyType.UpfrontAuthorizationPolicy) {
                 var self = this;
-                exports.DataService.authorizationManager.authorizeService(this)
+                this.authorizationPromise = exports.DataService.authorizationManager.authorizeService(this)
                 .then(function(authorization) {
                     self.authorization = authorization;
+                    return authorization;
                 },
                 function(error) {
                     console.log(error);
                 });
             }
+            else {
+                //Service doesn't need anything upfront, so we just go through
+                this.authorizationPromise = Promise.resolve();
+            }
         }
     },
 
+   /**
+     * holds authorization promise if there's one, defaults to a resolved for backward compatibility
+     *
+     * @type {Object}
+     */
+
+    authorizationPromise: {
+        value: Promise.resolve()
+    },
     /**
      * holds authorization object after a successfull authorization
      *
@@ -1080,21 +1116,24 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: function (typeOrSelector, stream) {
             var type = typeOrSelector instanceof DataObjectDescriptor && typeOrSelector,
                 selector = type && DataSelector.withTypeAndCriteria(type) || typeOrSelector,
-                service;
+                service,
+                self = this;
             // Set up the stream.
             stream = stream || new DataStream();
             stream.selector = selector;
-            // Use a child service to fetch the data.
-            try {
-                service = this._getChildServiceForType(selector.type);
-                if (service) {
-                    stream = service.fetchData(selector, stream) || stream;
-                } else {
-                    throw new Error("Can't fetch data of unknown type - " + selector.type.typeName + "/" + selector.type.uuid);
-                }
-            } catch (e) {
-                stream.dataError(e);
-            }
+                this._childServiceRegistrationPromise.then(function() {
+                    // Use a child service to fetch the data.
+                    try {
+                        service = self._getChildServiceForType(selector.type);
+                        if (service) {
+                            stream = service.fetchData(selector, stream) || stream;
+                        } else {
+                            throw new Error("Can't fetch data of unknown type - " + selector.type.typeName + "/" + selector.type.uuid);
+                        }
+                    } catch (e) {
+                        stream.dataError(e);
+                    }
+                })
             // Return the passed in or created stream.
             return stream;
         }
