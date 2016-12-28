@@ -36,6 +36,24 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         }
     },
 
+    /*
+     * The ConnectionDescriptor object where possible connections will be found
+     *
+     * @type {ConnectionDescriptor}
+     */
+    connectionDescriptor: {
+        value: undefined
+    },
+
+    /*
+     * The current DataConnection object used to connect to data source
+     *
+     * @type {DataConnection}
+     */
+    connection: {
+        value: undefined
+    },
+
     /***************************************************************************
      * Data Object Properties
      */
@@ -163,9 +181,10 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             var type = typeOrSelector instanceof DataObjectDescriptor && typeOrSelector,
                 selector = type && DataSelector.withTypeAndCriteria(type) || typeOrSelector;
             stream = stream || new DataStream();
-            stream.selector = this.mapSelectorToRawDataSelector(selector);
-            this.fetchRawData(stream);
             stream.selector = selector;
+            // stream.selector = this.mapSelectorToRawDataSelector(selector);
+            this._fetchRawData(stream);
+            //stream.selector = selector;
             return stream;
         }
     },
@@ -204,11 +223,27 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *                                 reference to the selector defining what
      *                                 raw data to fetch.
      */
+    //TODO, swizzling the stream's user-land for the rawData equivallent is not really
+    //practical nor safe, we either need to keep it separately, store it on the stream under
+    //rawDataSelector
+
+    _fetchRawData: {
+        value: function (stream) {
+            var self = this;
+            this.authorizationPromise.then(function(authorization) {
+                var streamSelector = stream.selector;
+                stream.selector = self.mapSelectorToRawDataSelector(streamSelector);
+                self.fetchRawData(stream);
+                stream.selector = streamSelector;
+            })
+        }
+    },
     fetchRawData: {
         value: function (stream) {
             this.rawDataDone(stream);
         }
     },
+
 
     /***************************************************************************
      * Saving Data
