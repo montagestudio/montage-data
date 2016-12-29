@@ -74,10 +74,11 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
 
     authorizeService : {
         value: function(aDataService) {
-            var self = this;
-            var authorizationPromise = new Promise(function(resolve,reject){
+            var self = this,
+                aDataServiceInfo = Montage.getInfoForObject(aDataService),
+                authorizationPromise = new Promise(function(resolve,reject){
                 var authorizationServicesModuleIds = aDataService.authorizationServices,
-                iService, iServiceModuleId, i, countI,
+                iService, iServiceModuleId, i, countI, iAuthorizationService,
                 registeredAuthorizationServices = self._registeredAuthorizationServicesByModuleId,
                 authorizationServices = [];
 
@@ -87,7 +88,7 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
 
                     //Looks like we don't have that service yet, we need to load it.
                     if(!iService) {
-                        var iPromise = mr.async(iServiceModuleId);
+                        var iPromise = aDataServiceInfo.require.async(iServiceModuleId);
                         authorizationServices[i] = iPromise;
 
                     }
@@ -108,7 +109,10 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
                     for(i=0, countI = authorizationServicesExports.length; i<countI; i++) {
                         iExport = authorizationServicesExports[i];
                         for(exportSymbol in iExport) {
-                            authorizationServices.push(new iExport[exportSymbol]);
+                            iAuthorizationService = new iExport[exportSymbol];
+                            //We tell the data service we're authorizing about authorizationService we create and are about to use.
+                            aDataService.authorizationManagerWillAuthorizeWithService(this,iAuthorizationService);
+                            authorizationServices.push(iAuthorizationService);
                         }
                     }
 
@@ -124,7 +128,7 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
                         iAuthorizationPanel = this._registeredAuthorizationPanelsByModuleId.get(iAuthorizationPanelModuleId)
                         if(!iAuthorizationPanel) {
                             // Lookup if already created, else ....
-                            var iPromise = mr.async(iAuthorizationPanelModuleId);
+                            var iPromise = Montage.getInfoForObject(iService).require.async(iAuthorizationPanelModuleId);
 
                             authorizationPanels.push(iPromise);
                             this._dataServicesForAuthorizationPanels.set(iAuthorizationPanelModuleId,iService);
@@ -157,11 +161,10 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
                                 //Give our delgate a chance to give us an existing instance of an AuthorizationPanel
                                 iAuthorizationPanel = this.callDelegateMethod("authorizationManagerWillInstantiateAuthorizationPanelForService", this,iAuthorizationPanelConstructor,iService);
                                 if(!iAuthorizationPanel) iAuthorizationPanel = new iAuthorizationPanelConstructor;
-                                var iAuthorizationPanelInfo = Montage.getInfoForObject(iAuthorizationPanel);
                                 // WEAKNESS: The FreeNAS service returned a moduleId of "/ui/sign-in.reel", which worked to load
                                 // but the info conained "ui/sign-in.reel", causing the lookup to fail. We need to be careful and
                                 // investigate a possible solution.
-                                iService = this._dataServicesForAuthorizationPanels.get(iAuthorizationPanelInfo.moduleId);
+                                iService = this._dataServicesForAuthorizationPanels.get(Montage.getInfoForObject(iAuthorizationPanelConstructor).moduleId)
                                 this._dataServicesForAuthorizationPanels.set(iAuthorizationPanel,iService);
                                 iAuthorizationPanel.dataService = iService;
                                 // We need to cache/lookup if we already have one like that.
