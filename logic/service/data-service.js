@@ -871,13 +871,9 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 existingDataObject = dataObject = this.objectForDataIdentifier(dataIdentifier);
             }
             if(!dataObject) {
-                dataObject = this._createDataObject(type);
+                dataObject = this._createDataObject(type, dataIdentifier);
             }
 
-            if(this.isUniquing && !existingDataObject) {
-                this.recordDataIdentifierForObject(dataIdentifier,dataObject);
-                this.recordObjectForDataIdentifier(dataObject,dataIdentifier);
-            }
             return dataObject;
 
         }
@@ -998,6 +994,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * @argument {DataObjectDescriptor} type - The type of object to create.
      * @returns {Object}                     - The created object.
      */
+    //TODO add the creation of a temporary identifier to pass to _createDataObject
     createDataObject: {
         value: function (type) {
             var object = this._createDataObject(type);
@@ -1015,9 +1012,19 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * @returns {Object}                     - The created object.
      */
     _createDataObject: {
-        value: function (type) {
+        value: function (type, dataIdentifier) {
             var object = Object.create(this._getPrototypeForType(type));
             if (object) {
+
+                //This needs to be done before a user-land code can attempt to do
+                //anyting inside its constructor, like creating a binding on a relationships
+                //causing a trigger to fire, not knowing about the match between identifier
+                //and object... If that's feels like a real situation, it is.
+                if(dataIdentifier && this.isUniquing) {
+                    this.recordDataIdentifierForObject(dataIdentifier,object);
+                    this.recordObjectForDataIdentifier(object,dataIdentifier);
+                }
+
                 object = object.constructor.call(object) || object;
                 if (object) {
                     this._setObjectType(object, type);
