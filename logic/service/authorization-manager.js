@@ -1,9 +1,8 @@
 var Montage = require("montage").Montage,
     Promise = require("montage/core/promise").Promise,
-
-
     // Set = require("collections/set");
-    Map = require("collections/map");
+    Map = require("collections/map"),
+    AuthorizationManager;
 
 
     if (typeof window !== "undefined") { // client-side
