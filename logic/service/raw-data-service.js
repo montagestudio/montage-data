@@ -182,9 +182,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
                 selector = type && DataSelector.withTypeAndCriteria(type) || typeOrSelector;
             stream = stream || new DataStream();
             stream.selector = selector;
-            // stream.selector = this.mapSelectorToRawDataSelector(selector);
             this._fetchRawData(stream);
-            //stream.selector = selector;
             return stream;
         }
     },
@@ -223,8 +221,8 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *                                 reference to the selector defining what
      *                                 raw data to fetch.
      */
-    //TODO, swizzling the stream's user-land for the rawData equivallent is not really
-    //practical nor safe, we either need to keep it separately, store it on the stream under
+    //TODO, swizzling the stream's user-land selector for the rawData equivallent is not really
+    //practical nor safe, we either need to keep it separately or store it on the stream under
     //rawDataSelector
 
     _fetchRawData: {
@@ -244,7 +242,19 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         }
     },
 
-
+    /**
+     * Called through MainService when consumer has indicated that he has lost interest in the passed DataStream.
+     * This will allow the RawDataService feeding the stream to take appropriate measures.
+     *
+     * @method
+     * @argument {DataStream} [dataStream] - The DataStream to cancel
+     * @argument {Object} [reason] - An object indicating the reason to cancel.
+     *
+     */
+    cancelRawDataStream: {
+        value: function (dataStream, reason) {
+        }
+    },
     /***************************************************************************
      * Saving Data
      */
@@ -435,11 +445,12 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             // will be done in place to avoid creating any unnecessary array.
             for (i = 0, n = records && records.length; i < n; i += 1) {
                 iRecord = records[i];
-                iDataIdentifier = this.dataIdentifierForTypeRawData(streamSelectorType,iRecord);
-                //Record snapshot before we may create an object
-                this.recordSnapshot(iDataIdentifier,iRecord);
-               //iDataIdentifier argument should be all we need later on
-                object = this.getDataObject(streamSelectorType, iRecord, context, iDataIdentifier);
+                object = this.objectForTypeRawData(streamSelectorType,iRecord,context);
+            //     iDataIdentifier = this.dataIdentifierForTypeRawData(streamSelectorType,iRecord);
+            //     //Record snapshot before we may create an object
+            //     this.recordSnapshot(iDataIdentifier,iRecord);
+            //    //iDataIdentifier argument should be all we need later on
+            //     object = this.getDataObject(streamSelectorType, iRecord, context, iDataIdentifier);
                 this.mapRawDataToObject(iRecord, object, context);
                 records[i] = object;
             }
@@ -447,6 +458,17 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             stream.addData(records);
         }
     },
+
+    objectForTypeRawData: {
+        value:function(type, rawData, context) {
+                var dataIdentifier = this.dataIdentifierForTypeRawData(type,rawData);
+                //Record snapshot before we may create an object
+                this.recordSnapshot(dataIdentifier,rawData);
+               //iDataIdentifier argument should be all we need later on
+                return this.getDataObject(type, rawData, context, dataIdentifier);
+        }
+    },
+
     //This should belong on the
     //Gives us an indirection layer to deal with backward compatibility.
     dataIdentifierForTypeRawData: {
