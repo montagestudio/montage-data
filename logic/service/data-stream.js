@@ -216,12 +216,16 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */ 
      */
     addData: {
         value: function (objects) {
-            if (objects && objects.length) {
-                this.data.push.apply(this.data, objects);
-            }
-            else {
-                this.data.push(objects);
-            }
+            if(objects) {
+                if(Array.isArray(objects)) {
+                    if (objects.length) {
+                        this.data.push.apply(this.data, objects);
+                    }
+                }
+                else {
+                    this.data.push(objects);
+                }
+           }
         }
     },
 
