@@ -219,6 +219,9 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */ 
             if (objects && objects.length) {
                 this.data.push.apply(this.data, objects);
             }
+            else {
+                this.data.push(objects);
+            }
         }
     },
 
