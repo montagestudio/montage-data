@@ -1437,7 +1437,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * same child service.
      *
      * For each operation not handled by a child service, the default
-     * implemenation calls a method named `performFooOfflineOperation()`, if
+     * implementation calls a method named `performFooOfflineOperation()`, if
      * such a method exists in this service where `foo` is the operation's
      * [data type]{@link DataOperation#dataType}. If no such method exists,
      * [readOfflineOperation()]{@link DataService#readOfflineOperation} is
@@ -1504,7 +1504,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             var self = this,
                 operationType = operation.type,
                 tableSchema, foreignKeys,
-                k, countK, kOnlinePrimaryKey;
+                k, countK, kOnlinePrimaryKey, kForeignKey;
 
             if(this.offlineService) {
                 tableSchema = this.offlineService.schema[operationType];
@@ -1535,7 +1535,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: function(operation) {
             // TODO: Remove support for operation.type once all child services
             // have been updated to provide an operation.dataType instead.
-            var type = operation.dataType || operation.type;
+            var type = operation.dataType || operation.type,
                 method = type && this[this._getOfflineOperationMethodName(type)];
             return typeof(method) === "function" ? method.call(this, operation) :
                                                    this.performOfflineOperation(operation);
