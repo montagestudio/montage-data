@@ -1128,21 +1128,66 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             // Set up the stream.
             stream = stream || new DataStream();
             stream.selector = selector;
-                this._childServiceRegistrationPromise.then(function() {
-                    // Use a child service to fetch the data.
-                    try {
-                        service = self._getChildServiceForType(selector.type);
-                        if (service) {
-                            stream = service.fetchData(selector, stream) || stream;
-                        } else {
-                            throw new Error("Can't fetch data of unknown type - " + selector.type.typeName + "/" + selector.type.uuid);
-                        }
-                    } catch (e) {
-                        stream.dataError(e);
+            this._dataServiceForDataStream.set(stream,this._childServiceRegistrationPromise.then(function() {
+                // Use a child service to fetch the data.
+                try {
+                    service = self._getChildServiceForType(selector.type);
+                    if (service) {
+                        stream = service.fetchData(selector, stream) || stream;
+                        self._dataServiceForDataStream.set(stream,service);
+                    } else {
+                        throw new Error("Can't fetch data of unknown type - " + selector.type.typeName + "/" + selector.type.uuid);
                     }
-                })
+                } catch (e) {
+                    stream.dataError(e);
+                }
+                return service;
+            }));
             // Return the passed in or created stream.
             return stream;
+        }
+    },
+
+    __dataServiceForDataStream: {
+        value: null
+    },
+    _dataServiceForDataStream: {
+        get: function() {
+            return this.__dataServiceForDataStream || (this.__dataServiceForDataStream = new WeakMap());
+        }
+    },
+    /**
+     * To be called to indicates that the consumer has lost interest in the passed DataStream.
+     * This will allow the RawDataService feeding the stream to take appropriate measures.
+     *
+     * @method
+     * @argument {DataStream} [dataStream] - The DataStream to cancel
+     * @argument {Object} [reason] - An object indicating the reason to cancel.
+     *
+     */
+    cancelDataStream: {
+        value: function (dataStream, reason) {
+            if(dataStream) {
+              var  rawDataService = this._dataServiceForDataStream.get(dataStream),
+                self = this;
+
+              if(Promise.is(rawDataService)) {
+                    rawDataService.then(function(service) {
+                        self._cancelServiceDataStream(service, dataStream, reason);
+                    })
+                }
+                else {
+                    this._cancelServiceDataStream(rawDataService, dataStream, reason);
+                }
+            }
+
+        }
+    },
+
+    _cancelServiceDataStream: {
+        value: function (rawDataService, dataStream, reason) {
+            rawDataService.cancelRawDataStream(dataStream, reason);
+            this._dataServiceForDataStream.delete(dataStream);
         }
     },
 
