@@ -1103,28 +1103,40 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * to the stream at a later time.
      *
      * @method
-     * @argument {DataObjectDescriptor|DataSelector}
-     *           typeOrSelector        - Defines what data should be returned.
-     *                                   If a [type]{@link DataOjectDescriptor}
-     *                                   is provided instead of a
-     *                                   {@link DataSelector}, a `DataSelector`
-     *                                   with the specified type and no
-     *                                   [criteria]{@link DataSelector#criteria}
-     *                                   will be created and used for the fetch.
-     * @argument {?DataStream} stream  - The stream to which the provided data
-     *                                   should be added. If no stream is
-     *                                   provided a stream will be created and
-     *                                   returned by this method.
+     * @argument {DataSelector|DataObjectDescriptor}
+     *           selectorOrType   - If this argument's value is a selector
+     *                              it will define what type of data should
+     *                              be returned and what criteria that data
+     *                              should satisfy. If the value is a type
+     *                              it will only define what type of data
+     *                              should be returned, and the criteria
+     *                              that data should satisfy can be defined
+     *                              using the `criteria` argument.
+     * @argument {?Object}
+     *           optionalCriteria - If the first argument's value is a
+     *                              type this argument can optionally be
+     *                              provided to defines the criteria which
+     *                              the returned data should satisfy.
+     *                              If the first argument's value is a
+     *                              selector this argument should be
+     *                              omitted and will be ignored if it is
+     *                              provided.
+     * @argument {?DataStream}
+     *           optionalStream   - The stream to which the provided data
+     *                              should be added. If no stream is
+     *                              provided a stream will be created and
+     *                              returned by this method.
      * @returns {?DataStream} - The stream to which the fetched data objects
      * were or will be added, whether this stream was provided to or created by
      * this method.
      */
     fetchData: {
-        value: function (typeOrSelector, stream) {
-            var type = typeOrSelector instanceof DataObjectDescriptor && typeOrSelector,
-                selector = type && DataSelector.withTypeAndCriteria(type) || typeOrSelector,
-                service,
-                self = this;
+        value: function (selectorOrType, optionalCriteria, optionalStream) {
+            var self = this,
+                type = selectorOrType instanceof DataObjectDescriptor && selectorOrType,
+                criteria = optionalCriteria instanceof DataStream ? undefined : optionalCriteria,
+                selector = type ? DataSelector.withTypeAndCriteria(type, criteria) : selectorOrType,
+                stream = optionalCriteria instanceof DataStream ? optionalCriteria : optionalStream;
             // Set up the stream.
             stream = stream || new DataStream();
             stream.selector = selector;
