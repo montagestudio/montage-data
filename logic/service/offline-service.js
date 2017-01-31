@@ -568,11 +568,11 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
 
     readOfflineOperations: {
         value: function (/* operationMapToService */) {
-            var operationTable = this.operationTable,
-                myDB = this._db;
+            var self = this;
             return new Promise(function (resolve, reject) {
+                var myDB = self._db;
                 myDB.open().then(function (/* db */) {
-                    operationTable.where("operation").anyOf("create", "update", "delete").toArray(function (offlineOperations) {
+                    self.operationTable.where("operation").anyOf("create", "update", "delete").toArray(function (offlineOperations) {
                         resolve(offlineOperations);
                     }).catch(function (e) {
                         console.log(selector.type + ": performOfflineSelectorChanges failed", e);
@@ -587,7 +587,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
     performOfflineSelectorChanges: {
         value: function (selector, rawDataArray, updateOperationArray, offlineObjectsToClear) {
             var myDB = this._db,
-                operationTable = this.operationTable,
+                self = this,
                 clonedRawDataArray = rawDataArray.slice(0), // why clone twice?
                 clonedUpdateOperationArray = updateOperationArray.slice(0),
                 clonedOfflineObjectsToClear = offlineObjectsToClear.slice(0);
@@ -596,7 +596,8 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
             .open()
             .then(function (db) {
 
-                var table = db[selector.type];
+                var table = db[selector.type],
+                    operationTable = self.operationTable;
 
             //Transaction:
                 //Objects to put:
@@ -859,11 +860,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
      */
     deleteData: {
         value: function (objects, type, context) {
-            var self = this,
-                changesPropertyName = this.changesPropertyName,
-                typePropertyName = this.typePropertyName,
-                operationPropertyName = this.operationPropertyName,
-                operationDeleteName = this.operationDeleteName;
+            var self = this;
 
             if(!objects || objects.length === 0) return Dexie.Promise.resolve();
 
@@ -876,6 +873,10 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                 dataID = self.dataIDPropertyName,
                 lastModifiedPropertyName = self.lastModifiedPropertyName,
                 lastModified = Date.now(),
+                changesPropertyName = self.changesPropertyName,
+                typePropertyName = self.typePropertyName,
+                operationPropertyName = self.operationPropertyName,
+                operationDeleteName = self.operationDeleteName,
                 updateDataPromises = [];
 
                 myDB.open().then(function (db) {
