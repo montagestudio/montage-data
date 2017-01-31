@@ -36,7 +36,6 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
         value: void 0
     },
 
-
      /**
      * Main initialiation method
      *
@@ -386,7 +385,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                             resultPromise = wherePromise
                                             .and(function (aRecord) {
                                                 var result = true;
-                                                for(var i=0, iKey, iValue, iKeyMatchValue;(iKey = whereProperties[i]);i++) {
+                                                for(var i=0, iKey, iValue, iKeyMatchValue, iOrValue;(iKey = whereProperties[i]);i++) {
                                                     iValue = criteria[iKey];
                                                     iKeyMatchValue = false;
                                                     if(Array.isArray(iValue)) {
@@ -496,16 +495,14 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
      *                                   call that is invoking this method.
      */
 
-    //writeOfflineData/readOfflineOperatio
+    //writeOfflineData/readOfflineOperation
 
     writeOfflineData: {
         value: function (rawDataArray, selector) {
 
             var self = this,
-                db = this._db,
                 tableName = selector.type,
                 table = this.tableNamed(tableName),
-                lastUpdatedTable = this.operationTable,
                 clonedArray = [],
                 i,countI,iRawData, iLastUpdated,
                 lastUpdated = Date.now(),
@@ -513,19 +510,15 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                 dataID = this.dataIDPropertyName,
                 primaryKey = table.schema.primKey.name,
                 lastUpdatedPropertyName = this.lastFetchedPropertyName,
-                j, countJ, jRawData,
+                j, jRawData,
                 rawDataMapByPrimaryKey,
                 offlineObjectsToClear = [],
                 rawDataStream = new DataStream();
 
                 rawDataStream.selector = selector;
 
-
-            primaryKey = table.schema.primKey.name;
-
-
             //Make a clone of the array and create the record to track the online Last Updated date
-            for(i=0, countI = rawDataArray.length;i<countI;i++) {
+            for(i=0, countI = rawDataArray.length; i<countI; i++) {
                 if((iRawData = rawDataArray[i])) {
                     clonedArray.push(iRawData);
 
@@ -542,10 +535,11 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
             return this.fetchData(selector,rawDataStream).then(function (offlineSelectedRecords) {
                 // 2) Loop on offline results and if we can't find it in the recent rawDataArray:
                 //    2.0) Remove the non-matching record so it doesn't show up in results
-                //         if that query were immediatrely done next as offline.
+                //         if that query were immediately done next as offline.
                 // Not ideal as we're going to do at worse a full lookup of rawDataArray, every iteration
                 for(var i=0, countI = offlineSelectedRecords.length, iRecord, iRecordPrimaryKey;(iRecord = offlineSelectedRecords[i]);i++) {
                     iRecordPrimaryKey = iRecord[self.dataIDPropertyName];
+                    // move above loop? remove conditional? saves case where countI = 0?
                     if(!rawDataMapByPrimaryKey) {
                         rawDataMapByPrimaryKey = new Map();
                         for(j=0;(jRawData = rawDataArray[j]);j++) {
@@ -573,23 +567,17 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
     },
 
     readOfflineOperations: {
-        value: function (operationMapToService) {
-            var operationTable,
-                self = this;
-
+        value: function (/* operationMapToService */) {
+            var self = this;
             return new Promise(function (resolve, reject) {
                 var myDB = self._db;
-
-                myDB
-                .open()
-                .then(function (db) {
-                    self.operationTable.where("operation").anyOf("create","update","delete")
-                    .toArray(function (offlineOperations) {
-                            resolve(offlineOperations);
-                    }).catch(function(e) {
-                            console.log(selector.type + ": performOfflineSelectorChanges failed",e);
-                            console.error(e);
-                            reject(e);
+                myDB.open().then(function (/* db */) {
+                    self.operationTable.where("operation").anyOf("create", "update", "delete").toArray(function (offlineOperations) {
+                        resolve(offlineOperations);
+                    }).catch(function (e) {
+                        console.log(selector.type + ": performOfflineSelectorChanges failed", e);
+                        console.error(e);
+                        reject(e);
                     });
                 });
             });
@@ -600,7 +588,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
         value: function (selector, rawDataArray, updateOperationArray, offlineObjectsToClear) {
             var myDB = this._db,
                 self = this,
-                clonedRawDataArray = rawDataArray.slice(0),
+                clonedRawDataArray = rawDataArray.slice(0), // why clone twice?
                 clonedUpdateOperationArray = updateOperationArray.slice(0),
                 clonedOfflineObjectsToClear = offlineObjectsToClear.slice(0);
 
@@ -610,6 +598,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
 
                 var table = db[selector.type],
                     operationTable = self.operationTable;
+
             //Transaction:
                 //Objects to put:
                 //      rawDataArray
@@ -628,7 +617,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                 }).then(function(value) {
                     //console.log(selector.type + ": performOfflineSelectorChanges succesful: "+rawDataArray.length+" rawDataArray, "+clonedUpdateOperationArray.length+" updateOperationArray");
                 }).catch(function(e) {
-                        console.log(selector.type + ": performOfflineSelectorChanges failed",e);
+                        console.log(selector.type + ": performOfflineSelectorChanges failed", e);
                         console.error(e);
                 });
             });
@@ -736,7 +725,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                                 //     console.log(offlinePrimaryKeys);
                                 // });
 
-                                //Once this succedded, we need to add our temporary primary keys bookeeping:
+                                //Once this succedded, we need to add our temporary primary keys bookkeeping:
                                 //Register potential temporary primaryKeys
                                 self.registerOfflinePrimaryKeyDependenciesForData(objects, table.name, primaryKey)
                                 .then(function() {
@@ -872,6 +861,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
     deleteData: {
         value: function (objects, type, context) {
             var self = this;
+
             if(!objects || objects.length === 0) return Dexie.Promise.resolve();
 
             return new Promise(function (resolve, reject) {
@@ -879,23 +869,22 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                 table = self.tableNamed(type),
                 operationTable = self.operationTable,
                 clonedObjects = objects.slice(0),
-                operations = [],
                 primaryKey = table.schema.primKey.name,
                 dataID = self.dataIDPropertyName,
                 lastModifiedPropertyName = self.lastModifiedPropertyName,
                 lastModified = Date.now(),
-                updateDataPromises = [],
-                typePropertyName = this.typePropertyName,
-                changesPropertyName = this.changesPropertyName,
-                operationPropertyName = this.operationPropertyName,
-                operationDeleteName = this.operationDeleteName;
+                changesPropertyName = self.changesPropertyName,
+                typePropertyName = self.typePropertyName,
+                operationPropertyName = self.operationPropertyName,
+                operationDeleteName = self.operationDeleteName,
+                updateDataPromises = [];
 
                 myDB.open().then(function (db) {
                     db.transaction('rw', table, operationTable,
                         function () {
                             //Make a clone of the array and create the record to track the online Last Updated date
-                            for(var i=0, countI = objects.length, iRawData,iPrimaryKey;i<countI;i++) {
-                                if((iRawData = objects[i])) {
+                            for (var i=0, countI = objects.length, iRawData, iOperation, iPrimaryKey; i<countI; i++) {
+                                if ((iRawData = objects[i])) {
                                     iPrimaryKey = iRawData[primaryKey];
                                     updateDataPromises.push(table.delete(iPrimaryKey, iRawData));
 
@@ -904,27 +893,25 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                                     iOperation[dataID] = iPrimaryKey;
                                     iOperation[lastModifiedPropertyName] = lastModified;
                                     iOperation[typePropertyName] = type;
-                                    // iOperation[changesPropertyName] = iRawData;
+                                    iOperation[changesPropertyName] = iRawData;
                                     iOperation[operationPropertyName] = operationDeleteName;
                                     iOperation.context = context;
 
-                                    updateDataPromises.push(operationTable.put(iPrimaryKey, iOperation));
+                                    updateDataPromises.push(operationTable.put(iOperation));
                                 }
                             }
                             return Dexie.Promise.all(updateDataPromises);
 
                         }).then(function(value) {
 
-                                //Once this succedded, we need to add our temporary primary keys bookeeping:
-                                //Register potential temporary primaryKeys
-                                self.deleteOfflinePrimaryKeyDependenciesForData(objects);
-
-
+                            //Once this succeeded, we need to add our temporary primary keys bookkeeping:
+                            //Register potential temporary primaryKeys
+                            self.deleteOfflinePrimaryKeyDependenciesForData(objects, type, primaryKey);
                             resolve(clonedObjects);
-                            //console.log(table.name,": updateData for ",objects.length," objects succesfully",value);
+                            //console.log(table.name,": updateData for ",objects.length," objects successfully",value);
                         }).catch(function(e) {
                             reject(e);
-                            // console.log("tableName:failed to addO ffline Data",e)
+                            // console.log("tableName:failed to add Offline Data",e)
                             console.error(table.name,": failed to updateData for ",objects.length," objects with error",e);
                         });
                     }
@@ -962,7 +949,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                         //console.log(table.name,": updateData for ",objects.length," objects succesfully",value);
                     }).catch(function(e) {
                         reject(e);
-                        // console.log("tableName:failed to addO ffline Data",e)
+                        // console.log("tableName:failed to add Offline Data",e)
                         console.error(table.name,": failed to updateData for ",objects.length," objects with error",e);
                     });
                 });
@@ -987,7 +974,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
         },
         registerOfflineService: {
             value: function(anOfflineService) {
-                this._registeredOfflineServiceByName.set(anOfflineService.name,anOfflineService);
+                this._registeredOfflineServiceByName.set(anOfflineService.name, anOfflineService);
             }
         },
         registeredOfflineServiceNamed: {
