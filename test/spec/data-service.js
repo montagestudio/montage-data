@@ -1,5 +1,4 @@
 var DataService = require("montage-data/logic/service/data-service").DataService,
-    DataStream = require("montage-data/logic/service/data-stream").DataStream,
     DataObjectDescriptor = require("montage-data/logic/model/data-object-descriptor").DataObjectDescriptor,
     RawDataService = require("montage-data/logic/service/raw-data-service").RawDataService;
 
@@ -36,7 +35,7 @@ describe("A DataService", function() {
         // Create the parent, child, and grandchild after resetting the main
         // service, and tie them all together.
         DataService.mainService = undefined;
-        parent = new RawDataService(),
+        parent = new RawDataService();
         parent.NAME = "PARENT";
         parent.jasmineToString = function () { return "PARENT"; };
         child = new RawDataService();
@@ -380,11 +379,14 @@ describe("A DataService", function() {
         });
 
         // Test that parent references are added and removed correctly
-        registerPromises = [syncChild, asyncChild].map(function (c) { parent.registerChildService(c); });
+        registerPromises = [syncChild, asyncChild].map(function (c) { return parent.registerChildService(c); });
         return Promise.all(registerPromises)
             .then(function () {
                 expect(syncChild.parentService).toBe(parent);
                 expect(asyncChild.parentService).toBe(parent);
+            //     return Promise.resolve();
+            })
+            .then(function () {
                 unregisterPromises = [syncChild, asyncChild].map(function (c) { parent.unregisterChildService(c); });
                 return Promise.all(unregisterPromises);
             })
