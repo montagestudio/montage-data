@@ -258,7 +258,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
     registerChildService: {
         value: function (child) {
-            var self = this
+            var self = this;
 
             if(!this._childServiceRegistrationPromise) {
                 this._childServiceRegistrationPromise = child.types;
@@ -640,7 +640,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
 
     /**
-     * Since root services are responsible for triggerring data objects fetches,
+     * Since root services are responsible for triggering data objects fetches,
      * subclasses whose instances will not be root services should override this
      * method to call their root service's implementation of it.
      *
@@ -1142,6 +1142,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             stream.selector = selector;
             this._dataServiceForDataStream.set(stream,this._childServiceRegistrationPromise.then(function() {
                 // Use a child service to fetch the data.
+                var service;
                 try {
                     service = self._getChildServiceForType(selector.type);
                     if (service) {
