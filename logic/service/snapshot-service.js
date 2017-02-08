@@ -1,32 +1,34 @@
-var Montage = require("montage/core/core").Montage;
+var Montage = require("montage/core/core").Montage,
+    Map = require("collections/map");
 
 /**
  * @class SnapshotService
  * @extends Montage
  */
 exports.SnapshotService = Montage.specialize(/** @lends SnapshotService# */ {
-    _cache: {
-        value: null
-    },
 
     constructor: {
-        value: function() {
+        value: function SnapshotService() {
             this._cache = new Map();
         }
     },
 
+    _cache: {
+        value: null
+    },
+
     saveSnapshotForTypeNameAndId: {
-        value: function(snapshot, typeName, id) {
+        value: function (snapshot, typeName, id) {
             if (!this._cache.has(typeName)) {
                 this._cache.set(typeName, new Map());
             }
-            
+
             this._cache.get(typeName).set(id, this._getClone(snapshot));
         }
     },
 
     getSnapshotForTypeNameAndId: {
-        value: function(typeName, id) {
+        value: function (typeName, id) {
             var result;
             if (this._cache.has(typeName)) {
                 result = this._cache.get(typeName).get(id);
@@ -36,7 +38,7 @@ exports.SnapshotService = Montage.specialize(/** @lends SnapshotService# */ {
     },
 
     removeSnapshotForTypeNameAndId: {
-        value: function(typeName, id) {
+        value: function (typeName, id) {
             if (this._cache.has(typeName)) {
                 this._cache.get(typeName).delete(id);
             }
@@ -44,10 +46,9 @@ exports.SnapshotService = Montage.specialize(/** @lends SnapshotService# */ {
     },
 
     getDifferenceWithSnapshotForTypeNameAndId: {
-        value: function(rawData, typeName, id) {
+        value: function (rawData, typeName, id) {
             var difference = this._getClone(rawData),
-                cachedVersion, cachedKeys,
-                key;
+                cachedVersion, cachedKeys, key;
             if (this._cache.has(typeName)) {
                 cachedVersion = this._cache.get(typeName).get(id);
             }
@@ -65,11 +66,12 @@ exports.SnapshotService = Montage.specialize(/** @lends SnapshotService# */ {
     },
 
     _getClone: {
-        value: function(object) {
+        value: function (object) {
+            var result, keys, key;
+            /*, temp, j, arrayLength, arrayKeys*/
             if (object) {
-                var result = Object.create(null),
-                    keys = Object.keys(object),
-                    key, temp, j, arrayLength, arrayKeys;
+                result = Object.create(null);
+                keys = Object.keys(object);
                 for (var i = 0, length = keys.length; i < length; i++) {
                     key = keys[i];
                     if (Array.isArray(object[key])) {
@@ -88,7 +90,7 @@ exports.SnapshotService = Montage.specialize(/** @lends SnapshotService# */ {
     },
 
     _getArrayClone: {
-        value: function(array) {
+        value: function (array) {
             var result = [],
                 value;
             for (var i = 0, length = array.length; i < length; i++) {
@@ -132,5 +134,37 @@ exports.SnapshotService = Montage.specialize(/** @lends SnapshotService# */ {
             }
             return result;
         }
+    },
+
+    _equals: {
+        value: function (a, b) {
+            return  typeof a === "object" && a !== null &&
+                    typeof b === "object" && b !== null ? this._compareObjects(a, b) : a === b;
+        }
+    },
+
+    _compareObjects: {
+        value: function (a, b) {
+            var aKeys = this._sortedNonNullKeysForObject(a),
+                bKeys = this._sortedNonNullKeysForObject(b),
+                areEqual = aKeys.length === bKeys.length,
+                i, length, key;
+
+            for (i = 0, length = bKeys.length; i < length && areEqual; i += 1) {
+                key = bKeys[i];
+                areEqual = this._equals(a[key], b[key]);
+            }
+            return areEqual;
+        }
+    },
+
+    _sortedNonNullKeysForObject: {
+        value: function (object) {
+            return Object.keys(object).sort().filter(function (key) {
+                return object[key] !== null;
+            })
+        }
     }
+
+
 });

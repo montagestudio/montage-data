@@ -75,11 +75,11 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
         value: function(aDataService) {
             var self = this,
                 aDataServiceInfo = Montage.getInfoForObject(aDataService),
-                authorizationPromise = new Promise(function(resolve,reject){
+                authorizationPromise = new Promise(function (resolve,reject) {
                 var authorizationServicesModuleIds = aDataService.authorizationServices,
-                iService, iServiceModuleId, i, countI, iAuthorizationService,
-                registeredAuthorizationServices = self._registeredAuthorizationServicesByModuleId,
-                authorizationServices = [];
+                    iService, iServiceModuleId, i, countI, iAuthorizationService,
+                    registeredAuthorizationServices = self._registeredAuthorizationServicesByModuleId,
+                    authorizationServices = [];
 
                 for(i=0, countI = authorizationServicesModuleIds.length; i<countI; i++) {
                     iServiceModuleId = authorizationServicesModuleIds[i];

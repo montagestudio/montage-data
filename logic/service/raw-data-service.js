@@ -1,7 +1,9 @@
 var DataService = require("logic/service/data-service").DataService,
+    Binder = require("montage/core/meta/binder").Binder,
     DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
     DataSelector = require("logic/service/data-selector").DataSelector,
     DataStream = require("logic/service/data-stream").DataStream,
+    Deserializer = require("montage/core/serialization/deserializer/montage-deserializer").MontageDeserializer,
     WeakMap = require("collections/weak-map");
 
 /**
@@ -36,6 +38,19 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         }
     },
 
+    initWithModel: {
+        value: function (model) {
+            var self = this;
+            return require.async(model).then(function (descriptor) {
+                var deserializer = new Deserializer().init(JSON.stringify(descriptor), require);
+                return deserializer.deserializeObject();
+            }).then(function (model) {
+                self.__dataModel = model;
+                return self;
+            });
+        }
+    },
+
     /*
      * The ConnectionDescriptor object where possible connections will be found
      *
@@ -52,6 +67,12 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     connection: {
         value: undefined
+    },
+
+    _dataModel: {
+        get: function () {
+            return this.__dataModel || this.parentService && this.parentService._dataModel;
+        }
     },
 
     /***************************************************************************
@@ -90,7 +111,34 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     fetchObjectProperty: {
         value: function (object, propertyName) {
-            return this.nullPromise;
+            return this._dataModel && this._fetchObjectProperty(object, propertyName) || this.nullPromise;
+        }
+    },
+
+    _fetchObjectProperty: {
+        value: function (object, propertyName) {
+            var self = this,
+                bluePrint = this._bluePrintForObject(object),
+                propertyBlueprint = bluePrint.propertyBlueprintForName(propertyName),
+                destinationValueDescriptor;
+
+            return propertyBlueprint.valueDescriptor.then(function (descriptor) {
+                destinationValueDescriptor = descriptor;
+                return require.async(destinationValueDescriptor.module.id);
+            }).then(function (exports) {
+                var constructor = exports[destinationValueDescriptor.exportName],
+                    selector = DataSelector.withTypeAndCriteria(constructor.TYPE, {
+                        source: object
+                    });
+                return self.rootService.fetchData(selector);
+            });
+        }
+    },
+
+    _bluePrintForObject: {
+        value: function (object) {
+            var isBinder = this._dataModel instanceof Binder;
+            return isBinder ? this._dataModel.blueprintForName(object.constructor.TYPE.typeName) : this._dataModel;
         }
     },
 
@@ -221,14 +269,14 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *                                 reference to the selector defining what
      *                                 raw data to fetch.
      */
-    //TODO, swizzling the stream's user-land selector for the rawData equivallent is not really
-    //practical nor safe, we either need to keep it separately or store it on the stream under
-    //rawDataSelector
+    // TODO, swizzling the stream's user-land selector for the rawData equivalent is not really
+    // practical nor safe, we either need to keep it separately or store it on the stream under
+    // rawDataSelector
 
     _fetchRawData: {
         value: function (stream) {
             var self = this;
-            this.authorizationPromise.then(function(authorization) {
+            this.authorizationPromise.then(function (authorization) {
                 var streamSelector = stream.selector;
                 stream.selector = self.mapSelectorToRawDataSelector(streamSelector);
                 self.fetchRawData(stream);
@@ -236,6 +284,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             });
         }
     },
+
     fetchRawData: {
         value: function (stream) {
             this.rawDataDone(stream);
@@ -472,7 +521,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     //This should belong on the
     //Gives us an indirection layer to deal with backward compatibility.
     dataIdentifierForTypeRawData: {
-        value: function(type,rawData) {
+        value: function (type, rawData) {
         }
     },
 
@@ -484,30 +533,31 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @argument  {Object} rawData
      */
     recordSnapshot: {
-        value: function(dataIdentifier,rawData) {
+        value: function (dataIdentifier, rawData) {
 
         }
     },
-     /**
+
+    /**
      * Removes the snapshot of the values of record for the DataIdentifier argument
      *
      * @private
      * @argument {DataIdentifier} dataIdentifier
      */
    removeSnapshot: {
-        value: function(dataIdentifier) {
+        value: function (dataIdentifier) {
 
         }
     },
 
-     /**
+    /**
      * Returns the snapshot associated with the DataIdentifier argument if available
      *
      * @private
      * @argument {DataIdentifier} dataIdentifier
      */
    snapshotForDataIdentifier: {
-        value: function(dataIdentifier) {
+        value: function (dataIdentifier) {
         }
     },
 
@@ -573,7 +623,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
 
     /**
-     * Convert a selector for data ojects to a selector for raw data.
+     * Convert a selector for data objects to a selector for raw data.
      *
      * The selector returned by this method will be the selector used by methods
      * that deal with raw data, like
