@@ -1,6 +1,7 @@
 var DataService = require("logic/service/data-service").DataService,
     Binder = require("montage/core/meta/binder").Binder,
     Blueprint = require("montage/core/meta/blueprint").Blueprint,
+    BlueprintDataMapping = require("logic/service/blueprint-data-mapping").BlueprintDataMapping,
     DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
     DataSelector = require("logic/service/data-selector").DataSelector,
     DataStream = require("logic/service/data-stream").DataStream,
@@ -698,8 +699,11 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     mapRawDataToObject: {
         value: function (record, object, context) {
+            var blueprint = this._bluePrintForObject(object);
             if (this.mapping) {
                 this.mapping.mapRawDataToObject(record, object, context);
+            } else if (blueprint) {
+                this.mapping = BlueprintDataMapping.withBlueprint(blueprint);
             } else if (record) {
                 this.mapFromRawData(object, record, context);
             }
