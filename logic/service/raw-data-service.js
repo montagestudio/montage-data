@@ -1,5 +1,6 @@
 var DataService = require("logic/service/data-service").DataService,
     Binder = require("montage/core/meta/binder").Binder,
+    Blueprint = require("montage/core/meta/blueprint").Blueprint,
     DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
     DataSelector = require("logic/service/data-selector").DataSelector,
     DataStream = require("logic/service/data-stream").DataStream,
@@ -111,34 +112,48 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     fetchObjectProperty: {
         value: function (object, propertyName) {
-            return this._dataModel && this._fetchObjectProperty(object, propertyName) || this.nullPromise;
+            var blueprint = this._bluePrintForObject(object),
+                propertyBlueprint = blueprint && blueprint.propertyBlueprintForName(propertyName),
+                propertyDescriptor = propertyBlueprint && propertyBlueprint.valueDescriptor;
+            return propertyDescriptor ? this._fetchObjectPropertyWithDescriptor(object, propertyName, propertyDescriptor) :
+                                        this.nullPromise;
         }
     },
 
-    _fetchObjectProperty: {
-        value: function (object, propertyName) {
-            var self = this,
-                bluePrint = this._bluePrintForObject(object),
-                propertyBlueprint = bluePrint.propertyBlueprintForName(propertyName),
-                destinationValueDescriptor;
-
-            return propertyBlueprint.valueDescriptor.then(function (descriptor) {
-                destinationValueDescriptor = descriptor;
-                return require.async(destinationValueDescriptor.module.id);
-            }).then(function (exports) {
-                var constructor = exports[destinationValueDescriptor.exportName],
-                    selector = DataSelector.withTypeAndCriteria(constructor.TYPE, {
-                        source: object
-                    });
-                return self.rootService.fetchData(selector);
+    _fetchObjectPropertyWithDescriptor: {
+        value: function (object, propertyName, propertyDescriptor) {
+            var service = this.rootService;
+            return this._blueprintTypeForValueDescriptor(propertyDescriptor).then(function (type) {
+                var selector = DataSelector.withTypeAndCriteria(type, {
+                    source: object,
+                    relationshipKey: propertyName
+                });
+                return service.fetchData(selector);
             });
         }
     },
 
     _bluePrintForObject: {
         value: function (object) {
-            var isBinder = this._dataModel instanceof Binder;
-            return isBinder ? this._dataModel.blueprintForName(object.constructor.TYPE.typeName) : this._dataModel;
+            var typeName = object.constructor.TYPE.typeName,
+                isBinder = this._dataModel instanceof Binder,
+                isBlueprint = !isBinder && this._dataModel instanceof Blueprint,
+                isObjectsBlueprint = isBlueprint && this._dataModel.name === typeName;
+            return  isBinder ?              this._dataModel.blueprintForName(typeName) :
+                    isObjectsBlueprint ?    this._dataModel :
+                                            undefined;
+        }
+    },
+
+    _blueprintTypeForValueDescriptor: {
+        value: function (valueDescriptor) {
+            var destinationBlueprint;
+            return valueDescriptor.then(function (blueprint) {
+                destinationBlueprint = blueprint;
+                return require.async(blueprint.module.id);
+            }).then(function (exports) {
+                return exports[destinationBlueprint.exportName].TYPE;
+            });
         }
     },
 
