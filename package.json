@@ -22,7 +22,8 @@
     "frb": "~4.0.x",
     "montage": "git://github.com/montagejs/montage.git#master",
     "weak-map": "^1.0.5",
-    "xhr2": "^0.1.4"
+    "xhr2": "^0.1.4",
+    "moment-timezone": "^0.5.11"
   },
   "devDependencies": {
     "concurrently": "^3.4.0",

@@ -1,4 +1,5 @@
-var DataMapping = require("logic/service/data-mapping").DataMapping;
+var DataMapping = require("logic/service/data-mapping").DataMapping,
+    moment = require("moment-timezone");
 
 /**
  * Maps raw data to data objects of a specific type by using a blueprint.
@@ -43,18 +44,17 @@ exports.BlueprintDataMapping = DataMapping.specialize(/** @lends BlueprintDataMa
      */
     mapRawDataToObject: {
         value: function (data, object, context) {
-            var propertyBlueprints = this._bluePrint.propertyBlueprints,
-                attributes = data.attributes,
+            var propertyBlueprints = this._blueprint.propertyBlueprints,
+                attributes = data.attributes || data,
                 // relationships = data.relationships,
                 i, length, property, propertyKey;
-
-            //console.log("mapFromRawData",object,data,context);
 
             for (i = 0, length = propertyBlueprints.length; i < length; i++) {
                 property = propertyBlueprints[i];
                 propertyKey = property.synonym || property.name;
                 if (attributes && propertyKey in attributes) {
                     object[property.name] = attributes[propertyKey];
+                    object[property.name] = property.valueType === "date" ? new moment(Number(attributes[propertyKey])) : attributes[propertyKey];
                     //console.log(iProperty.name +" found in attributes");
                 // }
                 // else if(relationships && property.name in relationships) {

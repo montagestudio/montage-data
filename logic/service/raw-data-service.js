@@ -700,14 +700,28 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     mapRawDataToObject: {
         value: function (record, object, context) {
             var blueprint = this._bluePrintForObject(object);
-            if (this.mapping) {
+
+            if (blueprint) {
+                this.mapping = this.mapping || BlueprintDataMapping.withBlueprint(blueprint);
                 this.mapping.mapRawDataToObject(record, object, context);
-            } else if (blueprint) {
-                this.mapping = BlueprintDataMapping.withBlueprint(blueprint);
-                this.mapping.mapRawDataToObject(record, object, context);
-            } else if (record) {
+            }
+
+            if (record) {
                 this.mapFromRawData(object, record, context);
             }
+
+            // if (this.mapping) {
+            //     this.mapping.mapRawDataToObject(record, object, context);
+            //     this.mapFromRawData(object, record, context);
+            // } else if (blueprint) {
+            //     this.mapping = BlueprintDataMapping.withBlueprint(blueprint);
+            //     this.mapping.mapRawDataToObject(record, object, context);
+            //     this.mapFromRawData(object, record, context);
+            // } else if (record) {
+            //     this.mapFromRawData(object, record, context);
+            // }
+
+
         }
     },
 
@@ -719,7 +733,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @method
      */
     mapObjectToRawData: {
-        value: function (object, record) {
+        value: function (object, record, context) {
             var blueprint = this._bluePrintForObject(object);
             if (this.mapping) {
                 this.mapping.mapObjectToRawData(record, object, context);
