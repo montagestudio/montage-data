@@ -865,10 +865,10 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     getDataObject: {
         value: function (type, data, context, dataIdentifier) {
-            var dataObject, existingDataObject;
+            var dataObject;
             // TODO [Charles]: Object uniquing.
             if(this.isUniquing && dataIdentifier) {
-                existingDataObject = dataObject = this.objectForDataIdentifier(dataIdentifier);
+                dataObject = this.objectForDataIdentifier(dataIdentifier);
             }
             if(!dataObject) {
                 dataObject = this._createDataObject(type, dataIdentifier);
