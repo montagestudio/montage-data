@@ -113,28 +113,60 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     fetchObjectProperty: {
         value: function (object, propertyName) {
-            var blueprint = this._bluePrintForObject(object),
-                propertyBlueprint = blueprint && blueprint.propertyBlueprintForName(propertyName),
+            var propertyBlueprint = this._propertyBlueprintForObjectAndName(object, propertyName),
                 propertyDescriptor = propertyBlueprint && propertyBlueprint.valueDescriptor;
-            return propertyDescriptor ? this._fetchObjectPropertyWithDescriptor(object, propertyName, propertyDescriptor) :
+            return propertyDescriptor ? this._fetchObjectPropertyWithDescriptor(object, propertyBlueprint) :
                                         this.nullPromise;
         }
     },
 
+    _propertyBlueprintForObjectAndName: {
+        value: function (object, propertyName) {
+            var blueprint = this._blueprintForObject(object);
+            return blueprint && blueprint.propertyBlueprintForName(propertyName);
+        }
+    },
+
     _fetchObjectPropertyWithDescriptor: {
-        value: function (object, propertyName, propertyDescriptor) {
-            var service = this.rootService;
-            return this._blueprintTypeForValueDescriptor(propertyDescriptor).then(function (type) {
+        value: function (object, propertyBlueprint) {
+            var self = this,
+                propertyName = propertyBlueprint.name,
+                service = this.rootService;
+            return this._blueprintTypeForValueDescriptor(propertyBlueprint.valueDescriptor).then(function (type) {
                 var selector = DataSelector.withTypeAndCriteria(type, {
                     source: object,
                     relationshipKey: propertyName
                 });
+                //[TJ] In order to validate cardinality, this will need to be responsible for setting the property value when the fetch data is complete.
                 return service.fetchData(selector);
+            }).then(function (data) {
+                return self._mapObjectPropertyValue(object, propertyBlueprint, data);
             });
         }
     },
 
-    _bluePrintForObject: {
+    _mapObjectPropertyValue: {
+        value: function (object, propertyBlueprint, value) {
+            var propertyName = propertyBlueprint.name;
+            if (propertyBlueprint.cardinality === Infinity) {
+                this.spliceWithArray(object[propertyName], value);
+            } else {
+                object[propertyName] = value[0];
+            }
+
+            if (propertyBlueprint.inversePropertyName && value && value[0]) {
+                var inverseBlueprint = this._propertyBlueprintForObjectAndName(value[0], propertyBlueprint.inversePropertyName);
+                if (inverseBlueprint && inverseBlueprint.cardinality === 1) {
+                    value.forEach(function (inverseObject) {
+                        inverseObject[propertyBlueprint.inversePropertyName] = object;
+                    });
+                }
+            }
+            return value;
+        }
+    },
+
+    _blueprintForObject: {
         value: function (object) {
             var typeName = object.constructor.TYPE.typeName,
                 isBinder = this._dataModel instanceof Binder,
@@ -151,7 +183,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             var destinationBlueprint;
             return valueDescriptor.then(function (blueprint) {
                 destinationBlueprint = blueprint;
-                return require.async(blueprint.module.id);
+                return blueprint.module.require.async(blueprint.module.id);
             }).then(function (exports) {
                 return exports[destinationBlueprint.exportName].TYPE;
             });
@@ -699,7 +731,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     mapRawDataToObject: {
         value: function (record, object, context) {
-            var blueprint = this._bluePrintForObject(object);
+            var blueprint = this._blueprintForObject(object);
 
             if (blueprint) {
                 this.mapping = this.mapping || BlueprintDataMapping.withBlueprint(blueprint);
@@ -734,7 +766,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     mapObjectToRawData: {
         value: function (object, record, context) {
-            var blueprint = this._bluePrintForObject(object);
+            var blueprint = this._blueprintForObject(object);
             if (this.mapping) {
                 this.mapping.mapObjectToRawData(record, object, context);
             } else if (blueprint) {
