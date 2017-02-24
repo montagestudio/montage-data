@@ -49,6 +49,8 @@ exports.BlueprintDataMapping = DataMapping.specialize(/** @lends BlueprintDataMa
                 // relationships = data.relationships,
                 i, length, property, propertyKey, value;
 
+
+
             for (i = 0, length = propertyBlueprints.length; i < length; i++) {
                 property = propertyBlueprints[i];
                 propertyKey = property.synonym || property.name;
