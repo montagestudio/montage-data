@@ -1,4 +1,5 @@
 var Montage = require("montage").Montage,
+    ModuleBlueprint = require("montage/core/meta/module-blueprint").ModuleBlueprint,
     Enum = require("montage/core/enum").Enum,
     AuthorizationManager = require("logic/service/authorization-manager").AuthorizationManager,
     AuthorizationPolicyType = new Enum().initWithMembers("NoAuthorizationPolicy","UpfrontAuthorizationPolicy","OnFirstFetchAuthorizationPolicy","OnDemandAuthorizationPolicy"),
@@ -267,7 +268,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             //(TODO) which should become the norm
             this._childServiceRegistrationPromise = this._childServiceRegistrationPromise
             .then(function() {
-                return child.types;
+                return self._createObjectDescriptorsForTypes(child.types);
             })
             .then(function (types) {
                 return self.addChildService(child, types);
@@ -276,6 +277,31 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             return this._childServiceRegistrationPromise;
         }
     },
+    
+    _createObjectDescriptorForBlueprint: {
+        value: function (blueprint) {
+            return blueprint.module.require.async(blueprint.module.id).then(function (exports) {
+                var properties = {};
+                blueprint.propertyBlueprints.forEach(function (propertyBlueprint) {
+                    if (propertyBlueprint.isAssociationBlueprint) {
+                        properties[propertyBlueprint.name] = {};
+                    }
+                });
+                Object.defineProperty(exports[blueprint.exportName], "TYPE", {
+                    get: DataObjectDescriptor.getterFor(exports, blueprint.exportName, properties)
+                });
+                exports[blueprint.exportName].TEMP_TYPE = blueprint;
+                return blueprint;
+            });
+        }
+    },
+
+    _createObjectDescriptorsForTypes: {
+        value: function (types) {
+            return Promise.all(types.map(this._createObjectDescriptorForBlueprint));
+        }
+    },
+
 
     /**
      * Remove a raw data service as a child of this service and clear its parent

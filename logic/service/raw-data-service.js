@@ -6,6 +6,7 @@ var DataService = require("logic/service/data-service").DataService,
     DataSelector = require("logic/service/data-selector").DataSelector,
     DataStream = require("logic/service/data-stream").DataStream,
     Deserializer = require("montage/core/serialization/deserializer/montage-deserializer").MontageDeserializer,
+    Map = require("collections/map"),
     WeakMap = require("collections/weak-map");
 
 /**
@@ -134,10 +135,10 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
                 service = this.rootService;
             return this._blueprintTypeForValueDescriptor(propertyBlueprint.valueDescriptor).then(function (type) {
                 var selector = DataSelector.withTypeAndCriteria(type, {
+                    snapshot: self._snapshots.get(object),
                     source: object,
                     relationshipKey: propertyName
                 });
-                //[TJ] In order to validate cardinality, this will need to be responsible for setting the property value when the fetch data is complete.
                 return service.fetchData(selector);
             }).then(function (data) {
                 return self._mapObjectPropertyValue(object, propertyBlueprint, data);
@@ -731,11 +732,16 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     mapRawDataToObject: {
         value: function (record, object, context) {
-            var blueprint = this._blueprintForObject(object);
+            var blueprint = this._blueprintForObject(object),
+                mapping;
 
             if (blueprint) {
-                this.mapping = this.mapping || BlueprintDataMapping.withBlueprint(blueprint);
-                this.mapping.mapRawDataToObject(record, object, context);
+                mapping = this.mappings.get(blueprint);
+                if (!mapping) {
+                    mapping = BlueprintDataMapping.withBlueprint(blueprint);
+                    this.mappings.set(blueprint, mapping);
+                }
+                mapping.mapRawDataToObject(record, object, context);
             }
 
             if (record) {
@@ -791,6 +797,15 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     mapping: {
         value: undefined
+    },
+
+    mappings: {
+        get: function () {
+            if (!this._mappings) {
+                this._mappings = new Map();
+            }
+            return this._mappings;
+        }
     },
 
     /***************************************************************************
