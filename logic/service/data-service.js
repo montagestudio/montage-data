@@ -290,8 +290,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 Object.defineProperty(exports[blueprint.exportName], "TYPE", {
                     get: DataObjectDescriptor.getterFor(exports, blueprint.exportName, properties)
                 });
-                exports[blueprint.exportName].TEMP_TYPE = blueprint;
-                return blueprint;
+                return exports[blueprint.exportName].TYPE;
             });
         }
     },
