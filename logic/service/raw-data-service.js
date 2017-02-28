@@ -48,7 +48,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
                 var deserializer = new Deserializer().init(JSON.stringify(descriptor), require);
                 return deserializer.deserializeObject();
             }).then(function (model) {
-                self.__dataModel = model;
+                self.model = model;
                 return self;
             });
         }
@@ -70,12 +70,6 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     connection: {
         value: undefined
-    },
-
-    _dataModel: {
-        get: function () {
-            return this.__dataModel || this.parentService && this.parentService._dataModel;
-        }
     },
 
     /***************************************************************************
@@ -170,11 +164,11 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     _blueprintForObject: {
         value: function (object) {
             var typeName = object.constructor.TYPE.typeName,
-                isBinder = this._dataModel instanceof Binder,
-                isBlueprint = !isBinder && this._dataModel instanceof Blueprint,
-                isObjectsBlueprint = isBlueprint && this._dataModel.name === typeName;
-            return  isBinder ?              this._dataModel.blueprintForName(typeName) :
-                    isObjectsBlueprint ?    this._dataModel :
+                isBinder = this.model instanceof Binder,
+                isBlueprint = !isBinder && this.model instanceof Blueprint,
+                isObjectsBlueprint = isBlueprint && this.model.name === typeName;
+            return  isBinder ?              this.model.blueprintForName(typeName) :
+                    isObjectsBlueprint ?    this.model :
                                             undefined;
         }
     },
