@@ -7,6 +7,7 @@ var Montage = require("montage").Montage,
     DataStream = require("logic/service/data-stream").DataStream,
     DataTrigger = require("logic/service/data-trigger").DataTrigger,
     Map = require("collections/map"),
+    ObjectDescriptor = require("logic/model/object-descriptor").ObjectDescriptor,
     Promise = require("bluebird"),
     Set = require("collections/set"),
     WeakMap = require("collections/weak-map");
@@ -435,6 +436,41 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
+     * Models
+     */
+
+    /**
+     * Adds a model to this data service.  The model is used by the service to
+     * create the prototype for newly created objects.  A data trigger is added
+     * to the prototype for each property of the object descriptor who has a
+     * value descriptor defined.
+     *
+     * @method
+     * @argument {ObjectModel} model
+     */
+    addModel: {
+        value: function (model) {
+            if (!this._models) {
+                this._models = [];
+            }
+            if (this.models.indexOf(model) < 0) {
+                this.models.push(model);
+            }
+        }
+    },
+
+    models: {
+        get: function () {
+            if (!this._models && this.parentService) {
+                this._models = this.parentService.models;
+            } else if (!this._models) {
+                this._models = [];
+            }
+            return this._models;
+        }
+    },
+
+    /***************************************************************************
      * Authorization
      */
 
@@ -577,18 +613,50 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      *
      * @private
      * @method
-     * @argument {DataObjectDescriptor} type
+     * @argument {DataObjectDescriptor|ObjectDescriptor} type
      * @returns {Object}
      */
     _getPrototypeForType: {
         value: function (type) {
-            var prototype = this._dataObjectPrototypes.get(type);
+            var prototype = this._dataObjectPrototypes.get(type),
+                isMontageDataType;
             if (type && !prototype) {
-                prototype = Object.create(type.objectPrototype);
-                this._dataObjectPrototypes.set(type, prototype);
-                this._dataObjectTriggers.set(type, DataTrigger.addTriggers(this, type, prototype));
+                isMontageDataType = type instanceof DataObjectDescriptor || type instanceof ObjectDescriptor;
+                prototype = isMontageDataType ?     this._getPrototypeForDataObjectDescriptor(type) :
+                                                    this._getPrototypeForObjectDescriptor(type);
             }
             return prototype;
+        }
+    },
+    /**
+     * Returns a prototype for objects of the specified data object descriptor.
+     * The data object descriptor is deprecated.  Future development should
+     * instead use the object descriptor class from the Montage framework.
+     * @deprecated
+     * @private
+     * @method
+     * @argument {DataObjectDescriptor} type
+     * @returns {Object}
+     */
+    _getPrototypeForDataObjectDescriptor: {
+        value: function (type) {
+            var prototype = Object.create(type.objectPrototype);
+            this._dataObjectPrototypes.set(type, prototype);
+            this._dataObjectTriggers.set(type, DataTrigger.addTriggers(this, type, prototype));
+            return type;
+        }
+    },
+
+    /**
+     * Returns a prototype for objects of the specified object descriptor.
+     * @private
+     * @method
+     * @argument {ObjectDescriptor} type
+     * @returns {Object}
+     */
+    _getPrototypeForObjectDescriptor: {
+        value: function (type) {
+
         }
     },
 

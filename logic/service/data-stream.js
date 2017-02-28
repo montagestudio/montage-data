@@ -85,6 +85,7 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */ 
     requestData: {
         value: function (start, length) {
             // Don't do anything.
+            return this;
         }
     },
 

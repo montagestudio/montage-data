@@ -126,10 +126,17 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             var service = this.rootService;
             return this._blueprintTypeForValueDescriptor(propertyDescriptor).then(function (type) {
                 var selector = DataSelector.withTypeAndCriteria(type, {
-                    source: object,
-                    relationshipKey: propertyName
-                });
+                        source: object,
+                        relationshipKey: propertyName
+                    });
                 return service.fetchData(selector);
+            }).then(function (data) {
+                if (propertyDescriptor.cardinality === 1) {
+                    object.propertyName = data[0];
+                } else {
+                    object.propertyName = data;
+                }
+                return null;
             });
         }
     },
@@ -722,12 +729,12 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         value: function (object, record) {
             var blueprint = this._bluePrintForObject(object);
             if (this.mapping) {
-                this.mapping.mapObjectToRawData(record, object, context);
+                this.mapping.mapObjectToRawData(record, object);
             } else if (blueprint) {
                 this.mapping = BlueprintDataMapping.withBlueprint(blueprint);
-                this.mapping.mapObjectToRawData(record, object, context);
+                this.mapping.mapObjectToRawData(record, object);
             } else if (record) {
-                this.mapFromRawData(object, record, context);
+                this.mapToRawData(object, record);
             }
 
             this.mapToRawData(object, record);
