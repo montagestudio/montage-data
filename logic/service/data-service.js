@@ -1755,7 +1755,22 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             return insert ? array.splice.apply(array, [index, length].concat(insert)) :
                             array.splice(index, length);
         }
-    }
+    },
+
+    _model: {
+        value: undefined
+    },
+    model: {
+        get: function () {
+            return this._model || this.parentService && this.parentService.model;
+        },
+        set: function(value){
+            if(value !== this._model) {
+                this._model = value;
+            }
+        }
+    },
+
 
 }, /** @lends DataService */ {
 
