@@ -1,5 +1,4 @@
 var Montage = require("montage").Montage,
-    ModuleBlueprint = require("montage/core/meta/module-blueprint").ModuleBlueprint,
     Enum = require("montage/core/enum").Enum,
     AuthorizationManager = require("logic/service/authorization-manager").AuthorizationManager,
     AuthorizationPolicyType = new Enum().initWithMembers("NoAuthorizationPolicy","UpfrontAuthorizationPolicy","OnFirstFetchAuthorizationPolicy","OnDemandAuthorizationPolicy"),
@@ -181,8 +180,10 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * property.
      *
      * Child services must have their [types]{@link DataService#types} property
-     * value set before they are passing in to this method, and that value
-     * cannot change after that.
+     * value or their [model]{@link DataService#model} set before they are passed in to
+     * this method, and that value cannot change after that.  The model property takes
+     * priority of the types property.  If the model is defined the service will handle
+     * all the object descriptors associated to the model.
      *
      * @method
      * @argument {RawDataService} service
@@ -203,7 +204,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     _addChildService: {
         value: function (child, types) {
             var children, type, i, n;
-            types = types || child.types;
+            types = types || child.model && child.model.objectDescriptors || child.types;
             // If the new child service already has a parent, remove it from
             // that parent.
             if (child._parentService) {
@@ -249,6 +250,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     __childServiceRegistrationPromise: {
         value: null
     },
+
     _childServiceRegistrationPromise: {
         get: function() {
             return this.__childServiceRegistrationPromise || (this.__childServiceRegistrationPromise = Promise.resolve());
@@ -257,6 +259,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             this.__childServiceRegistrationPromise = value;
         }
     },
+
     registerChildService: {
         value: function (child) {
             var self = this;
@@ -460,6 +463,18 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
+     * Models
+     */
+
+    /**
+     * The [model]{@link ObjectModel} that this service supports.  If the model is
+     * defined the service supports all the object descriptors contained within the model.
+     */
+    model: {
+        value: undefined
+    },
+
+    /***************************************************************************
      * Authorization
      */
 
@@ -602,14 +617,14 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      *
      * @private
      * @method
-     * @argument {DataObjectDescriptor} type
+     * @argument {DataObjectDescriptor|ObjectDescriptor} type
      * @returns {Object}
      */
     _getPrototypeForType: {
         value: function (type) {
             var prototype = this._dataObjectPrototypes.get(type);
             if (type && !prototype) {
-                prototype = Object.create(type.objectPrototype);
+                prototype = Object.create(type.objectPrototype || Montage.prototype);
                 this._dataObjectPrototypes.set(type, prototype);
                 this._dataObjectTriggers.set(type, DataTrigger.addTriggers(this, type, prototype));
             }
@@ -1751,20 +1766,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             length = length || length === 0 ? length : Infinity;
             return insert ? array.splice.apply(array, [index, length].concat(insert)) :
                             array.splice(index, length);
-        }
-    },
-
-    _model: {
-        value: undefined
-    },
-    model: {
-        get: function () {
-            return this._model || this.parentService && this.parentService.model;
-        },
-        set: function(value){
-            if(value !== this._model) {
-                this._model = value;
-            }
         }
     },
 
