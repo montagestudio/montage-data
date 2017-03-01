@@ -70,8 +70,8 @@ describe("An ObjectDescriptor", function() {
         expect(descriptor1).not.toEqual(descriptor2);
         expect(descriptor1.typeName).toEqual(className1);
         expect(descriptor2.typeName).toEqual(className2);
-        expect(Object.keys(descriptor1.propertyDescriptors).sort()).toEqual([propertyName1, propertyName2].sort());
-        expect(Object.keys(descriptor2.propertyDescriptors).sort()).toEqual([propertyName3, propertyName4].sort());
+        expect(Object.keys(descriptor1.propertyDescriptors).sort()).toEqual(["_serializableAttributeProperties", propertyName1, propertyName2].sort());
+        expect(Object.keys(descriptor2.propertyDescriptors).sort()).toEqual(["_serializableAttributeProperties", propertyName3, propertyName4].sort());
     });
 
     // TODO [Charles]: Update this for API changes.

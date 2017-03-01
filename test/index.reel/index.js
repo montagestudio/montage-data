@@ -24,7 +24,8 @@ exports.Index = Component.specialize(/** @lends Index.prototype */ {
                     require("spec/object-descriptor"),
                     require("spec/offline-service"),
                     require("spec/property-descriptor"),
-                    require("spec/raw-data-service")
+                    require("spec/raw-data-service"),
+                    require("spec/snapshot-service")
                 ]);
             }
         }

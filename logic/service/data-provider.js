@@ -1,4 +1,5 @@
-var Montage = require("montage").Montage;
+var Montage = require("montage").Montage,
+    Promise = require("montage/core/promise").Promise;
 
 /**
  * This class documents the properties and methods of objects that support the
@@ -37,7 +38,7 @@ exports.DataProvider = Montage.specialize(/** @lends DataProvider.prototype */ {
      * Although the contents of a data provider's
      * [data]{@link DataProvider#data} array may change over time, the array
      * itself will not change. Subclasses will typically want to create the
-     * [data]{@link DataProvider#data} array lazilly the first time it is needed
+     * [data]{@link DataProvider#data} array lazily the first time it is needed
      * and then not allow that property to change, with code like the following:
      *
      *     data: {
@@ -89,6 +90,7 @@ exports.DataProvider = Montage.specialize(/** @lends DataProvider.prototype */ {
      */
     requestData: {
         value: function (start, length) {
+            return Promise.resolve(this.data);
         }
     }
 

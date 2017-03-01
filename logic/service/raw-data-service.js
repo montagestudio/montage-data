@@ -1,7 +1,11 @@
 var DataService = require("logic/service/data-service").DataService,
+    Binder = require("montage/core/meta/binder").Binder,
+    Blueprint = require("montage/core/meta/blueprint").Blueprint,
+    BlueprintDataMapping = require("logic/service/blueprint-data-mapping").BlueprintDataMapping,
     DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
     DataSelector = require("logic/service/data-selector").DataSelector,
     DataStream = require("logic/service/data-stream").DataStream,
+    Deserializer = require("montage/core/serialization/deserializer/montage-deserializer").MontageDeserializer,
     WeakMap = require("collections/weak-map");
 
 /**
@@ -36,6 +40,19 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         }
     },
 
+    initWithModel: {
+        value: function (model) {
+            var self = this;
+            return require.async(model).then(function (descriptor) {
+                var deserializer = new Deserializer().init(JSON.stringify(descriptor), require);
+                return deserializer.deserializeObject();
+            }).then(function (model) {
+                self.__dataModel = model;
+                return self;
+            });
+        }
+    },
+
     /*
      * The ConnectionDescriptor object where possible connections will be found
      *
@@ -52,6 +69,12 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     connection: {
         value: undefined
+    },
+
+    _dataModel: {
+        get: function () {
+            return this.__dataModel || this.parentService && this.parentService._dataModel;
+        }
     },
 
     /***************************************************************************
@@ -90,7 +113,55 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     fetchObjectProperty: {
         value: function (object, propertyName) {
-            return this.nullPromise;
+            var blueprint = this._bluePrintForObject(object),
+                propertyBlueprint = blueprint && blueprint.propertyBlueprintForName(propertyName),
+                propertyDescriptor = propertyBlueprint && propertyBlueprint.valueDescriptor;
+            return propertyDescriptor ? this._fetchObjectPropertyWithDescriptor(object, propertyName, propertyDescriptor) :
+                                        this.nullPromise;
+        }
+    },
+
+    _fetchObjectPropertyWithDescriptor: {
+        value: function (object, propertyName, propertyDescriptor) {
+            var service = this.rootService;
+            return this._blueprintTypeForValueDescriptor(propertyDescriptor).then(function (type) {
+                var selector = DataSelector.withTypeAndCriteria(type, {
+                        source: object,
+                        relationshipKey: propertyName
+                    });
+                return service.fetchData(selector);
+            }).then(function (data) {
+                if (propertyDescriptor.cardinality === 1) {
+                    object.propertyName = data[0];
+                } else {
+                    object.propertyName = data;
+                }
+                return null;
+            });
+        }
+    },
+
+    _bluePrintForObject: {
+        value: function (object) {
+            var typeName = object.constructor.TYPE.typeName,
+                isBinder = this._dataModel instanceof Binder,
+                isBlueprint = !isBinder && this._dataModel instanceof Blueprint,
+                isObjectsBlueprint = isBlueprint && this._dataModel.name === typeName;
+            return  isBinder ?              this._dataModel.blueprintForName(typeName) :
+                    isObjectsBlueprint ?    this._dataModel :
+                                            undefined;
+        }
+    },
+
+    _blueprintTypeForValueDescriptor: {
+        value: function (valueDescriptor) {
+            var destinationBlueprint;
+            return valueDescriptor.then(function (blueprint) {
+                destinationBlueprint = blueprint;
+                return require.async(blueprint.module.id);
+            }).then(function (exports) {
+                return exports[destinationBlueprint.exportName].TYPE;
+            });
         }
     },
 
@@ -221,14 +292,14 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *                                 reference to the selector defining what
      *                                 raw data to fetch.
      */
-    //TODO, swizzling the stream's user-land selector for the rawData equivallent is not really
-    //practical nor safe, we either need to keep it separately or store it on the stream under
-    //rawDataSelector
+    // TODO, swizzling the stream's user-land selector for the rawData equivalent is not really
+    // practical nor safe, we either need to keep it separately or store it on the stream under
+    // rawDataSelector
 
     _fetchRawData: {
         value: function (stream) {
             var self = this;
-            this.authorizationPromise.then(function(authorization) {
+            this.authorizationPromise.then(function (authorization) {
                 var streamSelector = stream.selector;
                 stream.selector = self.mapSelectorToRawDataSelector(streamSelector);
                 self.fetchRawData(stream);
@@ -236,6 +307,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             })
         }
     },
+
     fetchRawData: {
         value: function (stream) {
             this.rawDataDone(stream);
@@ -472,7 +544,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     //This should belong on the
     //Gives us an indirection layer to deal with backward compatibility.
     dataIdentifierForTypeRawData: {
-        value: function(type,rawData) {
+        value: function (type, rawData) {
         }
     },
 
@@ -484,30 +556,31 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @argument  {Object} rawData
      */
     recordSnapshot: {
-        value: function(dataIdentifier,rawData) {
+        value: function (dataIdentifier, rawData) {
 
         }
     },
-     /**
+
+    /**
      * Removes the snapshot of the values of record for the DataIdentifier argument
      *
      * @private
      * @argument {DataIdentifier} dataIdentifier
      */
    removeSnapshot: {
-        value: function(dataIdentifier) {
+        value: function (dataIdentifier) {
 
         }
     },
 
-     /**
+    /**
      * Returns the snapshot associated with the DataIdentifier argument if available
      *
      * @private
      * @argument {DataIdentifier} dataIdentifier
      */
    snapshotForDataIdentifier: {
-        value: function(dataIdentifier) {
+        value: function (dataIdentifier) {
         }
     },
 
@@ -573,7 +646,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
 
     /**
-     * Convert a selector for data ojects to a selector for raw data.
+     * Convert a selector for data objects to a selector for raw data.
      *
      * The selector returned by this method will be the selector used by methods
      * that deal with raw data, like
@@ -633,7 +706,11 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     mapRawDataToObject: {
         value: function (record, object, context) {
+            var blueprint = this._bluePrintForObject(object);
             if (this.mapping) {
+                this.mapping.mapRawDataToObject(record, object, context);
+            } else if (blueprint) {
+                this.mapping = BlueprintDataMapping.withBlueprint(blueprint);
                 this.mapping.mapRawDataToObject(record, object, context);
             } else if (record) {
                 this.mapFromRawData(object, record, context);
@@ -650,6 +727,16 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     mapObjectToRawData: {
         value: function (object, record) {
+            var blueprint = this._bluePrintForObject(object);
+            if (this.mapping) {
+                this.mapping.mapObjectToRawData(record, object);
+            } else if (blueprint) {
+                this.mapping = BlueprintDataMapping.withBlueprint(blueprint);
+                this.mapping.mapObjectToRawData(record, object);
+            } else if (record) {
+                this.mapToRawData(object, record);
+            }
+
             this.mapToRawData(object, record);
         }
     },

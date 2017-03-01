@@ -1,4 +1,6 @@
 var Montage = require("montage").Montage,
+    DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
+    ObjectDescriptor = require("logic/model/object-descriptor").ObjectDescriptor,
     WeakMap = require("collections/weak-map");
 
 /**
@@ -368,6 +370,18 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */ {
      */
     addTriggers: {
         value: function (service, type, prototype) {
+            // This function was split into two to provide backwards compatibility
+            // to existing Montage data projects.  Future montage data projects
+            // should base their object descriptors on Montage's version of object
+            // descriptor.
+            var isMontageDataType = type instanceof DataObjectDescriptor || type instanceof ObjectDescriptor;
+            return isMontageDataType ?  this._addTriggersForMontageDataType(service, type, prototype, name) :
+                                        this._addTriggers(service, type, prototype, name);
+        }
+     },
+
+    _addTriggersForMontageDataType: {
+        value: function (service, type, prototype) {
             var triggers = {},
                 trigger, name;
             for (name in type.propertyDescriptors) {
@@ -378,7 +392,24 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */ {
             }
             return triggers;
         }
-     },
+    },
+
+    _addTriggers: {
+        value: function (service, objectDescriptor, prototype) {
+            var triggers = {}, propertyDescriptor, trigger, name, i, length;
+            for (i = 0, length = objectDescriptor.propertyDescriptors.length; i < n; i += 1) {
+                propertyDescriptor = objectDescriptor.propertyDescriptors[i];
+                if (propertyDescriptor.valueDescriptor) {
+                    name = propertyDescriptor.name;
+                    trigger = this.addTrigger(service, objectDescriptor, prototype, name);
+                    if (trigger) {
+                        triggers[name] = trigger;
+                    }
+                }
+            }
+            return triggers;
+        }
+    },
 
     /**
      * @method
@@ -389,6 +420,18 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */ {
      */
     addTrigger: {
         value: function (service, type, prototype, name) {
+            // This function was split into two to provide backwards compatibility
+            // to existing Montage data projects.  Future montage data projects
+            // should base their object descriptors on Montage's version of object
+            // descriptor.
+            var isMontageDataType = type instanceof DataObjectDescriptor || type instanceof ObjectDescriptor;
+            return isMontageDataType ?  this._addTriggerForMontageDataType(service, type, prototype, name) :
+                                        this._addTrigger(service, type, prototype, name);
+        }
+    },
+
+    _addTriggerForMontageDataType: {
+        value: function (service, type, prototype, name) {
             var descriptor = type.propertyDescriptors[name],
                 trigger;
             if (descriptor && descriptor.isRelationship) {
@@ -396,6 +439,28 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */ {
                 trigger._objectPrototype = prototype;
                 trigger._propertyName = name;
                 trigger._isGlobal = descriptor.isGlobal;
+                Montage.defineProperty(prototype, name, {
+                    get: function () {
+                        return trigger._getValue(this);
+                    },
+                    set: function (value) {
+                        trigger._setValue(this, value);
+                    }
+                });
+            }
+            return trigger;
+        }
+    },
+
+    _addTrigger: {
+        value: function (service, objectDescriptor, prototype, name) {
+            var descriptor = objectDescriptor.propertyDescriptorForName(name),
+                trigger;
+            if (descriptor && descriptor.valueDescriptor) {
+                trigger = Object.create(this._getTriggerPrototype(service));
+                trigger._objectPrototype = prototype;
+                trigger._propertyName = name;
+                // trigger._isGlobal = descriptor.isGlobal;
                 Montage.defineProperty(prototype, name, {
                     get: function () {
                         return trigger._getValue(this);
