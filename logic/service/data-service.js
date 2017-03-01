@@ -181,8 +181,10 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * property.
      *
      * Child services must have their [types]{@link DataService#types} property
-     * value set before they are passing in to this method, and that value
-     * cannot change after that.
+     * value or their [model]{@link DataService#model} set before they are passed in to
+     * this method, and that value cannot change after that.  The model property takes
+     * priority of the types property.  If the model is defined the service will handle
+     * all the object descriptors associated to the model.
      *
      * @method
      * @argument {RawDataService} service
@@ -203,7 +205,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     _addChildService: {
         value: function (child, types) {
             var children, type, i, n;
-            types = types || child.types;
+            types = types || child.model && child.model.objectDescriptors || child.types;
             // If the new child service already has a parent, remove it from
             // that parent.
             if (child._parentService) {
@@ -249,6 +251,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     __childServiceRegistrationPromise: {
         value: null
     },
+
     _childServiceRegistrationPromise: {
         get: function() {
             return this.__childServiceRegistrationPromise || (this.__childServiceRegistrationPromise = Promise.resolve());
@@ -257,6 +260,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             this.__childServiceRegistrationPromise = value;
         }
     },
+
     registerChildService: {
         value: function (child) {
             var self = this;
@@ -440,34 +444,11 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
 
     /**
-     * Adds a model to this data service.  The model is used by the service to
-     * create the prototype for newly created objects.  A data trigger is added
-     * to the prototype for each property of the object descriptor who has a
-     * value descriptor defined.
-     *
-     * @method
-     * @argument {ObjectModel} model
+     * The [model]{@link ObjectModel} that this service supports.  If the model is
+     * defined the service supports all the object descriptors contained within the model.
      */
-    addModel: {
-        value: function (model) {
-            if (!this._models) {
-                this._models = [];
-            }
-            if (this.models.indexOf(model) < 0) {
-                this.models.push(model);
-            }
-        }
-    },
-
-    models: {
-        get: function () {
-            if (!this._models && this.parentService) {
-                this._models = this.parentService.models;
-            } else if (!this._models) {
-                this._models = [];
-            }
-            return this._models;
-        }
+    model: {
+        value: undefined
     },
 
     /***************************************************************************
@@ -618,45 +599,10 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     _getPrototypeForType: {
         value: function (type) {
-            var prototype = this._dataObjectPrototypes.get(type),
-                isMontageDataType;
-            if (type && !prototype) {
-                isMontageDataType = type instanceof DataObjectDescriptor || type instanceof ObjectDescriptor;
-                prototype = isMontageDataType ?     this._getPrototypeForDataObjectDescriptor(type) :
-                                                    this._getPrototypeForObjectDescriptor(type);
-            }
-            return prototype;
-        }
-    },
-    /**
-     * Returns a prototype for objects of the specified data object descriptor.
-     * The data object descriptor is deprecated.  Future development should
-     * instead use the object descriptor class from the Montage framework.
-     * @deprecated
-     * @private
-     * @method
-     * @argument {DataObjectDescriptor} type
-     * @returns {Object}
-     */
-    _getPrototypeForDataObjectDescriptor: {
-        value: function (type) {
             var prototype = Object.create(type.objectPrototype);
             this._dataObjectPrototypes.set(type, prototype);
             this._dataObjectTriggers.set(type, DataTrigger.addTriggers(this, type, prototype));
-            return type;
-        }
-    },
-
-    /**
-     * Returns a prototype for objects of the specified object descriptor.
-     * @private
-     * @method
-     * @argument {ObjectDescriptor} type
-     * @returns {Object}
-     */
-    _getPrototypeForObjectDescriptor: {
-        value: function (type) {
-
+            return prototype;
         }
     },
 
@@ -675,7 +621,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             return type && this._dataObjectTriggers.get(type);
         }
     },
-
 
     _dataObjectPrototypes: {
         get: function () {
