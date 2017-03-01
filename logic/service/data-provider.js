@@ -1,4 +1,5 @@
-var Montage = require("montage/core/core").Montage;
+var Montage = require("montage/core/core").Montage,
+    Promise = require("montage/core/promise").Promise;
 
 /**
  * This class documents the properties and methods of objects that support the
@@ -89,6 +90,7 @@ exports.DataProvider = Montage.specialize(/** @lends DataProvider.prototype */ {
      */
     requestData: {
         value: function (start, length) {
+            return Promise.resolve(this.data);
         }
     }
 
