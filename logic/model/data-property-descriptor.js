@@ -4,6 +4,7 @@ var PropertyDescriptor = require("logic/model/property-descriptor").PropertyDesc
  * Extend {@link PropertyDescriptor} to describes a property of
  * [data objects]{@link DataObjectDescriptor} of a certain type.
  *
+ * @deprecated
  * @class
  * @extends PropertyDescriptor
  */

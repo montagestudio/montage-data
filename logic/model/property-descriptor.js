@@ -2,7 +2,7 @@ var Montage = require("montage/core/core").Montage;
 
 /**
  * Describes a property of objects of a certain type.
- *
+ * @deprecated
  * @class
  * @extends external:Montage
  */

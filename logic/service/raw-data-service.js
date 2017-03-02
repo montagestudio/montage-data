@@ -1,12 +1,12 @@
 var DataService = require("logic/service/data-service").DataService,
-    Binder = require("montage/core/meta/binder").Binder,
-    Blueprint = require("montage/core/meta/blueprint").Blueprint,
     BlueprintDataMapping = require("logic/service/blueprint-data-mapping").BlueprintDataMapping,
     DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
     DataSelector = require("logic/service/data-selector").DataSelector,
     DataStream = require("logic/service/data-stream").DataStream,
     Deserializer = require("montage/core/serialization/deserializer/montage-deserializer").MontageDeserializer,
     Map = require("collections/map"),
+    Model = require("montage/core/meta/model").Model,
+    ObjectDescriptor = require("montage/core/meta/object-descriptor").ObjectDescriptor,
     WeakMap = require("collections/weak-map");
 
 /**
@@ -108,52 +108,82 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     fetchObjectProperty: {
         value: function (object, propertyName) {
-            var propertyBlueprint = this._propertyBlueprintForObjectAndName(object, propertyName),
-                propertyDescriptor = propertyBlueprint && propertyBlueprint.valueDescriptor;
-            return propertyDescriptor ? this._fetchObjectPropertyWithDescriptor(object, propertyBlueprint) :
-                                        this.nullPromise;
+            var propertyDescriptor = this._propertyDescriptorForObjectAndName(object, propertyName),
+                destinationReference = propertyDescriptor && propertyDescriptor.valueDescriptor;
+            return destinationReference ?   this._fetchObjectPropertyWithPropertyDescriptor(object, destinationReference) :
+                                            this.nullPromise;
         }
     },
 
-    _propertyBlueprintForObjectAndName: {
+    _propertyDescriptorForObjectAndName: {
         value: function (object, propertyName) {
-            var blueprint = this._blueprintForObject(object);
-            return blueprint && blueprint.propertyBlueprintForName(propertyName);
+            var objectDescriptor = this._objectDescriptorForObject(object);
+            return objectDescriptor && objectDescriptor.propertyDescriptorForName(propertyName);
         }
     },
 
-    _fetchObjectPropertyWithDescriptor: {
-        value: function (object, propertyBlueprint) {
+    _objectDescriptorForObject: {
+        value: function (object) {
+            var types = this.types,
+                moduleId = Montage.getInfoForObject(object).moduleId,
+                objectDescriptor, i, n;
+            for (i = 0, n = types.length; i < n && !objectDescriptor; i += 1) {
+                if (moduleId === types[i].module) {
+                    objectDescriptor = types[i];
+                }
+            }
+            return objectDescriptor;
+            // var typeName = object.constructor.TYPE.typeName,
+            //     isModel = this.model instanceof Model,
+            //     isObjectDescriptor = !isModel && this.model instanceof ObjectDescriptor,
+            //     isObjectsObjectDescriptor = isObjectDescriptor && this.model.name === typeName;
+            // return  isModel ?                       this.model.objectDescriptorForName(typeName) :
+            //     isObjectsObjectDescriptor ?     this.model :
+            //         undefined;
+        }
+    },
+
+    _fetchObjectPropertyWithPropertyDescriptor: {
+        value: function (object, propertyDescriptor) {
             var self = this,
-                propertyName = propertyBlueprint.name,
                 service = this.rootService;
-            return this._blueprintTypeForValueDescriptor(propertyBlueprint.valueDescriptor).then(function (type) {
-                var selector = DataSelector.withTypeAndCriteria(type, {
+            return propertyDescriptor.valueDescriptor.then(function (objectDescriptor) {
+                var selector = DataSelector.withTypeAndCriteria(objectDescriptor, {
                     snapshot: self._snapshots.get(object),
                     source: object,
                     relationshipKey: propertyName
                 });
                 return service.fetchData(selector);
             }).then(function (data) {
-                return self._mapObjectPropertyValue(object, propertyBlueprint, data);
+                return self._mapObjectPropertyValue(object, propertyDescriptor, data);
             });
+            // return this._objectDescriptorTypeForValueDescriptor(propertyDescriptor.valueDescriptor).then(function (type) {
+            //     var selector = DataSelector.withTypeAndCriteria(type, {
+            //         snapshot: self._snapshots.get(object),
+            //         source: object,
+            //         relationshipKey: propertyName
+            //     });
+            //     return service.fetchData(selector);
+            // }).then(function (data) {
+            //     return self._mapObjectPropertyValue(object, propertyDescriptor, data);
+            // });
         }
     },
 
     _mapObjectPropertyValue: {
-        value: function (object, propertyBlueprint, value) {
-            var propertyName = propertyBlueprint.name;
-            if (propertyBlueprint.cardinality === Infinity) {
+        value: function (object, propertyDescriptor, value) {
+            var propertyName = propertyDescriptor.name;
+            if (propertyDescriptor.cardinality === Infinity) {
                 this.spliceWithArray(object[propertyName], value);
             } else {
                 object[propertyName] = value[0];
             }
 
-            if (propertyBlueprint.inversePropertyName && value && value[0]) {
-                var inverseBlueprint = this._propertyBlueprintForObjectAndName(value[0], propertyBlueprint.inversePropertyName);
+            if (propertyDescriptor.inversePropertyName && value && value[0]) {
+                var inverseBlueprint = this._propertyDescriptorForObjectAndName(value[0], propertyDescriptor.inversePropertyName);
                 if (inverseBlueprint && inverseBlueprint.cardinality === 1) {
                     value.forEach(function (inverseObject) {
-                        inverseObject[propertyBlueprint.inversePropertyName] = object;
+                        inverseObject[propertyDescriptor.inversePropertyName] = object;
                     });
                 }
             }
@@ -161,26 +191,14 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         }
     },
 
-    _blueprintForObject: {
-        value: function (object) {
-            var typeName = object.constructor.TYPE.typeName,
-                isBinder = this.model instanceof Binder,
-                isBlueprint = !isBinder && this.model instanceof Blueprint,
-                isObjectsBlueprint = isBlueprint && this.model.name === typeName;
-            return  isBinder ?              this.model.blueprintForName(typeName) :
-                    isObjectsBlueprint ?    this.model :
-                                            undefined;
-        }
-    },
-
-    _blueprintTypeForValueDescriptor: {
+    _objectDescriptorTypeForValueDescriptor: {
         value: function (valueDescriptor) {
-            var destinationBlueprint;
-            return valueDescriptor.then(function (blueprint) {
-                destinationBlueprint = blueprint;
-                return blueprint.module.require.async(blueprint.module.id);
-            }).then(function (exports) {
-                return exports[destinationBlueprint.exportName].TYPE;
+            // var destinationObjectDescriptor;
+            return valueDescriptor.then(function (objectDescriptor) {
+                // destinationObjectDescriptor = objectDescriptor;
+                return objectDescriptor.module.require.async(objectDescriptor.module.id);
+            // }).then(function (exports) {
+            //     return exports[destinationObjectDescriptor.exportName].TYPE;
             });
         }
     },
@@ -269,7 +287,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     fetchData: {
         value: function (typeOrSelector, stream) {
-            var type = typeOrSelector instanceof DataObjectDescriptor && typeOrSelector,
+            var type = typeOrSelector instanceof DataObjectDescriptor || typeOrSelector instanceof ObjectDescriptor && typeOrSelector,
                 selector = type && DataSelector.withTypeAndCriteria(type) || typeOrSelector;
             stream = stream || new DataStream();
             stream.selector = selector;
@@ -726,7 +744,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     mapRawDataToObject: {
         value: function (record, object, context) {
-            var blueprint = this._blueprintForObject(object),
+            var blueprint = this._objectDescriptorForObject(object),
                 mapping;
 
             if (blueprint) {
@@ -766,7 +784,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     mapObjectToRawData: {
         value: function (object, record, context) {
-            var blueprint = this._blueprintForObject(object);
+            var blueprint = this._objectDescriptorForObject(object);
             if (this.mapping) {
                 this.mapping.mapObjectToRawData(record, object, context);
             } else if (blueprint) {
