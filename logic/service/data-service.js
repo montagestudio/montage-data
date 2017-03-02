@@ -7,6 +7,7 @@ var Montage = require("montage").Montage,
     DataStream = require("logic/service/data-stream").DataStream,
     DataTrigger = require("logic/service/data-trigger").DataTrigger,
     Map = require("collections/map"),
+    ObjectDescriptor = require("montage/core/meta/ObjectDescriptor").ObjectDescriptor,
     Promise = require("bluebird"),
     Set = require("collections/set"),
     WeakMap = require("collections/weak-map");
@@ -1173,21 +1174,21 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     fetchData: {
         value: function (selectorOrType, optionalCriteria, optionalStream) {
             var self = this,
-                type = selectorOrType instanceof DataObjectDescriptor && selectorOrType,
+                type = selectorOrType instanceof DataObjectDescriptor || selectorOrType instanceof ObjectDescriptor && selectorOrType,
                 criteria = optionalCriteria instanceof DataStream ? undefined : optionalCriteria,
                 selector = type ? DataSelector.withTypeAndCriteria(type, criteria) : selectorOrType,
                 stream = optionalCriteria instanceof DataStream ? optionalCriteria : optionalStream;
             // Set up the stream.
             stream = stream || new DataStream();
             stream.selector = selector;
-            this._dataServiceForDataStream.set(stream,this._childServiceRegistrationPromise.then(function() {
+            this._dataServiceForDataStream.set(stream, this._childServiceRegistrationPromise.then(function() {
                 // Use a child service to fetch the data.
                 var service;
                 try {
                     service = self._getChildServiceForType(selector.type);
                     if (service) {
                         stream = service.fetchData(selector, stream) || stream;
-                        self._dataServiceForDataStream.set(stream,service);
+                        self._dataServiceForDataStream.set(stream, service);
                     } else {
                         throw new Error("Can't fetch data of unknown type - " + selector.type.typeName + "/" + selector.type.uuid);
                     }
@@ -1204,11 +1205,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     __dataServiceForDataStream: {
         value: null
     },
+
     _dataServiceForDataStream: {
         get: function() {
             return this.__dataServiceForDataStream || (this.__dataServiceForDataStream = new WeakMap());
         }
     },
+
     /**
      * To be called to indicates that the consumer has lost interest in the passed DataStream.
      * This will allow the RawDataService feeding the stream to take appropriate measures.

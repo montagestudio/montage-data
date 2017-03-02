@@ -5,6 +5,7 @@ var ObjectDescriptor = require("logic/model/object-descriptor").ObjectDescriptor
  * Extends an object descriptor with the additional object information needed by
  * Montage Data.
  *
+ * @deprecated
  * @class
  * @extends ObjectDescriptor
  */

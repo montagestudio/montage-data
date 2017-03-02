@@ -3,7 +3,7 @@ var Montage = require("montage").Montage,
 
 /**
  * Describes a type of object.
- *
+ * @deprecated
  * @class
  * @extends external:Montage
  */
