@@ -7,7 +7,7 @@ var Montage = require("montage").Montage,
     DataStream = require("logic/service/data-stream").DataStream,
     DataTrigger = require("logic/service/data-trigger").DataTrigger,
     Map = require("collections/map"),
-    ObjectDescriptor = require("montage/core/meta/ObjectDescriptor").ObjectDescriptor,
+    ObjectDescriptor = require("montage/core/meta/object-descriptor").ObjectDescriptor,
     Promise = require("bluebird"),
     Set = require("collections/set"),
     WeakMap = require("collections/weak-map");
@@ -1174,7 +1174,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     fetchData: {
         value: function (selectorOrType, optionalCriteria, optionalStream) {
             var self = this,
-                type = selectorOrType instanceof DataObjectDescriptor || selectorOrType instanceof ObjectDescriptor && selectorOrType,
+                isSupportedType = selectorOrType instanceof DataObjectDescriptor || selectorOrType instanceof ObjectDescriptor,
+                type = isSupportedType && selectorOrType,
                 criteria = optionalCriteria instanceof DataStream ? undefined : optionalCriteria,
                 selector = type ? DataSelector.withTypeAndCriteria(type, criteria) : selectorOrType,
                 stream = optionalCriteria instanceof DataStream ? optionalCriteria : optionalStream;

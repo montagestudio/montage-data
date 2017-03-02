@@ -6,6 +6,7 @@ var DataService = require("logic/service/data-service").DataService,
     Deserializer = require("montage/core/serialization/deserializer/montage-deserializer").MontageDeserializer,
     Map = require("collections/map"),
     Model = require("montage/core/meta/model").Model,
+    Montage = require("montage").Montage,
     ObjectDescriptor = require("montage/core/meta/object-descriptor").ObjectDescriptor,
     WeakMap = require("collections/weak-map");
 
@@ -287,7 +288,8 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     fetchData: {
         value: function (typeOrSelector, stream) {
-            var type = typeOrSelector instanceof DataObjectDescriptor || typeOrSelector instanceof ObjectDescriptor && typeOrSelector,
+            var isSupportedType = typeOrSelector instanceof DataObjectDescriptor || typeOrSelector instanceof ObjectDescriptor,
+                type = isSupportedType && typeOrSelector,
                 selector = type && DataSelector.withTypeAndCriteria(type) || typeOrSelector;
             stream = stream || new DataStream();
             stream.selector = selector;
