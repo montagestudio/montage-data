@@ -1175,7 +1175,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     fetchData: {
         value: function (selectorOrType, optionalCriteria, optionalStream) {
             var self = this,
-                type = selectorOrType instanceof DataObjectDescriptor || selectorOrType instanceof ObjectDescriptor && selectorOrType,
+                isSupportedType = selectorOrType instanceof DataObjectDescriptor || selectorOrType instanceof ObjectDescriptor,
+                type = isSupportedType && selectorOrType,
                 criteria = optionalCriteria instanceof DataStream ? undefined : optionalCriteria,
                 selector = type ? DataSelector.withTypeAndCriteria(type, criteria) : selectorOrType,
                 stream = optionalCriteria instanceof DataStream ? optionalCriteria : optionalStream;
