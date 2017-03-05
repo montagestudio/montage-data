@@ -164,12 +164,10 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
 
     _fetchObjectPropertyWithPropertyDescriptor: {
         value: function (object, propertyName, propertyDescriptor) {
-            var self = this,
-                cachedDescriptor,
-                service = this.rootService;
+            var self = this, moduleId, cachedDescriptor, service = this.rootService;
             return propertyDescriptor.valueDescriptor.then(function (objectDescriptor) {
-                cachedDescriptor = service._moduleIdAndExportNameToObjectDescriptorMap[objectDescriptor.module.id];
-                cachedDescriptor = cachedDescriptor && cachedDescriptor[objectDescriptor.exportName];
+                moduleId = [objectDescriptor.module.id, objectDescriptor.exportName].join("/");
+                cachedDescriptor = self.rootService._moduleIdToObjectDescriptorMap[moduleId];
                 var selector = DataSelector.withTypeAndCriteria(cachedDescriptor, {
                     // snapshot: self._snapshots.get(object),
                     source: object,
