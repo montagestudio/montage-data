@@ -288,17 +288,16 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
 
     _mapModuleToType: {
         value: function (module, type) {
-            var self = this,
-                mapping,
-                prototype;
+            var self = this, constructor, moduleId, prototype;
             return module.require.async(module.id).then(function (exports) {
-                prototype = Object.create(exports[type.exportName].prototype);
-                mapping = self._moduleIdAndExportNameToObjectDescriptorMap[module.id] || {};
-                mapping[type.exportName] = type;
-                self._moduleIdAndExportNameToObjectDescriptorMap[module.id] = mapping;
-                self._moduleToObjectDescriptorMap.set(exports[type.exportName], type);
-                self._dataObjectPrototypes.set(exports[type.exportName], prototype);
-                self._dataObjectTriggers.set(exports[type.exportName], DataTrigger.addTriggers(self, type, prototype));
+                moduleId = [module.id, type.exportName].join("/");
+                self._moduleIdToObjectDescriptorMap[moduleId] = type;
+
+                constructor = exports[type.exportName];
+                prototype = Object.create(constructor.prototype);
+                self._constructorToObjectDescriptorMap.set(constructor, type);
+                self._dataObjectPrototypes.set(constructor, prototype);
+                // self._dataObjectTriggers.set(constructor, DataTrigger.addTriggers(self, type, prototype));
                 self._dataObjectPrototypes.set(type, prototype);
                 self._dataObjectTriggers.set(type, DataTrigger.addTriggers(self, type, prototype));
                 return null;
@@ -306,27 +305,27 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
-    _moduleIdAndExportNameToObjectDescriptorMap: {
+    _moduleIdToObjectDescriptorMap: {
         get: function () {
-            if (!this.__moduleIdAndExportNameToObjectDescriptorMap) {
-                this.__moduleIdAndExportNameToObjectDescriptorMap = {};
+            if (!this.__moduleIdToObjectDescriptorMap) {
+                this.__moduleIdToObjectDescriptorMap = {};
             }
-            return this.__moduleIdAndExportNameToObjectDescriptorMap;
+            return this.__moduleIdToObjectDescriptorMap;
         }
     },
 
-    _moduleToObjectDescriptorMap: {
+    _constructorToObjectDescriptorMap: {
         get: function () {
-            if (!this.__moduleObjectDescriptorMap) {
-                this.__moduleObjectDescriptorMap = new Map();
+            if (!this.__constructorToObjectDescriptorMap) {
+                this.__constructorToObjectDescriptorMap = new Map();
             }
-            return this.__moduleObjectDescriptorMap;
+            return this.__constructorToObjectDescriptorMap;
         }
     },
 
-    _objectDescriptorForModule: {
+    _objectDescriptorForConstructor: {
         value: function (module) {
-            return this._moduleToObjectDescriptorMap.get(module);
+            return this._constructorToObjectDescriptorMap.get(module);
         }
     },
 
@@ -507,7 +506,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     _getChildServiceForType: {
         value: function (type) {
             var services;
-            type = this._objectDescriptorForModule(type) || type;
+            type = this._objectDescriptorForConstructor(type) || type;
             services = this._childServicesByType.get(type) || this._childServicesByType.get(null);
             return services && services[0] || null;
         }
@@ -619,13 +618,14 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     _getObjectType: {
         value: function (object) {
-            var type = this._typeRegistry.get(object)
-                ;
+            var type = this._typeRegistry.get(object),
+                info = Montage.getInfoForObject(object),
+                moduleId = [info.moduleId, info.objectName].join("/");
             while (!type && object) {
                 if (object.constructor.TYPE instanceof DataObjectDescriptor) {
                     type = object.constructor.TYPE;
-                } else if (this._moduleToObjectDescriptorMap.has(object.constructor)) {
-                    type = this._moduleToObjectDescriptorMap.get(object.constructor);
+                } else if (this._moduleIdToObjectDescriptorMap[moduleId]) {
+                    type = this._moduleIdToObjectDescriptorMap[moduleId];
                 } else {
                     object = Object.getPrototypeOf(object);
                 }
@@ -677,7 +677,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     _getPrototypeForType: {
         value: function (type) {
             var prototype;
-            type = this._objectDescriptorForModule(type) || type;
+            type = this._objectDescriptorForConstructor(type) || type;
             prototype = this._dataObjectPrototypes.get(type);
             if (type && !prototype) {
                 prototype = Object.create(type.objectPrototype || Montage.prototype);
@@ -1230,7 +1230,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: function (selectorOrType, optionalCriteria, optionalStream) {
             var self = this,
                 isSupportedType = selectorOrType instanceof DataObjectDescriptor || selectorOrType instanceof ObjectDescriptor,
-                type = isSupportedType && selectorOrType || this._objectDescriptorForModule(selectorOrType),
+                type = isSupportedType && selectorOrType || this._objectDescriptorForConstructor(selectorOrType),
                 criteria = optionalCriteria instanceof DataStream ? undefined : optionalCriteria,
                 selector = type ? DataSelector.withTypeAndCriteria(type, criteria) : selectorOrType,
                 stream = optionalCriteria instanceof DataStream ? optionalCriteria : optionalStream;
