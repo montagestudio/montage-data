@@ -396,8 +396,8 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */ {
 
     _addTriggers: {
         value: function (service, objectDescriptor, prototype) {
-            var triggers = {}, propertyDescriptor, trigger, name, i, length;
-            for (i = 0, length = objectDescriptor.propertyDescriptors.length; i < n; i += 1) {
+            var triggers = {}, propertyDescriptor, trigger, name, i, n;
+            for (i = 0, n = objectDescriptor.propertyDescriptors.length; i < n; i += 1) {
                 propertyDescriptor = objectDescriptor.propertyDescriptors[i];
                 if (propertyDescriptor.valueDescriptor) {
                     name = propertyDescriptor.name;

@@ -262,24 +262,72 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
+    registerChildServices: {
+        value: function (childServices) {
+            var self;
+            if (!this.__childServiceRegistrationPromise) {
+                self = this;
+                this.__childServiceRegistrationPromise = Promise.all(childServices.map(function (child) {
+                    return self.registerChildService(child);
+                }));
+            }
+        }
+    },
+
     registerChildService: {
         value: function (child) {
-            var self = this;
-
-            if(!this._childServiceRegistrationPromise) {
-                this._childServiceRegistrationPromise = child.types;
-            }
-            //If a service loads it's types lazily, .types returns a promise,
-            //(TODO) which should become the norm
-            this._childServiceRegistrationPromise = this._childServiceRegistrationPromise
-            .then(function() {
-                return self._createObjectDescriptorsForTypes(child.types);
-            })
-            .then(function (types) {
-                return self.addChildService(child, types);
+            var self = this,
+                types = child.model && child.model.objectDescriptors || child.types;
+            return Promise.all(types.map(function (type) {
+                return self._mapModuleToType(type.module, type);
+            })).then(function () {
+                self.addChildService(child, types);
+                return null;
             });
+        }
+    },
 
-            return this._childServiceRegistrationPromise;
+    _mapModuleToType: {
+        value: function (module, type) {
+            var self = this,
+                mapping,
+                prototype;
+            return module.require.async(module.id).then(function (exports) {
+                prototype = Object.create(exports[type.exportName].prototype);
+                mapping = self._moduleIdAndExportNameToObjectDescriptorMap[module.id] || {};
+                mapping[type.exportName] = type;
+                self._moduleIdAndExportNameToObjectDescriptorMap[module.id] = mapping;
+                self._moduleToObjectDescriptorMap.set(exports[type.exportName], type);
+                self._dataObjectPrototypes.set(exports[type.exportName], prototype);
+                self._dataObjectTriggers.set(exports[type.exportName], DataTrigger.addTriggers(self, type, prototype));
+                self._dataObjectPrototypes.set(type, prototype);
+                self._dataObjectTriggers.set(type, DataTrigger.addTriggers(self, type, prototype));
+                return null;
+            });
+        }
+    },
+
+    _moduleIdAndExportNameToObjectDescriptorMap: {
+        get: function () {
+            if (!this.__moduleIdAndExportNameToObjectDescriptorMap) {
+                this.__moduleIdAndExportNameToObjectDescriptorMap = {};
+            }
+            return this.__moduleIdAndExportNameToObjectDescriptorMap;
+        }
+    },
+
+    _moduleToObjectDescriptorMap: {
+        get: function () {
+            if (!this.__moduleObjectDescriptorMap) {
+                this.__moduleObjectDescriptorMap = new Map();
+            }
+            return this.__moduleObjectDescriptorMap;
+        }
+    },
+
+    _objectDescriptorForModule: {
+        value: function (module) {
+            return this._moduleToObjectDescriptorMap.get(module);
         }
     },
 
@@ -459,7 +507,9 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     _getChildServiceForType: {
         value: function (type) {
-            var services = this._childServicesByType.get(type) || this._childServicesByType.get(null);
+            var services;
+            type = this._objectDescriptorForModule(type) || type;
+            services = this._childServicesByType.get(type) || this._childServicesByType.get(null);
             return services && services[0] || null;
         }
     },
@@ -570,10 +620,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     _getObjectType: {
         value: function (object) {
-            var type = this._typeRegistry.get(object);
+            var type = this._typeRegistry.get(object)
+                ;
             while (!type && object) {
                 if (object.constructor.TYPE instanceof DataObjectDescriptor) {
                     type = object.constructor.TYPE;
+                } else if (this._moduleToObjectDescriptorMap.has(object.constructor)) {
+                    type = this._moduleToObjectDescriptorMap.get(object.constructor);
                 } else {
                     object = Object.getPrototypeOf(object);
                 }
@@ -624,7 +677,9 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     _getPrototypeForType: {
         value: function (type) {
-            var prototype = this._dataObjectPrototypes.get(type);
+            var prototype;
+            type = this._objectDescriptorForModule(type) || type;
+            prototype = this._dataObjectPrototypes.get(type);
             if (type && !prototype) {
                 prototype = Object.create(type.objectPrototype || Montage.prototype);
                 this._dataObjectPrototypes.set(type, prototype);
@@ -1176,7 +1231,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: function (selectorOrType, optionalCriteria, optionalStream) {
             var self = this,
                 isSupportedType = selectorOrType instanceof DataObjectDescriptor || selectorOrType instanceof ObjectDescriptor,
-                type = isSupportedType && selectorOrType,
+                type = isSupportedType && selectorOrType || this._objectDescriptorForModule(selectorOrType),
                 criteria = optionalCriteria instanceof DataStream ? undefined : optionalCriteria,
                 selector = type ? DataSelector.withTypeAndCriteria(type, criteria) : selectorOrType,
                 stream = optionalCriteria instanceof DataStream ? optionalCriteria : optionalStream;
