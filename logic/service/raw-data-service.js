@@ -55,6 +55,20 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         }
     },
 
+    deserializeSelf: {
+        value:function (deserializer) {
+            var value, model;
+            value = deserializer.getProperty("model") || deserializer.getProperty("binder");
+            if (value) {
+                this.model = value;
+            }
+            value = !this.model && deserializer.getProperty("types");
+            if (value) {
+                Array.prototype.push.apply(this._childServiceTypes, value);
+            }
+        }
+    },
+
     /*
      * The ConnectionDescriptor object where possible connections will be found
      *
@@ -111,7 +125,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         value: function (object, propertyName) {
             var propertyDescriptor = this._propertyDescriptorForObjectAndName(object, propertyName),
                 destinationReference = propertyDescriptor && propertyDescriptor.valueDescriptor;
-            return destinationReference ?   this._fetchObjectPropertyWithPropertyDescriptor(object, destinationReference) :
+            return destinationReference ?   this._fetchObjectPropertyWithPropertyDescriptor(object, propertyName, propertyDescriptor) :
                                             this.nullPromise;
         }
     },
@@ -126,10 +140,14 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     _objectDescriptorForObject: {
         value: function (object) {
             var types = this.types,
-                moduleId = Montage.getInfoForObject(object).moduleId,
-                objectDescriptor, i, n;
+                objectInfo = Montage.getInfoForObject(object),
+                moduleId = objectInfo.moduleId,
+                objectName = objectInfo.objectName,
+                module, exportName, objectDescriptor, i, n;
             for (i = 0, n = types.length; i < n && !objectDescriptor; i += 1) {
-                if (moduleId === types[i].module) {
+                module = types[i].module;
+                exportName = module && types[i].exportName;
+                if (module && moduleId === module.id && objectName === exportName) {
                     objectDescriptor = types[i];
                 }
             }
@@ -145,12 +163,15 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     },
 
     _fetchObjectPropertyWithPropertyDescriptor: {
-        value: function (object, propertyDescriptor) {
+        value: function (object, propertyName, propertyDescriptor) {
             var self = this,
+                cachedDescriptor,
                 service = this.rootService;
             return propertyDescriptor.valueDescriptor.then(function (objectDescriptor) {
-                var selector = DataSelector.withTypeAndCriteria(objectDescriptor, {
-                    snapshot: self._snapshots.get(object),
+                cachedDescriptor = service._moduleIdAndExportNameToObjectDescriptorMap[objectDescriptor.module.id];
+                cachedDescriptor = cachedDescriptor && cachedDescriptor[objectDescriptor.exportName];
+                var selector = DataSelector.withTypeAndCriteria(cachedDescriptor, {
+                    // snapshot: self._snapshots.get(object),
                     source: object,
                     relationshipKey: propertyName
                 });
