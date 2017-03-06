@@ -278,8 +278,11 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: function (child) {
             var self = this,
                 types = child.model && child.model.objectDescriptors || child.types;
-            return Promise.all(types.map(function (type) {
-                return self._mapModuleToType(type.module, type);
+            return Promise.all(types.map(function (objectDescriptor) {
+                var module = objectDescriptor.module,
+                    moduleId = [module.id, objectDescriptor.exportName].join("/");
+                self._moduleIdToObjectDescriptorMap[moduleId] = objectDescriptor;
+                return self._mapModuleToObjectDescriptor(module, objectDescriptor);
             })).then(function () {
                 self.addChildService(child, types);
                 return null;
@@ -287,20 +290,16 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
-    _mapModuleToType: {
-        value: function (module, type) {
-            var self = this, constructor, moduleId, prototype;
+    _mapModuleToObjectDescriptor: {
+        value: function (module, objectDescriptor) {
+            var self = this;
             return module.require.async(module.id).then(function (exports) {
-                moduleId = [module.id, type.exportName].join("/");
-                self._moduleIdToObjectDescriptorMap[moduleId] = type;
-
-                constructor = exports[type.exportName];
-                prototype = Object.create(constructor.prototype);
-                self._constructorToObjectDescriptorMap.set(constructor, type);
+                var constructor = exports[objectDescriptor.exportName],
+                    prototype = Object.create(constructor.prototype);
+                self._constructorToObjectDescriptorMap.set(constructor, objectDescriptor);
                 self._dataObjectPrototypes.set(constructor, prototype);
-                // self._dataObjectTriggers.set(constructor, DataTrigger.addTriggers(self, type, prototype));
-                self._dataObjectPrototypes.set(type, prototype);
-                self._dataObjectTriggers.set(type, DataTrigger.addTriggers(self, type, prototype));
+                self._dataObjectPrototypes.set(objectDescriptor, prototype);
+                self._dataObjectTriggers.set(objectDescriptor, DataTrigger.addTriggers(self, objectDescriptor, prototype));
                 return null;
             });
         }
