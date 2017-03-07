@@ -322,9 +322,11 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
-    _objectDescriptorForConstructor: {
-        value: function (module) {
-            return this._constructorToObjectDescriptorMap.get(module);
+    _objectDescriptorForType: {
+        value: function (type) {
+            return  this._constructorToObjectDescriptorMap.get(type) ||
+                    typeof type === "string" && this.__moduleIdToObjectDescriptorMap[type] ||
+                    type;
         }
     },
 
@@ -505,7 +507,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     _getChildServiceForType: {
         value: function (type) {
             var services;
-            type = this._objectDescriptorForConstructor(type) || type;
+            type = this._objectDescriptorForType(type);
             services = this._childServicesByType.get(type) || this._childServicesByType.get(null);
             return services && services[0] || null;
         }
@@ -617,9 +619,11 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     _getObjectType: {
         value: function (object) {
+            // var type = this._typeRegistry.get(object),
+            //     info = Montage.getInfoForObject(object),
+            //     moduleId = [info.moduleId, info.objectName].join("/");
             var type = this._typeRegistry.get(object),
-                info = Montage.getInfoForObject(object),
-                moduleId = [info.moduleId, info.objectName].join("/");
+                moduleId = typeof object === "string" ? object : this._getModuleIdForObject(object);
             while (!type && object) {
                 if (object.constructor.TYPE instanceof DataObjectDescriptor) {
                     type = object.constructor.TYPE;
@@ -630,6 +634,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 }
             }
             return type;
+        }
+    },
+
+    _getModuleIdForObject: {
+        value: function (object) {
+            var info = Montage.getInfoForObject(object);
+            return [info.moduleId, info.objectName].join("/");
         }
     },
 
@@ -676,7 +687,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     _getPrototypeForType: {
         value: function (type) {
             var prototype;
-            type = this._objectDescriptorForConstructor(type) || type;
+            type = this._objectDescriptorForType(type);
             prototype = this._dataObjectPrototypes.get(type);
             if (type && !prototype) {
                 prototype = Object.create(type.objectPrototype || Montage.prototype);
@@ -1116,8 +1127,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 //causing a trigger to fire, not knowing about the match between identifier
                 //and object... If that's feels like a real situation, it is.
                 if(dataIdentifier && this.isUniquing) {
-                    this.recordDataIdentifierForObject(dataIdentifier,object);
-                    this.recordObjectForDataIdentifier(object,dataIdentifier);
+                    this.recordDataIdentifierForObject(dataIdentifier, object);
+                    this.recordObjectForDataIdentifier(object, dataIdentifier);
                 }
 
                 object = object.constructor.call(object) || object;
@@ -1229,7 +1240,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: function (selectorOrType, optionalCriteria, optionalStream) {
             var self = this,
                 isSupportedType = selectorOrType instanceof DataObjectDescriptor || selectorOrType instanceof ObjectDescriptor,
-                type = isSupportedType && selectorOrType || this._objectDescriptorForConstructor(selectorOrType),
+                type = isSupportedType && selectorOrType || this._constructorToObjectDescriptorMap.get(selectorOrType),
                 criteria = optionalCriteria instanceof DataStream ? undefined : optionalCriteria,
                 selector = type ? DataSelector.withTypeAndCriteria(type, criteria) : selectorOrType,
                 stream = optionalCriteria instanceof DataStream ? optionalCriteria : optionalStream;
