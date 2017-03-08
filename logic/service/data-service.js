@@ -715,7 +715,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
-
     _dataObjectPrototypes: {
         get: function () {
             if (!this.__dataObjectPrototypes){
@@ -1240,11 +1239,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     fetchData: {
         value: function (selectorOrType, optionalCriteria, optionalStream) {
             var self = this,
-                isSupportedType = selectorOrType instanceof DataObjectDescriptor || selectorOrType instanceof ObjectDescriptor,
-                type = isSupportedType && selectorOrType || this._constructorToObjectDescriptorMap.get(selectorOrType),
+                isSupportedType = !(selectorOrType instanceof DataSelector),
+                type = isSupportedType && selectorOrType,
                 criteria = optionalCriteria instanceof DataStream ? undefined : optionalCriteria,
                 selector = type ? DataSelector.withTypeAndCriteria(type, criteria) : selectorOrType,
                 stream = optionalCriteria instanceof DataStream ? optionalCriteria : optionalStream;
+            // make sure type is an object descriptor or data object descriptor.
+            selector.type = this._objectDescriptorForType(selector.type);
             // Set up the stream.
             stream = stream || new DataStream();
             stream.selector = selector;
