@@ -564,7 +564,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         value: function (stream, records, context) {
             var offline, object, i, n,
                 streamSelectorType = stream.selector.type,
-                iRecord, iDataIdentifier;
+                iRecord, iDataIdentifier, result;
             // Record fetched raw data for offline use if appropriate.
             offline = records && !this.isOffline && this._streamRawData.get(stream);
             if (offline) {
@@ -582,11 +582,35 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             //     this.recordSnapshot(iDataIdentifier,iRecord);
             //    //iDataIdentifier argument should be all we need later on
             //     object = this.getDataObject(streamSelectorType, iRecord, context, iDataIdentifier);
-                this.mapRawDataToObject(iRecord, object, context);
+                result = this.mapRawDataToObject(iRecord, object, context);
+                if (result && result instanceof Promise) {
+                    this._addMapDataPromiseForStream(result, stream);
+                }
+
                 records[i] = object;
             }
+
             // Add the converted data to the stream.
             stream.addData(records);
+        }
+    },
+
+    _addMapDataPromiseForStream: {
+        value: function (promise, stream) {
+            if (!this._streamMapDataPromises.has(stream)) {
+                this._streamMapDataPromises.set(stream, [promise]);
+            } else {
+                this.__streamMapDataPromises.get(stream).push(promise);
+            }
+        }
+    },
+
+    _streamMapDataPromises: {
+        get: function () {
+            if (!this.__streamMapDataPromises) {
+                this.__streamMapDataPromises = new Map();
+            }
+            return this.__streamMapDataPromises;
         }
     },
 
@@ -660,22 +684,33 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *                                 [writeOfflineData()]{@link RawDataService#writeOfflineData}
      *                                 if it is provided.
      */
-    rawDataDone: {
-        value: function (stream, context) {
-            var offline = this._streamRawData.get(stream);
-            if (!offline) {
-                stream.dataDone();
-            } else {
-                this._streamRawData.delete(stream);
-                this.writeOfflineData(offline, stream.selector, context).then(function () {
-                    stream.dataDone();
-                    return null;
-                }).catch(function (e) {
-                    console.error(e);
-                });
-            }
+
+rawDataDone: {
+    value: function (stream, context) {
+        var self = this,
+            dataToPersist = this._streamRawData.get(stream),
+            mappingPromises = this._streamMapDataPromises.get(stream),
+            dataReadyPromise = mappingPromises ? Promise.all(mappingPromises) : this.nullPromise;
+
+        if (mappingPromises) {
+            this._streamMapDataPromises.delete(stream);
         }
-    },
+
+        if (dataToPersist) {
+            this._streamRawData.delete(stream);
+        }
+
+        dataReadyPromise.then(function (results) {
+            return dataToPersist ? self.writeOfflineData(dataToPersist, stream.selector, context) : null;
+        }).then(function () {
+            stream.dataDone();
+            return null;
+        }).catch(function (e) {
+            console.error(e);
+        });
+
+    }
+},
 
     /**
      * Records in the process of being written to streams (after
@@ -766,7 +801,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     mapRawDataToObject: {
         value: function (record, object, context) {
             var blueprint = this._objectDescriptorForObject(object),
-                mapping;
+                mapping, result;
 
             if (blueprint) {
                 mapping = this.mappings.get(blueprint);
@@ -778,8 +813,10 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             }
 
             if (record) {
-                this.mapFromRawData(object, record, context);
+                result = this.mapFromRawData(object, record, context);
             }
+
+            return result;
 
             // if (this.mapping) {
             //     this.mapping.mapRawDataToObject(record, object, context);

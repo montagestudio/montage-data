@@ -460,7 +460,7 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */ {
                 trigger = Object.create(this._getTriggerPrototype(service));
                 trigger._objectPrototype = prototype;
                 trigger._propertyName = name;
-                // trigger._isGlobal = descriptor.isGlobal;
+                trigger._isGlobal = descriptor.isGlobal;
                 Montage.defineProperty(prototype, name, {
                     get: function () {
                         return trigger._getValue(this);
