@@ -8,6 +8,7 @@
   ],
   "name": "montage-data",
   "version": "1.0.0-alpha1",
+  "private": true,
   "license": "BSD-3-Clause",
   "author": "Montage Studio, inc. (http://montagestudio.com/)",
   "repository": {
@@ -34,5 +35,7 @@
     "karma-phantomjs-launcher": "^1.0.4",
     "montage-testing": "montagejs/montage-testing"
   },
-  "private": true
+  "scripts": {
+    "test": "node test/run-node.js"
+  }
 }
