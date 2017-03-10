@@ -1266,12 +1266,15 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             // This needs to be fixed to allow DataService child services and
             // DataService subclass root services.
             var self = this;
-            if (!exports.DataService.prototype._isOfflineInitialized) {
+            if (
+                typeof global.addEventListener === 'function' &&
+                    !exports.DataService.prototype._isOfflineInitialized
+            ) {
                 exports.DataService.prototype._isOfflineInitialized = true;
-                window.addEventListener('online', function (event) {
+                global.addEventListener('online', function (event) {
                     self.rootService.isOffline = false;
                 });
-                window.addEventListener('offline', function (event) {
+                global.addEventListener('offline', function (event) {
                     self.rootService.isOffline = true;
                 });
             }
@@ -1698,7 +1701,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             var self = this;
             if (!this._eventLoopPromise) {
                 this._eventLoopPromise = new Promise(function (resolve, reject) {
-                    window.setTimeout(function () {
+                    setTimeout(function () {
                         self._eventLoopPromise = undefined;
                         resolve();
                     }, 0);
