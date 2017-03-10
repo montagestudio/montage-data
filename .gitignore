@@ -18,6 +18,7 @@ atlassian-ide-plugin.xml
 /builds
 /out
 TEST-*.xml
+/report
 
 # Run-time generated files that shouldn't be committed.
 node_modules

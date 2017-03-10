@@ -22,5 +22,17 @@
     "montage": "~16.0.x",
     "weak-map": "^1.0.5"
   },
+  "devDependencies": {
+    "jasmine-console-reporter": "^1.2.7",
+    "jasmine-core": "^2.5.2",
+    "jshint": "~2.4.4",
+    "karma": "^1.5.0",
+    "karma-chrome-launcher": "^2.0.0",
+    "karma-coverage": "^1.1.1",
+    "karma-firefox-launcher": "^1.0.1",
+    "karma-jasmine": "^1.1.0",
+    "karma-phantomjs-launcher": "^1.0.4",
+    "montage-testing": "montagejs/montage-testing"
+  },
   "private": true
 }
