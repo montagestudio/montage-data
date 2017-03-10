@@ -1,25 +1,26 @@
 {
-    "_comment": [
-        "# If you use npm to generate or modify this file, make sure",
-        "# to restore the file's 4 space indents after the generation",
-        "# or modification so it matches other source files in the",
-        "# project. npm only generates files with 2 space indents",
-        "# (see https://github.com/npm/npm/pull/3180#issuecomment-16336516)."
-    ],
-    "name": "montage-data",
-    "version": "1.0.0-alpha1",
-    "license": "BSD-3-Clause",
-    "author": "Montage Studio, inc. (http://montagestudio.com/)",
-    "repository": {
-        "type": "git",
-        "url": "montagestudio/montage-data"
-    },
-    "dependencies": {
-        "bluebird": "~3.4.x",
-        "collections": "~5.0.x",
-        "dexie": "~1.4.1",
-        "frb":"~3.0.x",
-        "montage": "~16.0.x"
-    },
-    "private": true
+  "_comment": [
+    "# If you use npm to generate or modify this file, make sure",
+    "# to restore the file's 4 space indents after the generation",
+    "# or modification so it matches other source files in the",
+    "# project. npm only generates files with 2 space indents",
+    "# (see https://github.com/npm/npm/pull/3180#issuecomment-16336516)."
+  ],
+  "name": "montage-data",
+  "version": "1.0.0-alpha1",
+  "license": "BSD-3-Clause",
+  "author": "Montage Studio, inc. (http://montagestudio.com/)",
+  "repository": {
+    "type": "git",
+    "url": "montagestudio/montage-data"
+  },
+  "dependencies": {
+    "bluebird": "~3.4.x",
+    "collections": "~5.0.x",
+    "dexie": "~1.4.1",
+    "frb": "~3.0.x",
+    "montage": "~16.0.x",
+    "weak-map": "^1.0.5"
+  },
+  "private": true
 }
