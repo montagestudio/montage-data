@@ -91,6 +91,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
+
+    mappings: {
+        get: function () {
+            return this._childServiceMappings;
+        }
+    },
+
     /***************************************************************************
      * Service Hierarchy
      */
@@ -284,7 +291,29 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 self._moduleIdToObjectDescriptorMap[moduleId] = objectDescriptor;
                 return self._mapModuleToObjectDescriptor(module, objectDescriptor);
             })).then(function () {
+                var childMappings = child.mappings || [];
+                return Promise.all(childMappings.map(function (mapping) {
+                    return self._addMappingToChild(mapping, child);
+                }));
+            }).then(function () {
                 self.addChildService(child, types);
+                return null;
+            });
+        }
+    },
+
+    _addMappingToChild: {
+        value: function (mapping, child) {
+            var service = this,
+                promise = mapping._objectDescriptorReference.promise(require);
+            return promise.then(function (mappingObjectDescriptor) {
+                var type = [mappingObjectDescriptor.module.id, mappingObjectDescriptor.name].join("/"),
+                    objectDescriptor = service._objectDescriptorForType(type);
+                if (objectDescriptor) {
+                    mapping.objectDescriptor = objectDescriptor;
+                    mapping.service = child;
+                    child._mappingByType.set(objectDescriptor, mapping);
+                }
                 return null;
             });
         }
@@ -326,7 +355,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     _objectDescriptorForType: {
         value: function (type) {
             return  this._constructorToObjectDescriptorMap.get(type) ||
-                    typeof type === "string" && this.__moduleIdToObjectDescriptorMap[type] ||
+                    typeof type === "string" && this._moduleIdToObjectDescriptorMap[type] ||
                     type;
         }
     },
@@ -446,7 +475,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * @type {Map<DataObjectDescriptor, Array.<DataService>>}
      */
     _childServicesByType: {
-        get: function() {
+        get: function () {
             if (!this.__childServicesByType) {
                 this.__childServicesByType = new Map();
             }
@@ -455,6 +484,20 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     __childServicesByType: {
+        value: undefined
+    },
+
+
+    _mappingByType: {
+        get: function () {
+            if (!this.__mappingByType) {
+                this.__mappingByType = new Map();
+            }
+            return this.__mappingByType;
+        }
+    },
+
+    __mappingByType: {
         value: undefined
     },
 
@@ -478,6 +521,19 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     __childServiceTypes: {
+        value: undefined
+    },
+
+    _childServiceMappings: {
+        get: function () {
+            if (!this.__childServiceMappings) {
+                this.__childServiceMappings = [];
+            }
+            return this.__childServiceMappings;
+        }
+    },
+
+    __childServiceMappings: {
         value: undefined
     },
 
@@ -511,6 +567,15 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             type = this._objectDescriptorForType(type);
             services = this._childServicesByType.get(type) || this._childServicesByType.get(null);
             return services && services[0] || null;
+        }
+    },
+
+    _getMappingForType: {
+        value: function (type) {
+            var mapping;
+            type = this._objectDescriptorForType(type);
+            mapping = this._mappingByType.has(type) && this._mappingByType.get(type);
+            return mapping || null;
         }
     },
 
@@ -973,7 +1038,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: function (type, data, context, dataIdentifier) {
             var dataObject;
             // TODO [Charles]: Object uniquing.
-            if(this.isUniquing && dataIdentifier) {
+            if(this.isUniqueing && dataIdentifier) {
                 dataObject = this.objectForDataIdentifier(dataIdentifier);
             }
             if(!dataObject) {
@@ -985,19 +1050,20 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
-    isUniquing: {
+    isUniqueing: {
         value: false
     },
-
 
     __dataIdentifierByObject: {
         value: null
     },
+
     _dataIdentifierByObject: {
         get: function() {
             return this.__objectsByDataIdentifier || (this.__objectsByDataIdentifier = new WeakMap());
         }
     },
+
     /**
      * Returns a unique object for a DataIdentifier
      * [fetchObjectProperty()]{@link DataService#fetchObjectProperty} instead
@@ -1009,7 +1075,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      *
      * @returns {DataIdentifier}        - An object's DataIdentifier
      */
-
      dataIdentifierForObject: {
         value: function(object) {
             return this._dataIdentifierByObject.get(object);
@@ -1126,7 +1191,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 //anyting inside its constructor, like creating a binding on a relationships
                 //causing a trigger to fire, not knowing about the match between identifier
                 //and object... If that's feels like a real situation, it is.
-                if(dataIdentifier && this.isUniquing) {
+                if(dataIdentifier && this.isUniqueing) {
                     this.recordDataIdentifierForObject(dataIdentifier, object);
                     this.recordObjectForDataIdentifier(object, dataIdentifier);
                 }
@@ -1209,7 +1274,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * to the stream at a later time.
      *
      * @method
-     * @argument {DataSelector|DataObjectDescriptor}
+     * @argument {DataSelector|DataObjectDescriptor|ObjectDescriptor|Function|String}
      *           selectorOrType   - If this argument's value is a selector
      *                              it will define what type of data should
      *                              be returned and what criteria that data
@@ -1217,7 +1282,14 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      *                              it will only define what type of data
      *                              should be returned, and the criteria
      *                              that data should satisfy can be defined
-     *                              using the `criteria` argument.
+     *                              using the `criteria` argument.  A type
+     *                              is defined as either a DataObjectDesc-
+     *                              riptor, an Object Descriptor, a Construct-
+     *                              or the string module id.  The method will
+     *                              convert the passed in type to a Data-
+     *                              ObjectDescriptor (deprecated) or an
+     *                              ObjectDescriptor.  This is true whether
+     *                              passing in a DataSelector or a type.
      * @argument {?Object}
      *           optionalCriteria - If the first argument's value is a
      *                              type this argument can optionally be
@@ -1244,7 +1316,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 criteria = optionalCriteria instanceof DataStream ? undefined : optionalCriteria,
                 selector = type ? DataSelector.withTypeAndCriteria(type, criteria) : selectorOrType,
                 stream = optionalCriteria instanceof DataStream ? optionalCriteria : optionalStream;
-            // make sure type is an object descriptor or data object descriptor.
+            // make sure type is an object descriptor or a data object descriptor.
             selector.type = this._objectDescriptorForType(selector.type);
             // Set up the stream.
             stream = stream || new DataStream();
@@ -1841,7 +1913,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             return insert ? array.splice.apply(array, [index, length].concat(insert)) :
                             array.splice(index, length);
         }
-    },
+    }
 
 
 }, /** @lends DataService */ {
