@@ -1,5 +1,4 @@
-var DataMapping = require("montage-data/logic/service/data-mapping").DataMapping,
-    ObjectDescriptor = require("montage-data/logic/model/object-descriptor").ObjectDescriptor;
+var DataMapping = require("montage-data/logic/service/data-mapping").DataMapping;
 
 describe("A DataMapping", function() {
 

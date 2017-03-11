@@ -5,7 +5,6 @@ var DataService = require("logic/service/data-service").DataService,
     DataStream = require("logic/service/data-stream").DataStream,
     Deserializer = require("montage/core/serialization/deserializer/montage-deserializer").MontageDeserializer,
     Map = require("collections/map"),
-    Model = require("montage/core/meta/model").Model,
     Montage = require("montage").Montage,
     ObjectDescriptor = require("montage/core/meta/object-descriptor").ObjectDescriptor,
     WeakMap = require("collections/weak-map");
@@ -65,6 +64,10 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             value = !this.model && deserializer.getProperty("types");
             if (value) {
                 Array.prototype.push.apply(this._childServiceTypes, value);
+            }
+            value = deserializer.getProperty("mappings");
+            if (value) {
+                Array.prototype.push.apply(this._childServiceMappings, value);
             }
         }
     },
@@ -600,7 +603,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             if (!this._streamMapDataPromises.has(stream)) {
                 this._streamMapDataPromises.set(stream, [promise]);
             } else {
-                this.__streamMapDataPromises.get(stream).push(promise);
+                this._streamMapDataPromises.get(stream).push(promise);
             }
         }
     },
@@ -800,20 +803,44 @@ rawDataDone: {
      */
     mapRawDataToObject: {
         value: function (record, object, context) {
-            var blueprint = this._objectDescriptorForObject(object),
-                mapping, result;
+            var objectDescriptor = this._objectDescriptorForObject(object),
+                mapping = objectDescriptor && this._getMappingForType(objectDescriptor),
+                result;
 
-            if (blueprint) {
-                mapping = this.mappings.get(blueprint);
+            if (mapping) {
+                result = mapping.mapFromRawData(object, record, context);
+            } else if (objectDescriptor) {
+                mapping = this._objectDescriptorMappings.get(objectDescriptor);
                 if (!mapping) {
-                    mapping = BlueprintDataMapping.withBlueprint(blueprint);
-                    this.mappings.set(blueprint, mapping);
+                    mapping = BlueprintDataMapping.withBlueprint(objectDescriptor);
+                    this._objectDescriptorMappings.set(objectDescriptor, mapping);
                 }
-                mapping.mapRawDataToObject(record, object, context);
+                result = mapping.mapRawDataToObject(record, object, context);
+            } else if (record) {
+                this.mapFromRawData(object, record, context);
             }
 
+            // if (blueprint) {
+            //     // mapping = this.mappings.get(blueprint);
+            //     // if (!mapping) {
+            //     //     this.mappings.set(blueprint, mapping);
+            //     // }
+            //     mapping = BlueprintDataMapping.withBlueprint(blueprint);
+            //     mapping.mapRawDataToObject(record, object, context);
+            // }
+
+            // TODO: Remove -- should be part of if/else block above.
             if (record) {
-                result = this.mapFromRawData(object, record, context);
+                if (result) {
+                    var otherResult = this.mapFromRawData(object, record, context);
+                    if (result instanceof Promise && otherResult instanceof Promise) {
+                        result = Promise.all([result, otherResult]);
+                    } else if (otherResult instanceof Promise) {
+                        result = otherResult;
+                    }
+                } else {
+                    result = this.mapFromRawData(object, record, context);
+                }
             }
 
             return result;
@@ -856,25 +883,38 @@ rawDataDone: {
         }
     },
 
-    /**
-     * If defined, used by
-     * [mapRawDataToObject()]{@link RawDataService#mapRawDataToObject} and
-     * [mapObjectToRawData()]{@link RawDataService#mapObjectToRawData} to map
-     * between the raw data on which this service is based and the typed data
-     * objects which this service provides and manages.
-     *
-     * @type {?DataMapping}
-     */
-    mapping: {
-        value: undefined
+    // /**
+    //  * If defined, used by
+    //  * [mapRawDataToObject()]{@link RawDataService#mapRawDataToObject} and
+    //  * [mapObjectToRawData()]{@link RawDataService#mapObjectToRawData} to map
+    //  * between the raw data on which this service is based and the typed data
+    //  * objects which this service provides and manages.
+    //  *
+    //  * @type {?DataMapping}
+    //  */
+    // mapping: {
+    //     value: undefined
+    // },
+
+    _mappingsPromise: {
+        get: function () {
+            if (!this.__mappingsPromise) {
+                this.__mappingsPromise = Promise.all(this.mappings.map(function (mapping) {
+                    return mapping.objectDescriptor;
+                })).then(function (values) {
+
+                });
+            }
+            return this.__mappingsPromise;
+        }
     },
 
-    mappings: {
+    _objectDescriptorMappings: {
         get: function () {
-            if (!this._mappings) {
-                this._mappings = new Map();
+            if (!this.__objectDescriptorMappings) {
+                this.__objectDescriptorMappings = new Map();
             }
-            return this._mappings;
+            return this.__objectDescriptorMappings;
         }
     },
 
