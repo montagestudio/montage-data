@@ -347,7 +347,6 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
         value: function (selector, stream) {
             var db = this._db,
                 criteria = selector.criteria,
-                whereProperties = Object.keys(criteria),
                 orderings = selector.orderings,
                 self = this;
 
@@ -361,11 +360,13 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                 db.open().then(function (db) {
                     var table = self.tableNamed(selector.type);
 
-                    if(whereProperties.length) {
+                    var whereProperties = (criteria && criteria.parameters) ? Object.keys(criteria.parameters) : undefined;
+
+                    if(whereProperties && whereProperties.length) {
                         var wherePromise,
                             resultPromise,
                             whereProperty = whereProperties.shift(),
-                            whereValue = criteria[whereProperty];
+                            whereValue = criteria.parameters[whereProperty];
 
                         if(whereProperties.length > 0) {
                                 //db.table1.where("key1").between(8,12).and(function (x) { return x.key2 >= 3 && x.key2 < 18; }).toArray();
@@ -386,7 +387,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                                             .and(function (aRecord) {
                                                 var result = true;
                                                 for(var i=0, iKey, iValue, iKeyMatchValue, iOrValue;(iKey = whereProperties[i]);i++) {
-                                                    iValue = criteria[iKey];
+                                                    iValue = criteria.parameters[iKey];
                                                     iKeyMatchValue = false;
                                                     if(Array.isArray(iValue)) {
                                                         iOrValue = false;
