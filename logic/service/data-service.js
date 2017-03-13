@@ -418,7 +418,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 var type = [objectDescriptor.module.id, objectDescriptor.name].join("/");
                 objectDescriptor = service._moduleIdToObjectDescriptorMap[type];
                 mapping.objectDescriptor = objectDescriptor;
-                mapping.schemeDescriptor = schemaDescriptor;
+                mapping.schemaDescriptor = schemaDescriptor;
                 mapping.service = child;
                 child.addMappingForType(mapping, objectDescriptor);
                 return null;
@@ -1150,7 +1150,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: function (type, data, context, dataIdentifier) {
             var dataObject;
             // TODO [Charles]: Object uniquing.
-            if(this.isUniqueing && dataIdentifier) {
+            if(this.isUniquing && dataIdentifier) {
                 dataObject = this.objectForDataIdentifier(dataIdentifier);
             }
             if(!dataObject) {
@@ -1162,7 +1162,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
-    isUniqueing: {
+    isUniquing: {
         value: false
     },
 
@@ -1296,21 +1296,22 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     _createDataObject: {
         value: function (type, dataIdentifier) {
-            var object = Object.create(this._getPrototypeForType(type));
+            var objectDescriptor = this._objectDescriptorForType(type),
+                object = Object.create(this._getPrototypeForType(objectDescriptor));
             if (object) {
 
                 //This needs to be done before a user-land code can attempt to do
                 //anyting inside its constructor, like creating a binding on a relationships
                 //causing a trigger to fire, not knowing about the match between identifier
                 //and object... If that's feels like a real situation, it is.
-                if(dataIdentifier && this.isUniqueing) {
+                if(dataIdentifier && this.isUniquing) {
                     this.recordDataIdentifierForObject(dataIdentifier, object);
                     this.recordObjectForDataIdentifier(object, dataIdentifier);
                 }
 
                 object = object.constructor.call(object) || object;
                 if (object) {
-                    this._setObjectType(object, type);
+                    this._setObjectType(object, objectDescriptor);
                 }
             }
             return object;

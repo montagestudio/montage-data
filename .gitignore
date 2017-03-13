@@ -3,6 +3,17 @@
 .idea
 .DS_Store
 atlassian-ide-plugin.xml
+.*.swp
+.iml
+
+# Build and test generated files that shouldn't be committed.
+/.watch.log
+/builds
+/out
+TEST-*.xml
+
+# Run-time generated files that shouldn't be committed.
+node_modules
 npm-debug.log
 report/
 node_modules/

@@ -44,7 +44,7 @@ exports.BlueprintDataMapping = DataMapping.specialize(/** @lends BlueprintDataMa
      */
     mapRawDataToObject: {
         value: function (data, object, context) {
-            var propertyBlueprints = this._blueprint.propertyBlueprints,
+            var propertyBlueprints = this._blueprint.propertyDescriptors,
                 attributes = data.attributes || data,
                 // relationships = data.relationships,
                 i, length, property, propertyKey, value;

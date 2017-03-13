@@ -103,12 +103,12 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     _resolveSchemaReferenceIfNecessary: {
         value: function () {
             var self = this,
-                requiresInitialization = !this.schema && this.schemaReference,
+                requiresInitialization = !this.schemaDescriptor && this.schemaDescriptorReference,
                 promise = requiresInitialization ?  this.schemaReference.promise(require) :
                                                     Promise.resolve(null);
             return promise.then(function (objectDescriptor) {
                 if (objectDescriptor) {
-                    self.schema = objectDescriptor;
+                    self.schemaDescriptor = objectDescriptor;
                 }
                 return null;
             });
@@ -158,6 +158,9 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         get: function () {
             return  this._objectDescriptorReference ?   this._objectDescriptorReference.promise(require) :
                                                         Promise.resolve(null);
+        },
+        set: function (value) {
+            this._objectDescriptorReference = value;
         }
     },
 
@@ -165,6 +168,9 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         get: function () {
             return  this._schemaDescriptorReference ?   this._schemaDescriptorReference.promise(require) :
                                                         Promise.resolve(null);
+        },
+        set: function (value) {
+            this._schemaDescriptorReference = value;
         }
     },
 
