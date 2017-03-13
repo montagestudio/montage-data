@@ -646,7 +646,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                     i, countI, iRawData, iLastUpdated;
 
                 primaryKey = table.schema.primKey.name;
-                rawDataStream.selector = selector;
+                rawDataStream.query = selector;
 
                 //Make a clone of the array and create the record to track the online Last Updated date
                 for(i = 0, countI = rawDataArray.length; i < countI; i++) {

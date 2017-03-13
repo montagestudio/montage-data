@@ -1,23 +1,23 @@
-var DataSelector = require("montage-data/logic/service/data-selector").DataSelector,
+var DataQuery = require("montage-data/logic/model/data-query").DataQuery,
     ObjectDescriptor = require("montage-data/logic/model/object-descriptor").ObjectDescriptor,
     Criteria = require("montage/core/criteria").Criteria,
     WeatherReportType = require("./logic/model/weather-report").Type,
     WeatherReport = require("./logic/model/weather-report").WeatherReport,
     serialize = require("montage/core/serialization/serializer/montage-serializer").serialize,
-    deserialize = require("montage/core/serialization/deserializer/montage-deserializer").deserialize;
+    deserialize = require("montage/core/serialization/deserializer/montage-deserializer").deserialize;s
 
-describe("A DataSelector", function() {
+describe("A DataQuery", function() {
 
     it("can be created", function () {
-        expect(new DataSelector()).toBeDefined();
+        expect(new DataQuery()).toBeDefined();
     });
 
     it("initially has no type", function () {
-        expect(new DataSelector().type).toBeUndefined();
+        expect(new DataQuery().type).toBeUndefined();
     });
 
     it("preserves its type", function () {
-        var selector = new DataSelector(),
+        var selector = new DataQuery(),
             type = new ObjectDescriptor(),
             name = "String" + Math.random();
         type.name = name;
@@ -27,11 +27,11 @@ describe("A DataSelector", function() {
     });
 
     xit("initially has no criteria", function () {
-        expect(new DataSelector().criteria).toBeUndefined();
+        expect(new DataQuery().criteria).toBeUndefined();
     });
 
     xit("preserves its criteria", function () {
-        var selector = new DataSelector(),
+        var selector = new DataQuery(),
             criteria = {a: Math.random(), b: Math.random(), c: Math.random()};
         selector.criteria.a = criteria.a;
         selector.criteria.b = criteria.b;
@@ -47,7 +47,7 @@ describe("A DataSelector", function() {
             country: 'us',
             unit: 'imperial'
         };
-        
+
         var dataType = WeatherReport.TYPE;
         var dataCriteria = new Criteria().initWithExpression(dataExpression, dataParameters);
 
@@ -62,13 +62,13 @@ describe("A DataSelector", function() {
 
             expect(dataQueryJsonObj.criteria).toBeDefined();
             expect(dataQueryJsonObj.criteria.prototype).toBe('montage/core/criteria');
-            var dataQuery = deserialize(dataQueryJson, require).then(function (dataQueryFromJson) {   
+            var dataQuery = deserialize(dataQueryJson, require).then(function (dataQueryFromJson) {
                 expect(dataQueryJson).toBeDefined();
-                done(); 
+                done();
             }, function (err) {
                 fail(err);
             });
-               
+
         } catch (err) {
             fail(err);
         }

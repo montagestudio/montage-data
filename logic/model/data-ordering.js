@@ -28,7 +28,7 @@ var Montage = require("montage/core/core").Montage,
  * @class
  * @extends external:Montage
  */
-exports.DataOrdering = Montage.specialize(/** @lends DataSelector.prototype */ {
+exports.DataOrdering = Montage.specialize(/** @lends DataOrdering.prototype */ {
 
     /**
      * An expression to be applied to objects in a set to yield a value

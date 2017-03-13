@@ -1,5 +1,5 @@
 var RawDataService = require("logic/service/raw-data-service").RawDataService,
-    DataSelector = require("logic/service/data-selector").DataSelector,
+    DataQuery = require("logic/model/data-query").DataQuery,
     Enumeration = require("logic/model/enumeration").Enumeration,
     Map = require("collections/map"),
     Promise = require("montage/core/promise").Promise;
@@ -55,9 +55,10 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
             if (!this._getCachedFetchPromise(object, propertyName)) {
                 // Parse arguments.
                 if (arguments.length >= 4) {
-                    selector = DataSelector.withTypeAndCriteria(type, arguments[arguments.length - 1]);//RDW unclear if there's any special change required here for formal Criteria
+                    selector = DataQuery.withTypeAndCriteria(type, arguments[arguments.length - 1]);//RDW unclear if there's any special change required here for formal Criteria
+
                 } else {
-                    selector = DataSelector.withTypeAndCriteria(type);
+                    selector = DataQuery.withTypeAndCriteria(type);
                 }
                 if (arguments.length < 5 || !prerequisitePropertyNames) {
                     prerequisites = [];
