@@ -1,13 +1,14 @@
 var DataService = require("logic/service/data-service").DataService,
     BlueprintDataMapping = require("logic/service/blueprint-data-mapping").BlueprintDataMapping,
     DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
-    DataSelector = require("logic/service/data-selector").DataSelector,
+    DataQuery = require("logic/model/data-query").DataQuery,
     DataStream = require("logic/service/data-stream").DataStream,
     Deserializer = require("montage/core/serialization/deserializer/montage-deserializer").MontageDeserializer,
     Map = require("collections/map"),
     Montage = require("montage").Montage,
     ObjectDescriptor = require("montage/core/meta/object-descriptor").ObjectDescriptor,
-    WeakMap = require("collections/weak-map");
+    WeakMap = require("collections/weak-map"),
+    deprecate = require("montage/core/deprecate");
 
 /**
  * Provides data objects of certain types and manages changes to them based on
@@ -171,7 +172,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             return propertyDescriptor.valueDescriptor.then(function (objectDescriptor) {
                 moduleId = [objectDescriptor.module.id, objectDescriptor.exportName].join("/");
                 cachedDescriptor = self.rootService._moduleIdToObjectDescriptorMap[moduleId];
-                var selector = DataSelector.withTypeAndCriteria(cachedDescriptor, {
+                var selector = DataQuery.withTypeAndCriteria(cachedDescriptor, {
                     // snapshot: self._snapshots.get(object),
                     source: object,
                     relationshipKey: propertyName
@@ -181,7 +182,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
                 return self._mapObjectPropertyValue(object, propertyDescriptor, data);
             });
             // return this._objectDescriptorTypeForValueDescriptor(propertyDescriptor.valueDescriptor).then(function (type) {
-            //     var selector = DataSelector.withTypeAndCriteria(type, {
+            //     var selector = DataQuery.withTypeAndCriteria(type, {
             //         snapshot: self._snapshots.get(object),
             //         source: object,
             //         relationshipKey: propertyName
@@ -292,13 +293,13 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * [fetchRawData()]{@link RawDataService#fetchRawData}.
      *
      * @method
-     * @argument {DataObjectDescriptor|DataSelector}
+     * @argument {DataObjectDescriptor|DataQuery}
      *           typeOrSelector        - Defines what data should be returned.
      *                                   If a [type]{@link DataOjectDescriptor}
      *                                   is provided instead of a
-     *                                   {@link DataSelector}, a `DataSelector`
+     *                                   {@link DataQuery}, a `DataQuery`
      *                                   with the specified type and no
-     *                                   [criteria]{@link DataSelector#criteria}
+     *                                   [criteria]{@link DataQuery#criteria}
      *                                   will be created and used for the fetch.
      * @argument {?DataStream} stream  - The stream to which the provided data
      *                                   should be added. If no stream is
@@ -312,9 +313,9 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         value: function (typeOrSelector, stream) {
             var isSupportedType = typeOrSelector instanceof DataObjectDescriptor || typeOrSelector instanceof ObjectDescriptor,
                 type = isSupportedType && typeOrSelector,
-                selector = type && DataSelector.withTypeAndCriteria(type) || typeOrSelector;
+                selector = type && DataQuery.withTypeAndCriteria(type) || typeOrSelector;
             stream = stream || new DataStream();
-            stream.selector = selector;
+            stream.query = selector;
             this._fetchRawData(stream);
             return stream;
         }
@@ -356,16 +357,16 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     // TODO, swizzling the stream's user-land selector for the rawData equivalent is not really
     // practical nor safe, we either need to keep it separately or store it on the stream under
-    // rawDataSelector
+    // rawDataQuery
 
     _fetchRawData: {
         value: function (stream) {
             var self = this;
             this.authorizationPromise.then(function (authorization) {
-                var streamSelector = stream.selector;
-                stream.selector = self.mapSelectorToRawDataSelector(streamSelector);
+                var streamSelector = stream.query;
+                stream.query = self.mapSelectorToRawDataQuery(streamSelector);
                 self.fetchRawData(stream);
-                stream.selector = streamSelector;
+                stream.query = streamSelector;
             })
         }
     },
@@ -510,7 +511,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * @method
      * @argument {Object} records  - An array of objects whose properties' values
      *                               hold the raw data.
-     * @argument {?DataSelector} selector
+     * @argument {?DataQuery} selector
      *                             - Describes how the raw data was selected.
      * @argument {?} context       - The value that was passed in to the
      *                               [rawDataDone()]{@link RawDataService#rawDataDone}
@@ -566,7 +567,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     addRawData: {
         value: function (stream, records, context) {
             var offline, object, i, n,
-                streamSelectorType = stream.selector.type,
+                streamSelectorType = stream.query.type,
                 iRecord, iDataIdentifier, result;
             // Record fetched raw data for offline use if appropriate.
             offline = records && !this.isOffline && this._streamRawData.get(stream);
@@ -704,7 +705,7 @@ rawDataDone: {
         }
 
         dataReadyPromise.then(function (results) {
-            return dataToPersist ? self.writeOfflineData(dataToPersist, stream.selector, context) : null;
+            return dataToPersist ? self.writeOfflineData(dataToPersist, stream.query, context) : null;
         }).then(function () {
             stream.dataDone();
             return null;
@@ -758,14 +759,20 @@ rawDataDone: {
      * The default implementation of this method returns the passed in selector.
      *
      * @method
-     * @argument {DataSelector} selector - A selector defining data objects to
+     * @argument {DataQuery} selector - A selector defining data objects to
      *                                     select.
-     * @returns {DataSelector} - A selector defining raw data to select.
+     * @returns {DataQuery} - A selector defining raw data to select.
      */
-    mapSelectorToRawDataSelector: {
-        value: function (selector) {
-            return selector;
+    mapSelectorToRawDataQuery: {
+        value: function (query) {
+            return query;
         }
+    },
+
+    mapSelectorToRawDataSelector: {
+        value: deprecate.deprecateMethod(void 0, function (selector) {
+            return this.mapSelectorToRawDataQuery(selector);
+        }, "mapSelectorToRawDataSelector", "mapSelectorToRawDataQuery"),
     },
 
     /**

@@ -1,8 +1,9 @@
 // Note: Bluebird promises are used even if ECMAScript 6 promises are available.
 var DataProvider = require("logic/service/data-provider").DataProvider,
     DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
-    DataSelector = require("logic/service/data-selector").DataSelector,
-    Promise = require("bluebird");
+    DataQuery = require("logic/model/data-query").DataQuery,
+    Promise = require("bluebird"),
+    deprecate = require("montage/core/deprecate");
 
 /**
  * A [DataProvider]{@link DataProvider} whose data is received sequentially.
@@ -44,14 +45,27 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */ 
      */
 
     /**
-     * The selector defining the data returned in this stream.
+     * The query defining the data returned in this stream.
      *
-     * @type {DataSelector}
+     * @type {DataQuery}
      */
-    selector: {
+    query: {
         value: undefined
     },
 
+    /**
+     * The selector defining the data returned in this stream.
+     *
+     * @type {DataQuery}
+     */
+    selector: {
+        get: deprecate.deprecateMethod(void 0, function () {
+            return this.query;
+        }, "selector", "query"),
+        set: deprecate.deprecateMethod(void 0, function (value) {
+            this.query = value;
+        }, "selector", "query")
+    },
     /***************************************************************************
      * DataProvider behavior
      */
@@ -279,9 +293,9 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */ 
     withTypeOrSelector: {
         value: function (typeOrSelector) {
             var type = typeOrSelector instanceof DataObjectDescriptor && typeOrSelector,
-                selector = type && DataSelector.withTypeAndCriteria(type) || typeOrSelector,
+                selector = type && DataQuery.withTypeAndCriteria(type) || typeOrSelector,
                 stream = new this();
-            stream.selector = selector;
+            stream.query = selector;
             return stream;
         }
     },

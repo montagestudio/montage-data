@@ -1,5 +1,5 @@
 var Converter = require("montage/core/converter/converter").Converter,
-    DataSelector = require("logic/service/data-selector").DataSelector;
+    DataQuery = require("logic/model/data-query").DataQuery;
 /**
  * @class RawPropertyValueToObjectConverter
  * @classdesc Converts a property value of raw data to the referenced object.
@@ -58,7 +58,7 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
                 var type = [objectDescriptor.module.id, objectDescriptor.name].join("/"),
                     criteria = {};
                 criteria[self.foreignProperty] = self.expression(v);
-                return self.service.rootService.fetchData(DataSelector.withTypeAndCriteria(type, criteria));
+                return self.service.rootService.fetchData(DataQuery.withTypeAndCriteria(type, criteria));
             });
         }
     },

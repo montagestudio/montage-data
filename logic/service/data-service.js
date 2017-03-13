@@ -3,7 +3,7 @@ var Montage = require("montage").Montage,
     AuthorizationManager = require("logic/service/authorization-manager").AuthorizationManager,
     AuthorizationPolicyType = new Enum().initWithMembers("NoAuthorizationPolicy","UpfrontAuthorizationPolicy","OnFirstFetchAuthorizationPolicy","OnDemandAuthorizationPolicy"),
     DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
-    DataSelector = require("logic/service/data-selector").DataSelector,
+    DataQuery = require("logic/model/data-query").DataQuery,
     DataStream = require("logic/service/data-stream").DataStream,
     DataTrigger = require("logic/service/data-trigger").DataTrigger,
     Map = require("collections/map"),
@@ -1259,11 +1259,11 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * Fetch data from the service using its child services.
      *
      * This method accept [types]{@link DataObjectDescriptor} as alternatives to
-     * [selectors]{@link DataSelector}, and its [stream]{DataStream} argument is
+     * [queries]{@link DataQuery}, and its [stream]{DataStream} argument is
      * optional, but when it calls its child services it will provide them with
-     * a [selector]{@link DataSelector}, it provide them with a
+     * a [query]{@link DataQuery}, it provide them with a
      * [stream]{DataStream}, creating one if necessary, and the stream will
-     * include a reference to the selector. Also, if a child service's
+     * include a reference to the query. Also, if a child service's
      * implementation of this method return `undefined` or `null`, this method
      * will return the stream passed in to the call to that child.
      *
@@ -1272,8 +1272,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * to the stream at a later time.
      *
      * @method
-     * @argument {DataSelector|DataObjectDescriptor|ObjectDescriptor|Function|String}
-     *           selectorOrType   - If this argument's value is a selector
+     * @argument {DataQuery|DataObjectDescriptor|ObjectDescriptor|Function|String}
+     *           queryOrType   - If this argument's value is a query
      *                              it will define what type of data should
      *                              be returned and what criteria that data
      *                              should satisfy. If the value is a type
@@ -1287,14 +1287,14 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      *                              convert the passed in type to a Data-
      *                              ObjectDescriptor (deprecated) or an
      *                              ObjectDescriptor.  This is true whether
-     *                              passing in a DataSelector or a type.
+     *                              passing in a DataQuery or a type.
      * @argument {?Object}
      *           optionalCriteria - If the first argument's value is a
      *                              type this argument can optionally be
      *                              provided to defines the criteria which
      *                              the returned data should satisfy.
      *                              If the first argument's value is a
-     *                              selector this argument should be
+     *                              query this argument should be
      *                              omitted and will be ignored if it is
      *                              provided.
      * @argument {?DataStream}
@@ -1307,28 +1307,28 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * this method.
      */
     fetchData: {
-        value: function (selectorOrType, optionalCriteria, optionalStream) {
+        value: function (queryOrType, optionalCriteria, optionalStream) {
             var self = this,
-                isSupportedType = !(selectorOrType instanceof DataSelector),
-                type = isSupportedType && selectorOrType,
+                isSupportedType = !(queryOrType instanceof DataQuery),
+                type = isSupportedType && queryOrType,
                 criteria = optionalCriteria instanceof DataStream ? undefined : optionalCriteria,
-                selector = type ? DataSelector.withTypeAndCriteria(type, criteria) : selectorOrType,
+                query = type ? DataQuery.withTypeAndCriteria(type, criteria) : queryOrType,
                 stream = optionalCriteria instanceof DataStream ? optionalCriteria : optionalStream;
             // make sure type is an object descriptor or a data object descriptor.
-            selector.type = this._objectDescriptorForType(selector.type);
+            query.type = this._objectDescriptorForType(query.type);
             // Set up the stream.
             stream = stream || new DataStream();
-            stream.selector = selector;
+            stream.query = query;
             this._dataServiceForDataStream.set(stream, this._childServiceRegistrationPromise.then(function() {
                 // Use a child service to fetch the data.
                 var service;
                 try {
-                    service = self._getChildServiceForType(selector.type);
+                    service = self._getChildServiceForType(query.type);
                     if (service) {
-                        stream = service.fetchData(selector, stream) || stream;
+                        stream = service.fetchData(query, stream) || stream;
                         self._dataServiceForDataStream.set(stream, service);
                     } else {
-                        throw new Error("Can't fetch data of unknown type - " + selector.type.typeName + "/" + selector.type.uuid);
+                        throw new Error("Can't fetch data of unknown type - " + query.type.typeName + "/" + query.type.uuid);
                     }
                 } catch (e) {
                     stream.dataError(e);

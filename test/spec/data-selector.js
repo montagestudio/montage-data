@@ -1,18 +1,18 @@
-var DataSelector = require("montage-data/logic/service/data-selector").DataSelector,
+var DataQuery = require("montage-data/logic/model/data-query").DataQuery,
     ObjectDescriptor = require("montage-data/logic/model/object-descriptor").ObjectDescriptor;
 
-describe("A DataSelector", function() {
+describe("A DataQuery", function() {
 
     it("can be created", function () {
-        expect(new DataSelector()).toBeDefined();
+        expect(new DataQuery()).toBeDefined();
     });
 
     it("initially has no type", function () {
-        expect(new DataSelector().type).toBeUndefined();
+        expect(new DataQuery().type).toBeUndefined();
     });
 
     it("preserves its type", function () {
-        var selector = new DataSelector(),
+        var selector = new DataQuery(),
             type = new ObjectDescriptor(),
             name = "String" + Math.random();
         type.name = name;
@@ -22,11 +22,11 @@ describe("A DataSelector", function() {
     });
 
     it("initially has no criteria", function () {
-        expect(new DataSelector().criteria).toEqual({});
+        expect(new DataQuery().criteria).toEqual({});
     });
 
     it("preserves its criteria", function () {
-        var selector = new DataSelector(),
+        var selector = new DataQuery(),
             criteria = {a: Math.random(), b: Math.random(), c: Math.random()};
         selector.criteria.a = criteria.a;
         selector.criteria.b = criteria.b;

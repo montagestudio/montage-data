@@ -8,4 +8,4 @@ var DataSelector = require("logic/model/data-selector").DataSelector;
  * @extends external:Montage
  * @todo Deprecate.
  */
-exports.DataSelector = DataSelector.specialize();
+exports.DataSelector = DataSelector;
