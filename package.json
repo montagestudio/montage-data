@@ -20,20 +20,14 @@
     "collections": "~5.0.x",
     "dexie": "~1.4.1",
     "frb": "~3.0.x",
-    "montage": "~16.0.x",
-    "weak-map": "^1.0.5"
+    "weak-map": "^1.0.5",
+    "montage": "hthetiot/montage#upgrade_test"
   },
   "devDependencies": {
     "jasmine-console-reporter": "^1.2.7",
     "jasmine-core": "^2.5.2",
-    "jshint": "~2.4.4",
-    "karma": "^1.5.0",
-    "karma-chrome-launcher": "^2.0.0",
-    "karma-coverage": "^1.1.1",
-    "karma-firefox-launcher": "^1.0.1",
-    "karma-jasmine": "^1.1.0",
-    "karma-phantomjs-launcher": "^1.0.4",
-    "montage-testing": "montagejs/montage-testing"
+    "mr": "hthetiot/mr#npmv3",
+    "montage-testing": "hthetiot/montage-testing#upgrade"
   },
   "scripts": {
     "test": "node test/run-node.js"
