@@ -19,12 +19,10 @@
     },
     "mappings": {
         "montage": "../node_modules/montage",
-        "montage-data": "../",
-        "montage-testing": "../node_modules/montage-testing"
+        "montage-data": "../"
     },
     "dependencies": {
-        "montage": "~16.0.x",
-        "montage-data": "montagestudio/montage-data"
+        "montage": "~16.0.x"
     },
     "private": true
 }
