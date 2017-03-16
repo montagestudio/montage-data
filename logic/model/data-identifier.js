@@ -1,4 +1,4 @@
-var Montage = require("montage").Montage;
+var Montage = require("montage/core/core").Montage;
 
 /**
  * A DataIdentifier represents a universal identifier for an object managed by

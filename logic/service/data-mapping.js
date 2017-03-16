@@ -1,4 +1,4 @@
-var Montage = require("montage").Montage;
+var Montage = require("montage/core/core").Montage;
 
 /**
  * Maps raw data to data objects of a specific type.

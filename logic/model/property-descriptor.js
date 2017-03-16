@@ -1,4 +1,4 @@
-var Montage = require("montage").Montage;
+var Montage = require("montage/core/core").Montage;
 
 /**
  * Describes a property of objects of a certain type.
