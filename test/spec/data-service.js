@@ -1,5 +1,7 @@
 var DataService = require("montage-data/logic/service/data-service").DataService,
     DataObjectDescriptor = require("montage-data/logic/model/data-object-descriptor").DataObjectDescriptor,
+    ModuleObjectDescriptor = require("montage/core/meta/module-object-descriptor").ModuleObjectDescriptor,
+    ModuleReference = require("montage/core/module-reference").ModuleReference,
     RawDataService = require("montage-data/logic/service/raw-data-service").RawDataService;
 
 describe("A DataService", function() {
@@ -349,14 +351,16 @@ describe("A DataService", function() {
     });
 
     it("can handle child services with an async types property using the register/unregister API", function (done) {
-        var parent, syncChild, asyncChild, type, registerPromises, unregisterPromises;
+        var parent, syncChild, asyncChild, moduleReference, type, registerPromises, unregisterPromises;
 
         // Create a sample type
-        type = Function.noop;
-        type.TYPE = new DataObjectDescriptor();
-        type.TYPE.jasmineToString = function () { return "TYPE-" + this.id; };
-        type.TYPE.id = 1;
+        // type = Function.noop;
+        // type.TYPE = new DataObjectDescriptor();
+        // type.TYPE.jasmineToString = function () { return "TYPE-" + this.id; };
+        // type.TYPE.id = 1;
 
+        moduleReference = new ModuleReference().initWithIdAndRequire("spec/data/model/movie", require);
+        type = new ModuleObjectDescriptor().initWithModuleAndExportName(moduleReference, "Movie");
         // Create the main service
         parent = new RawDataService();
         parent.NAME = "PARENT";
