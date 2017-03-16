@@ -42,6 +42,9 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         }
     },
 
+    /**
+     * @deprecated
+     */
     initWithModel: {
         value: function (model) {
             var self = this;
@@ -54,6 +57,10 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             });
         }
     },
+
+    /***************************************************************************
+     * Serialization
+     */
 
     deserializeSelf: {
         value:function (deserializer) {
@@ -136,33 +143,8 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
 
     _propertyDescriptorForObjectAndName: {
         value: function (object, propertyName) {
-            var objectDescriptor = this._objectDescriptorForObject(object);
+            var objectDescriptor = this.objectDescriptorForObject(object);
             return objectDescriptor && objectDescriptor.propertyDescriptorForName(propertyName);
-        }
-    },
-
-    _objectDescriptorForObject: {
-        value: function (object) {
-            var types = this.types,
-                objectInfo = Montage.getInfoForObject(object),
-                moduleId = objectInfo.moduleId,
-                objectName = objectInfo.objectName,
-                module, exportName, objectDescriptor, i, n;
-            for (i = 0, n = types.length; i < n && !objectDescriptor; i += 1) {
-                module = types[i].module;
-                exportName = module && types[i].exportName;
-                if (module && moduleId === module.id && objectName === exportName) {
-                    objectDescriptor = types[i];
-                }
-            }
-            return objectDescriptor;
-            // var typeName = object.constructor.TYPE.typeName,
-            //     isModel = this.model instanceof Model,
-            //     isObjectDescriptor = !isModel && this.model instanceof ObjectDescriptor,
-            //     isObjectsObjectDescriptor = isObjectDescriptor && this.model.name === typeName;
-            // return  isModel ?                       this.model.objectDescriptorForName(typeName) :
-            //     isObjectsObjectDescriptor ?     this.model :
-            //         undefined;
         }
     },
 
@@ -181,16 +163,6 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             }).then(function (data) {
                 return self._mapObjectPropertyValue(object, propertyDescriptor, data);
             });
-            // return this._objectDescriptorTypeForValueDescriptor(propertyDescriptor.valueDescriptor).then(function (type) {
-            //     var selector = DataQuery.withTypeAndCriteria(type, {
-            //         snapshot: self._snapshots.get(object),
-            //         source: object,
-            //         relationshipKey: propertyName
-            //     });
-            //     return service.fetchData(selector);
-            // }).then(function (data) {
-            //     return self._mapObjectPropertyValue(object, propertyDescriptor, data);
-            // });
         }
     },
 
@@ -217,12 +189,8 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
 
     _objectDescriptorTypeForValueDescriptor: {
         value: function (valueDescriptor) {
-            // var destinationObjectDescriptor;
             return valueDescriptor.then(function (objectDescriptor) {
-                // destinationObjectDescriptor = objectDescriptor;
                 return objectDescriptor.module.require.async(objectDescriptor.module.id);
-            // }).then(function (exports) {
-            //     return exports[destinationObjectDescriptor.exportName].TYPE;
             });
         }
     },
@@ -688,33 +656,32 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *                                 [writeOfflineData()]{@link RawDataService#writeOfflineData}
      *                                 if it is provided.
      */
+    rawDataDone: {
+        value: function (stream, context) {
+            var self = this,
+                dataToPersist = this._streamRawData.get(stream),
+                mappingPromises = this._streamMapDataPromises.get(stream),
+                dataReadyPromise = mappingPromises ? Promise.all(mappingPromises) : this.nullPromise;
 
-rawDataDone: {
-    value: function (stream, context) {
-        var self = this,
-            dataToPersist = this._streamRawData.get(stream),
-            mappingPromises = this._streamMapDataPromises.get(stream),
-            dataReadyPromise = mappingPromises ? Promise.all(mappingPromises) : this.nullPromise;
+            if (mappingPromises) {
+                this._streamMapDataPromises.delete(stream);
+            }
 
-        if (mappingPromises) {
-            this._streamMapDataPromises.delete(stream);
+            if (dataToPersist) {
+                this._streamRawData.delete(stream);
+            }
+
+            dataReadyPromise.then(function (results) {
+                return dataToPersist ? self.writeOfflineData(dataToPersist, stream.query, context) : null;
+            }).then(function () {
+                stream.dataDone();
+                return null;
+            }).catch(function (e) {
+                console.error(e);
+            });
+
         }
-
-        if (dataToPersist) {
-            this._streamRawData.delete(stream);
-        }
-
-        dataReadyPromise.then(function (results) {
-            return dataToPersist ? self.writeOfflineData(dataToPersist, stream.query, context) : null;
-        }).then(function () {
-            stream.dataDone();
-            return null;
-        }).catch(function (e) {
-            console.error(e);
-        });
-
-    }
-},
+    },
 
     /**
      * Records in the process of being written to streams (after
@@ -810,8 +777,8 @@ rawDataDone: {
      */
     mapRawDataToObject: {
         value: function (record, object, context) {
-            var objectDescriptor = this._objectDescriptorForObject(object),
-                mapping = objectDescriptor && this._getMappingForType(objectDescriptor),
+            var objectDescriptor = this.objectDescriptorForObject(object),
+                mapping = objectDescriptor && this.mappingWithType(objectDescriptor),
                 result;
 
             if (mapping) {
@@ -876,7 +843,7 @@ rawDataDone: {
      */
     mapObjectToRawData: {
         value: function (object, record, context) {
-            var blueprint = this._objectDescriptorForObject(object);
+            var blueprint = this.objectDescriptorForObject(object);
             if (this.mapping) {
                 this.mapping.mapObjectToRawData(record, object, context);
             } else if (blueprint) {

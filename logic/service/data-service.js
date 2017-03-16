@@ -92,6 +92,12 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
 
+    /**
+     * The data mappings used by this service to convert objects to raw
+     * data and vice-versa.
+     *
+     * @type {Array.<DataMapping>}
+     */
     mappings: {
         get: function () {
             return this._childServiceMappings;
@@ -241,21 +247,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
-    /**
-     * Alternative to [addChildService()]{@link DataService#addChildService}.
-     * While addChildService is synchronous, registerChildService is asynchronous
-     * and may take a child whose [types]{@link DataService#types} property is
-     * a promise instead of an array.
-     *
-     * This is useful for example if the child service does not know its types
-     * immediately, e.g. if it must fetch them from a .mjson descriptors file.
-     *
-     * If the child's types is an array, it is guaranteed to behave exactly
-     * like addChildService.
-     *
-     * @method
-     * @return {Promise}
-     */
     __childServiceRegistrationPromise: {
         value: null
     },
@@ -281,15 +272,33 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
+    /**
+     * Alternative to [addChildService()]{@link DataService#addChildService}.
+     * While addChildService is synchronous, registerChildService is asynchronous
+     * and may take a child whose [types]{@link DataService#types} property is
+     * a promise instead of an array.
+     *
+     * This is useful for example if the child service does not know its types
+     * immediately, e.g. if it must fetch them from a .mjson descriptors file.
+     *
+     * If the child's types is an array, it is guaranteed to behave exactly
+     * like addChildService.
+     *
+     * @method
+     * @return {Promise}
+     */
     registerChildService: {
-        value: function (child) {
+        value: function (child, types) {
             var self = this,
-                types = child.model && child.model.objectDescriptors || child.types;
+                types = types && Array.isArray(types) && types ||
+                        types && [types] ||
+                        child.model && child.model.objectDescriptors ||
+                        child.types;
             return Promise.all(types.map(function (objectDescriptor) {
                 var module = objectDescriptor.module,
                     moduleId = [module.id, objectDescriptor.exportName].join("/");
                 self._moduleIdToObjectDescriptorMap[moduleId] = objectDescriptor;
-                return self._mapModuleToObjectDescriptor(module, objectDescriptor);
+                return self._initializePrototypeForModuleAndObjectDescriptor(module, objectDescriptor);
             })).then(function () {
                 var childMappings = child.mappings || [];
                 return Promise.all(childMappings.map(function (mapping) {
@@ -305,30 +314,34 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     _addMappingToChild: {
         value: function (mapping, child) {
             var service = this,
-                promise = mapping._objectDescriptorReference.promise(require);
-            return promise.then(function (mappingObjectDescriptor) {
-                var type = [mappingObjectDescriptor.module.id, mappingObjectDescriptor.name].join("/"),
-                    objectDescriptor = service._objectDescriptorForType(type);
+                objectDescriptor = mapping.objectDescriptor,
+                objectDescriptorReference = !objectDescriptor && mapping.objectDescriptorReference,
+                promise = objectDescriptor ?            Promise.resolve(objectDescriptor) :
+                          objectDescriptorReference ?   objectDescriptorReference.promise(require) :
+                                                        null;
+            return promise ? promise.then(function (objectDescriptor) {
+                var type = [objectDescriptor.module.id, objectDescriptor.name].join("/");
+                objectDescriptor = service._objectDescriptorForType(type);
                 if (objectDescriptor) {
                     mapping.objectDescriptor = objectDescriptor;
                     mapping.service = child;
-                    child._mappingByType.set(objectDescriptor, mapping);
+                    child.addMappingForType(mapping, objectDescriptor);
                 }
                 return null;
-            });
+            }) : Promise.resolve(null);
         }
     },
 
-    _mapModuleToObjectDescriptor: {
+    _initializePrototypeForModuleAndObjectDescriptor: {
         value: function (module, objectDescriptor) {
             var self = this;
             return module.require.async(module.id).then(function (exports) {
                 var constructor = exports[objectDescriptor.exportName],
                     prototype = Object.create(constructor.prototype);
-                self._constructorToObjectDescriptorMap.set(constructor, objectDescriptor);
                 self._dataObjectPrototypes.set(constructor, prototype);
                 self._dataObjectPrototypes.set(objectDescriptor, prototype);
                 self._dataObjectTriggers.set(objectDescriptor, DataTrigger.addTriggers(self, objectDescriptor, prototype));
+                self._constructorToObjectDescriptorMap.set(constructor, objectDescriptor);
                 return null;
             });
         }
@@ -448,10 +461,10 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     unregisterChildService: {
         value: function (child) {
             var self = this;
-            return Promise.resolve(child.types)
-                .then(function (types) {
-                    return self.removeChildService(child, types);
-                });
+            return new Promise(function (resolve, reject) {
+                self.removeChildService(child, child.types);
+                resolve();
+            });
         }
     },
 
@@ -487,20 +500,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: undefined
     },
 
-
-    _mappingByType: {
-        get: function () {
-            if (!this.__mappingByType) {
-                this.__mappingByType = new Map();
-            }
-            return this.__mappingByType;
-        }
-    },
-
-    __mappingByType: {
-        value: undefined
-    },
-
     /**
      * An array of the data types handled by all child services of this service.
      *
@@ -521,19 +520,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     __childServiceTypes: {
-        value: undefined
-    },
-
-    _childServiceMappings: {
-        get: function () {
-            if (!this.__childServiceMappings) {
-                this.__childServiceMappings = [];
-            }
-            return this.__childServiceMappings;
-        }
-    },
-
-    __childServiceMappings: {
         value: undefined
     },
 
@@ -570,13 +556,61 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
-    _getMappingForType: {
+    /***************************************************************************
+     * Mappings
+     */
+
+    /**
+     * Adds a mapping to the service for the specified
+     * type.
+     * @param {DataMapping} mapping.  The mapping to use.
+     * @param {ObjectDescriptor} type.  The object type.
+     */
+    addMappingForType: {
+        value: function (mapping, type) {
+            this._mappingByType.set(type, mapping);
+        }
+    },
+
+    /**
+     * Return the mapping to use for the specified type.
+     * @param {ObjectDescriptor} type.
+     * @returns {DataMapping|null} returns the specified mapping or null
+     * if a mapping is not defined for the specified type.
+     */
+    mappingWithType: {
         value: function (type) {
             var mapping;
             type = this._objectDescriptorForType(type);
             mapping = this._mappingByType.has(type) && this._mappingByType.get(type);
             return mapping || null;
         }
+    },
+
+    _mappingByType: {
+        get: function () {
+            if (!this.__mappingByType) {
+                this.__mappingByType = new Map();
+            }
+            return this.__mappingByType;
+        }
+    },
+
+    __mappingByType: {
+        value: undefined
+    },
+
+    _childServiceMappings: {
+        get: function () {
+            if (!this.__childServiceMappings) {
+                this.__childServiceMappings = [];
+            }
+            return this.__childServiceMappings;
+        }
+    },
+
+    __childServiceMappings: {
+        value: undefined
     },
 
     /***************************************************************************
@@ -673,6 +707,32 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     /***************************************************************************
      * Data Object Types
      */
+
+    /**
+     * Returns an object descriptor for the provided object.  If this service
+     * does not have an object descriptor for this object it will ask its
+     * parent for one.
+     * @param {object}
+     * @returns {ObjectDescriptor|null} if an object descriptor is not found this
+     * method will return null.
+     */
+    objectDescriptorForObject: {
+        value: function (object) {
+            var types = this.types,
+                objectInfo = Montage.getInfoForObject(object),
+                moduleId = objectInfo.moduleId,
+                objectName = objectInfo.objectName,
+                module, exportName, objectDescriptor, i, n;
+            for (i = 0, n = types.length; i < n && !objectDescriptor; i += 1) {
+                module = types[i].module;
+                exportName = module && types[i].exportName;
+                if (module && moduleId === module.id && objectName === exportName) {
+                    objectDescriptor = types[i];
+                }
+            }
+            return objectDescriptor || this.parentService && this.parentService.objectDescriptorForObject(object);
+        }
+    },
 
     /**
      * Get the type of the specified data object.

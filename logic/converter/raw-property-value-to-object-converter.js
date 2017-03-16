@@ -7,6 +7,16 @@ var Converter = require("montage/core/converter/converter").Converter,
  */
 exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends RawPropertyValueToObjectConverter# */ {
 
+    /*********************************************************************
+     * Serialization
+     */
+
+    serializeSelf: {
+        value: function () {
+            // TODO: Implement
+        }
+    },
+
     deserializeSelf: {
         value: function (deserializer) {
             var value = deserializer.getProperty("foreignProperty");
@@ -24,28 +34,66 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
         }
     },
 
+    /*********************************************************************
+     * Initialization
+     */
+
+    /**
+     * @param {string} foreignProperty the property of the destination to query on.
+     * @param {number} cardinality defines if this is a to one or to many relationship.
+     * @return itself
+     */
+    initWithForeignPropertyAndCardinality: {
+        value: function (foreignProperty, cardinality) {
+            this.foreignProperty = foreignProperty;
+            this.cardinality = cardinality;
+            return this;
+        }
+    },
+
+    /*********************************************************************
+     * Properties
+     */
+
+    /**
+     * The cardinality defines if this is a to one or to many relationship
+     * @type {number}
+     * */
     cardinality: {
         value: null
     },
 
+    /**
+     * The descriptor of the destination object.  If one is not provided
+     * the value descriptor of the property descriptor that defines the
+     * relationship will be used.
+     * @type {?ObjectDescriptorReference}
+     * */
     foreignDescriptor: {
         value: null
     },
 
     /**
-     * The pattern to use when parsing the value during conversion or reversion.
-     * @type {?string}
+     * The property name on the destination object.
+     * @type {string}
      */
     foreignProperty: {
         value: null
     },
 
+    /**
+     * The service to use to make requests.
+     */
     service: {
         value: undefined
     },
 
+    /*********************************************************************
+     * Public API
+     */
+
     /**
-     * Converts the specified value to a moment object.
+     * Converts the fault for the relationship to an actual object.
      * @function
      * @param {Property} v The value to format.
      * @returns {Promise} A promise for the referenced object.  The promise is
@@ -64,13 +112,14 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
     },
 
     /**
-     * Reverts a moment to the string output specified by the pattern property.
+     * Reverts the relationship back to raw data.
      * @function
      * @param {moment} v The value to revert.
      * @returns {string} v
      */
     revert: {
         value: function (v) {
+            console.log("V (", v, ")");
         }
     }
 
