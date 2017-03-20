@@ -7,7 +7,7 @@ var Montage = require("montage/core/core").Montage,
     DataStream = require("logic/service/data-stream").DataStream,
     DataTrigger = require("logic/service/data-trigger").DataTrigger,
     Map = require("collections/map"),
-    Promise = require("bluebird"),
+    Promise = require("montage/core/promise").Promise,
     Set = require("collections/set"),
     WeakMap = require("collections/weak-map");
 
