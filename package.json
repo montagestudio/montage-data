@@ -16,12 +16,12 @@
     "url": "montagestudio/montage-data"
   },
   "dependencies": {
-    "bluebird": "~3.4.x",
     "collections": "~5.0.x",
     "dexie": "~1.4.1",
     "frb": "~3.0.x",
+    "montage": "hthetiot/montage#upgrade_test",
     "weak-map": "^1.0.5",
-    "montage": "hthetiot/montage#upgrade_test"
+    "xhr2": "^0.1.4"
   },
   "devDependencies": {
     "jasmine-console-reporter": "^1.2.7",
