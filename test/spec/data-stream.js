@@ -92,7 +92,7 @@ describe("A DataStream", function() {
         // Verify that all of the stream fulfillment callbacks were called once
         // and only once. Use a timeout to allow any possible fulfillments and
         // rejection to be triggered before the verification.
-        window.setTimeout(function () {
+        setTimeout(function () {
             expect(counters).toEqual([1, 1, 1, 1]);
             done();
         }, 10);
@@ -106,7 +106,7 @@ describe("A DataStream", function() {
         stream.dataDone();
         // Verify that the stream was fulfilled with the expected data but defer
         // the verification using a timeout.
-        window.setTimeout(function () {
+        setTimeout(function () {
             stream.then(function (value) {
                 expect(value).toEqual(DATA1.concat(DATA2));
                 done();
@@ -148,7 +148,7 @@ describe("A DataStream", function() {
         // and only once and that none of the stream rejection callbacks were
         // called. Use a timeout to allow any possible fulfillment and
         // rejection to be triggered before the verification.
-        window.setTimeout(function () {
+        setTimeout(function () {
             expect(counters).toEqual([1, 0, 1, 0, 1, 0, 1, 0, 1, 0]);
             done();
         }, 10);
@@ -182,7 +182,7 @@ describe("A DataStream", function() {
         // that all of the stream rejection callbacks were called once and only
         // once. Use a timeout to allow any possible fulfillment and rejection
         // to be triggered before the verification.
-        window.setTimeout(function () {
+        setTimeout(function () {
             expect(counters).toEqual([0, 1, 0, 1, 0, 1]);
             done();
         }, 10);
@@ -227,7 +227,7 @@ describe("A DataStream", function() {
         // that all of the stream rejection callbacks were called once and only
         // once. Use a timeout to allow any possible fulfillment and rejection
         // to be triggered before the verification.
-        window.setTimeout(function () {
+        setTimeout(function () {
             expect(counters).toEqual([0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1]);
             done();
         }, 10);
@@ -248,7 +248,7 @@ describe("A DataStream", function() {
         // Verify that the stream was rejected with the expected error, but
         // defer setting up the callback counters used for the verification,
         // and defer the verification itself, using timeouts.
-        window.setTimeout(function () {
+        setTimeout(function () {
             promises.push(streams[0].then(makeCounter(counters, 0), makeCounter(counters, 1)));
             promises.push(streams[0].catch(makeCounter(counters, 2)));
             promises.push(streams[1].catch(makeCounter(counters, 3)));
@@ -259,7 +259,7 @@ describe("A DataStream", function() {
                 fail(reason);
                 return null;
             });
-            window.setTimeout(function () {
+            setTimeout(function () {
                 expect(counters).toEqual([0, 1, 1, 1]);
                 done();
             }, 10);
@@ -299,7 +299,7 @@ describe("A DataStream", function() {
         // and that all of the promise rejection callbacks were called once and
         // only once. Use a timeout to allow all the possible fulfillments and
         // rejections to be triggered before the verification.
-        window.setTimeout(function () {
+        setTimeout(function () {
             expect(counters).toEqual([0, 1, 0, 1, 0, 1, 0, 1, 0, 1]);
             done();
         }, 10);

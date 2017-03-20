@@ -1,5 +1,6 @@
 var jasmineRequire = require('jasmine-core/lib/jasmine-core/jasmine.js');
 var JasmineConsoleReporter = require('jasmine-console-reporter');
+global.XMLHttpRequest = require('xhr2');
 
 // Init
 var jasmine = jasmineRequire.core(jasmineRequire);
