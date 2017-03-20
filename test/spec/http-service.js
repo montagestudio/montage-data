@@ -21,6 +21,12 @@ describe("An HttpService", function() {
         var dataType = WeatherReport.TYPE;
         var dataQuery  = DataSelector.withTypeAndCriteria(dataType, dataCriteria);
 
+        /*
+        var s = new MontageSerializer().initWithRequire(require);
+        var dataQueryJson = s.serializeObject(dataQuery);
+        console.log(dataQueryJson);
+        */
+        
         var mainService = new DataService();
         mainService.addChildService(new WeatherService());
         mainService.fetchData(dataQuery).then(function (weatherReports) {
