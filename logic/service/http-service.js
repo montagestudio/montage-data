@@ -2,7 +2,7 @@ var RawDataService = require("logic/service/raw-data-service").RawDataService,
     DataSelector = require("logic/service/data-selector").DataSelector,
     Enumeration = require("logic/model/enumeration").Enumeration,
     Map = require("collections/map"),
-    Promise = require("bluebird");
+    Promise = require("montage/core/promise").Promise;
 
 /**
  * Superclass for services communicating using HTTP, usually REST services.

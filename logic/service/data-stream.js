@@ -1,7 +1,7 @@
 // Note: Bluebird promises are used even if ECMAScript 6 promises are available.
 var DataProvider = require("logic/service/data-provider").DataProvider,
     DataSelector = require("logic/service/data-selector").DataSelector,
-    Promise = require("bluebird");
+    Promise = require("montage/core/promise").Promise;
 
 /**
  * A [DataProvider]{@link DataProvider} whose data is received sequentially.
