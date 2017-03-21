@@ -49,7 +49,7 @@ describe("A DataSelector", function() {
 
         var serializer = new MontageSerializer().initWithRequire(require);
         var dataQueryJson = serializer.serializeObject(dataQuery);
-        expect(dataQueryJsona).toBeDefined();
+        expect(dataQueryJson).toBeDefined();
     });
 
 });
