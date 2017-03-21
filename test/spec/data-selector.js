@@ -34,4 +34,22 @@ describe("A DataSelector", function() {
         expect(selector.criteria).toEqual(criteria);
     });
 
+    it("can serialize", function () {
+
+        var dataExpression = "city = $city && unit = $unit && country = $country";
+        var dataParameters = {
+            city: 'San-Francisco',
+            country: 'us',
+            unit: 'imperial'
+        };
+        
+        var dataType = WeatherReport.TYPE;
+        var dataCriteria = new Criteria().initWithExpression(dataExpression, dataParameters);
+        var dataQuery  = DataSelector.withTypeAndCriteria(dataType, dataCriteria);
+
+        var serializer = new MontageSerializer().initWithRequire(require);
+        var dataQueryJson = serializer.serializeObject(dataQuery);
+        expect(dataQueryJsona).toBeDefined();
+    });
+
 });
