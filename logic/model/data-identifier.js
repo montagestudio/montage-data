@@ -37,12 +37,38 @@ exports.DataIdentifier = Montage.specialize(/** @lends DataIdentifier.prototype 
     },
 
     /**
-     * The ObjectDescriptor associated with a dataIdentifier
+     * The ObjectDescriptor associated with a dataIdentifier if available
      *
      * @type {ObjectDescriptor}
      */
     objectDescriptor: {
         value: undefined
+    },
+
+    /**
+     * The primaryKey of the object the dataIdentifier represents
+     *
+     * @type {Object}
+     */
+    primaryKey: {
+        value: undefined
+    },
+
+    /**
+     * The primaryKey of the object the dataIdentifier represents
+     *
+     * @type {String}
+     */
+    _typeName:{
+        value: undefined
+    },
+    typeName: {
+        get: function() {
+            return this._typeName || (this._typeName = this.objectDescriptor ? this.objectDescriptor.name : "MISSING_TYPE_NAME");
+        },
+        set: function(value) {
+            this._typeName = value;
+        }
     },
 
     /**
@@ -70,6 +96,17 @@ exports.DataIdentifier = Montage.specialize(/** @lends DataIdentifier.prototype 
      */
     url: {
         get: function () {
+            if(!this._url) {
+                var _url = "montage-data://";
+                _url += this.dataService.identifier
+                _url += "/";
+                _url += this.dataService.connectionDescriptor ? this.dataService.connectionDescriptor.name : "default";
+                _url += "/";
+                _url += this.objectDescriptor.name;
+                _url += "/";
+                _url += this.primaryKey;
+                this._url = _url;
+            }
             return this._url;
         },
         set: function (value) {
