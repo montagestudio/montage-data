@@ -43,7 +43,7 @@ describe("A DataSelector", function() {
             unit: 'imperial'
         };
         
-        var dataType = WeatherReport.TYPE;
+        var dataType = new ObjectDescriptor();
         var dataCriteria = new Criteria().initWithExpression(dataExpression, dataParameters);
         var dataQuery  = DataSelector.withTypeAndCriteria(dataType, dataCriteria);
 
