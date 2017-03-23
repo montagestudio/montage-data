@@ -28,21 +28,25 @@ describe("An Expression Data Mapping", function() {
     mainService = new DataService();
     mainService.NAME = "Movies";
     movieService = new RawDataService();
-    movieModuleReference = new ModuleReference().initWithIdAndRequire("spec/data/model/movie", require);
+    movieModuleReference = new ModuleReference().initWithIdAndRequire("spec/data/model/logic/movie", require);
     movieObjectDescriptor = new ModuleObjectDescriptor().initWithModuleAndExportName(movieModuleReference, "Movie");
     movieObjectDescriptor.addPropertyDescriptor(new PropertyDescriptor().initWithNameObjectDescriptorAndCardinality("title", movieObjectDescriptor, 1));
     categoryService = new CategoryService();
-    categoryModuleReference = new ModuleReference().initWithIdAndRequire("spec/data/model/category", require);
+
+    categoryModuleReference = new ModuleReference().initWithIdAndRequire("spec/data/model/logic/category", require);
     categoryObjectDescriptor = new ModuleObjectDescriptor().initWithModuleAndExportName(categoryModuleReference, "Category");
     categoryObjectDescriptor.addPropertyDescriptor(new PropertyDescriptor().initWithNameObjectDescriptorAndCardinality("name", categoryObjectDescriptor, 1));
     categoryPropertyDescriptor = new PropertyDescriptor().initWithNameObjectDescriptorAndCardinality("category", movieObjectDescriptor, 1);
     categoryPropertyDescriptor.valueDescriptor = categoryObjectDescriptor;
     movieObjectDescriptor.addPropertyDescriptor(categoryPropertyDescriptor);
-    plotSummaryModuleReference = new ModuleReference().initWithIdAndRequire("spec/data/model/plot-summary", require);
-    plotSummaryObjectDescriptor = new ModuleObjectDescriptor().initWithModuleAndExportName().initWithNameObjectDescriptorAndCardinality(plotSummaryModuleReference, "PlotSummary");
+
+    plotSummaryModuleReference = new ModuleReference().initWithIdAndRequire("spec/data/model/logic/plot-summary", require);
+    plotSummaryObjectDescriptor = new ModuleObjectDescriptor().initWithModuleAndExportName(plotSummaryModuleReference, "PlotSummary");
+    plotSummaryObjectDescriptor.addPropertyDescriptor(new PropertyDescriptor().initWithNameObjectDescriptorAndCardinality("summary", plotSummaryObjectDescriptor, 1));
     plotSummaryPropertyDescriptor = new PropertyDescriptor().initWithNameObjectDescriptorAndCardinality("plotSummary", movieObjectDescriptor, 1);
     plotSummaryPropertyDescriptor.valueDescriptor = plotSummaryObjectDescriptor;
-    movieObjectDescriptor.addPropertyDescriptor(plotSummaryObjectDescriptor);
+    movieObjectDescriptor.addPropertyDescriptor(plotSummaryPropertyDescriptor);
+
     movieMapping = new ExpressionDataMapping().initWithObjectDescriptorAndService(movieObjectDescriptor, movieService);
     movieMapping.addRequisitePropertyName("title", "category");
     movieMapping.addObjectMappingRule("title", {"<->": "name"});

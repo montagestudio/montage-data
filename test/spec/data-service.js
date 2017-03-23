@@ -359,7 +359,7 @@ describe("A DataService", function() {
         // type.TYPE.jasmineToString = function () { return "TYPE-" + this.id; };
         // type.TYPE.id = 1;
 
-        moduleReference = new ModuleReference().initWithIdAndRequire("spec/data/model/movie", require);
+        moduleReference = new ModuleReference().initWithIdAndRequire("spec/data/model/logic/movie", require);
         type = new ModuleObjectDescriptor().initWithModuleAndExportName(moduleReference, "Movie");
         // Create the main service
         parent = new RawDataService();

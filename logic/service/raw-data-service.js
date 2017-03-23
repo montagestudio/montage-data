@@ -791,17 +791,8 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
                 }
                 result = mapping.mapRawDataToObject(record, object, context);
             } else if (record) {
-                this.mapFromRawData(object, record, context);
+                // this.mapFromRawData(object, record, context);
             }
-
-            // if (blueprint) {
-            //     // mapping = this.mappings.get(blueprint);
-            //     // if (!mapping) {
-            //     //     this.mappings.set(blueprint, mapping);
-            //     // }
-            //     mapping = BlueprintDataMapping.withBlueprint(blueprint);
-            //     mapping.mapRawDataToObject(record, object, context);
-            // }
 
             // TODO: Remove -- should be part of if/else block above.
             if (record) {
@@ -818,18 +809,6 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             }
 
             return result;
-
-            // if (this.mapping) {
-            //     this.mapping.mapRawDataToObject(record, object, context);
-            //     this.mapFromRawData(object, record, context);
-            // } else if (blueprint) {
-            //     this.mapping = BlueprintDataMapping.withBlueprint(blueprint);
-            //     this.mapping.mapRawDataToObject(record, object, context);
-            //     this.mapFromRawData(object, record, context);
-            // } else if (record) {
-            //     this.mapFromRawData(object, record, context);
-            // }
-
 
         }
     },
