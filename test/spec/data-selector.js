@@ -1,5 +1,8 @@
 var DataSelector = require("montage-data/logic/service/data-selector").DataSelector,
-    ObjectDescriptor = require("montage-data/logic/model/object-descriptor").ObjectDescriptor;
+    ObjectDescriptor = require("montage-data/logic/model/object-descriptor").ObjectDescriptor,
+    Criteria = require("montage/core/criteria").Criteria,
+    serialize = require("montage/core/serialization/serializer/montage-serializer").serialize,
+    deserialize = require("montage/core/serialization/deserializer/montage-deserializer").deserialize;
 
 describe("A DataSelector", function() {
 
@@ -34,7 +37,7 @@ describe("A DataSelector", function() {
         expect(selector.criteria).toEqual(criteria);
     });
 
-    it("can serialize", function () {
+    it("can serialize and deserialize", function () {
 
         var dataExpression = "city = $city && unit = $unit && country = $country";
         var dataParameters = {
@@ -47,8 +50,8 @@ describe("A DataSelector", function() {
         var dataCriteria = new Criteria().initWithExpression(dataExpression, dataParameters);
         var dataQuery  = DataSelector.withTypeAndCriteria(dataType, dataCriteria);
 
-        var serializer = new MontageSerializer().initWithRequire(require);
-        var dataQueryJson = serializer.serializeObject(dataQuery);
+        var dataQueryJson = serialize(dataQuery, require);
+        var dataQuery = deserialize(dataQueryJson, require);
         expect(dataQueryJson).toBeDefined();
     });
 
