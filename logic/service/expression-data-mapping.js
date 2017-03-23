@@ -1,7 +1,9 @@
 var DataMapping = require("./data-mapping").DataMapping,
     assign = require("frb/assign"),
-    parse = require("frb/parse"),
     compile = require("frb/compile-evaluator"),
+    ObjectDescriptorReference = require("montage/core/meta/object-descriptor-reference").ObjectDescriptorReference,
+    parse = require("frb/parse"),
+    Promise = require("montage/core/promise").Promise,
     Scope = require("frb/scope"),
     Promise = require("montage/core/promise").Promise,
     Set = require("collections/set");
@@ -65,10 +67,11 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
      * @param   {DataService} service  - the data service this mapping should use.
      * @return itself
      */
-    initWithObjectDescriptorAndService: {
-        value: function (objectDescriptor, service) {
-            this.objectDescriptor = objectDescriptor;
+    initWithServiceObjectDescriptorAndSchema: {
+        value: function (service, objectDescriptor, schema) {
             this.service = service;
+            this.objectDescriptor = objectDescriptor;
+            this.schemaDescriptor = schema;
             return this;
         }
     },
@@ -117,12 +120,33 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
      */
 
     /**
-     * The definition of the objects that are mapped by this
+     * The descriptor of the objects that are mapped by this
      * data mapping.
      * @type {ObjectDescriptor}
      */
     objectDescriptor: {
-        value: undefined
+        get: function () {
+            return this._objectDescriptor;
+        },
+        set: function (value) {
+            this._objectDescriptor = value;
+            this._objectDescriptorReference = new ObjectDescriptorReference().initWithValue(value);
+        }
+    },
+
+    /**
+     * The descriptor of the "raw data" mapped by this
+     * data mapping.
+     * @type {ObjectDescriptor}
+     */
+    schemaDescriptor: {
+        get: function () {
+            return this._schemaDescriptor;
+        },
+        set: function (value) {
+            this._schemaDescriptor = value;
+            this._schemaDescriptorReference = new ObjectDescriptorReference().initWithValue(value);
+        }
     },
 
     /**
@@ -131,7 +155,17 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
      * @type {ObjectDescriptorReference}
      */
     objectDescriptorReference: {
-        value: undefined
+        get: function () {
+            return  this._objectDescriptorReference ?   this._objectDescriptorReference.promise(require) :
+                                                        Promise.resolve(null);
+        }
+    },
+
+    schemaDescriptorReference: {
+        get: function () {
+            return  this._schemaDescriptorReference ?   this._schemaDescriptorReference.promise(require) :
+                                                        Promise.resolve(null);
+        }
     },
 
     /**
@@ -159,6 +193,15 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                     this._requisitePropertyNames.add(arg);
                 }
             }
+        }
+    },
+
+    /**
+     * @return {Set}
+     */
+    requisitePropertyNames: {
+        get: function () {
+            return this._requisitePropertyNames;
         }
     },
 
@@ -274,7 +317,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                     rule.converter.service = rule.converter.service || self.service;
                     promises.push(self._convertRelationshipToRawData());
                 } else if (propertyDescriptor) {
-                    data[key] = this._parseRawData(rule, scope);
+                    data[key] = this._parseObject(rule, scope);
                 }
             }
             return promises && promises.length && Promise.all(promises) || Promise.resolve(null);
@@ -319,13 +362,15 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     _mapObjectMappingRules: {
         value: function (rawRules, addOneWayBindings) {
             var rules = this._compiledObjectMappingRules,
-                propertyName, rawRule, targetPath;
+                propertyName, rawRule, rule, targetPath;
             for (propertyName in rawRules) {
                 rawRule = rawRules[propertyName];
                 if (this._shouldMapRule(rawRule, addOneWayBindings)) {
                     targetPath = addOneWayBindings && propertyName || rawRule[TWO_WAY_BINDING];
-                    rules[targetPath] = addOneWayBindings ?     this._mapRule(rawRule) :
-                                                                this._mapReverseRule(rawRule);
+                    rule = addOneWayBindings ?  this._mapRule(rawRule) :
+                        this._mapReverseRule({"<->": propertyName, converter: rawRule.converter});
+                    rule.converter = rule.converter || this._defaultConverter(propertyName, targetPath);
+                    rules[targetPath] = rule;
                 }
             }
         }
@@ -334,7 +379,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     _mapRawDataMappingRules: {
         value: function (rawRules, addOneWayBindings) {
             var rules = this._compiledRawDataMappingRules,
-                propertyName, propertyDescriptorName, propertyDescriptor, rawRule, targetPath;
+                propertyName, propertyDescriptorName, propertyDescriptor, rawRule, rule, targetPath;
             for (propertyName in rawRules) {
                 rawRule = rawRules[propertyName];
                 if (this._shouldMapRule(rawRule, addOneWayBindings)) {
@@ -342,9 +387,11 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                         propertyName;
                     propertyDescriptor = this.objectDescriptor.propertyDescriptorForName(propertyDescriptorName);
                     targetPath = addOneWayBindings && propertyName || rawRule[TWO_WAY_BINDING];
-                    rules[targetPath] = addOneWayBindings ?     this._mapRule(rawRule) :
-                                                                this._mapReverseRule(rawRule);
-                    rules[targetPath].propertyDescriptor = propertyDescriptor;
+                    rule = addOneWayBindings ?  this._mapRule(rawRule) :
+                                                this._mapReverseRule({"<->": propertyName, converter: rawRule.converter});
+                    rule.converter = rule.converter || this._defaultConverter(propertyName, targetPath);
+                    rule.propertyDescriptor = propertyDescriptor;
+                    rules[targetPath] = rule;
                 }
             }
         }
@@ -408,11 +455,41 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         }
     },
 
+    _parseObject: {
+        value: function (rule, scope) {
+            var value = rule.expression(scope);
+            return rule.converter && rule.converter.revert(value) || value;
+        }
+    },
+
     _shouldMapRule: {
         value: function (rawRule, addOneWayBindings) {
             var isOneWayBinding = rawRule.hasOwnProperty(ONE_WAY_BINDING),
                 isTwoWayBinding = !isOneWayBinding && rawRule.hasOwnProperty(TWO_WAY_BINDING);
             return isOneWayBinding && addOneWayBindings || isTwoWayBinding;
+        }
+    },
+
+    _defaultConverter: {
+        value: function (sourcePath, targetPath) {
+            var sourceDescriptor = this.objectDescriptor && this.objectDescriptor.propertyDescriptorForName(sourcePath),
+                targetDescriptor = this.schemaDescriptor && this.schemaDescriptor.propertyDescriptorForName(targetPath),
+                sourceDescriptorValueType = sourceDescriptor && sourceDescriptor.valueType,
+                targetDescriptorValueType = targetDescriptor && targetDescriptor.valueType;
+
+            return  sourceDescriptor && targetDescriptor &&
+                    sourceDescriptorValueType !== targetDescriptorValueType ?
+                        this._converterForValueTypes(sourceDescriptorValueType, targetDescriptorValueType) :
+                        null;
+
+        }
+    },
+
+
+    _converterForValueTypes: {
+        value: function (sourceType, destinationType) {
+            var converters = exports.ExpressionDataMapping.defaultConverters;
+            return converters[sourceType] && converters[sourceType][destinationType] || null;
         }
     },
 
@@ -437,6 +514,120 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     mapToRawData: {
         value: function (object, record) {
             this.mapObjectToRawData(object, record);
+        }
+    }
+
+}, {
+
+    defaultConverters: {
+        get: function () {
+            if (!exports.ExpressionDataMapping._defaultConverters) {
+                var defaultConverters = {};
+                exports.ExpressionDataMapping._addDefaultConvertersToMap(defaultConverters);
+                exports.ExpressionDataMapping._defaultConverters = defaultConverters;
+            }
+            return exports.ExpressionDataMapping._defaultConverters;
+        }
+    },
+
+    _addDefaultConvertersToMap: {
+        value: function (converters) {
+            exports.ExpressionDataMapping._addDefaultBooleanConvertersToConverters(converters);
+            exports.ExpressionDataMapping._addDefaultNumberConvertersToConverters(converters);
+            exports.ExpressionDataMapping._addDefaultStringConvertersToConverters(converters);
+        }
+    },
+
+    _addDefaultBooleanConvertersToConverters: {
+        value: function (converters) {
+            var booleanConverters = {};
+            booleanConverters["string"] = Object.create({}, {
+                convert: {
+                    value: function (value) {
+                        return Boolean(value);
+                    }
+                },
+                revert: {
+                    value: function (value) {
+                        return String(value);
+                    }
+                }
+            });
+            booleanConverters["number"] = Object.create({}, {
+                convert: {
+                    value: function (value) {
+                        return Boolean(value);
+                    }
+                },
+                revert: {
+                    value: function (value) {
+                        return Number(value);
+                    }
+                }
+            });
+            converters["boolean"] = booleanConverters;
+        }
+    },
+
+    _addDefaultNumberConvertersToConverters: {
+        value: function (converters) {
+            var numberConverters = {};
+            numberConverters["string"] = Object.create({}, {
+                convert: {
+                    value: function (value) {
+                        return Number(value);
+                    }
+                },
+                revert: {
+                    value: function (value) {
+                        return String(value);
+                    }
+                }
+            });
+            numberConverters["boolean"] = Object.create({}, {
+                convert: {
+                    value: function (value) {
+                        return Number(value);
+                    }
+                },
+                revert: {
+                    value: function (value) {
+                        return Boolean(value);
+                    }
+                }
+            });
+            converters["number"] = numberConverters;
+        }
+    },
+
+    _addDefaultStringConvertersToConverters: {
+        value: function (converters) {
+            var stringConverters = {};
+            stringConverters["number"] = Object.create({}, {
+                convert: {
+                    value: function (value) {
+                        return String(value);
+                    }
+                },
+                revert: {
+                    value: function (value) {
+                        return Number(value);
+                    }
+                }
+            });
+            stringConverters["boolean"] = Object.create({}, {
+                convert: {
+                    value: function (value) {
+                        return String(value);
+                    }
+                },
+                revert: {
+                    value: function (value) {
+                        return Boolean(value);
+                    }
+                }
+            });
+            converters["string"] = stringConverters;
         }
     }
 
