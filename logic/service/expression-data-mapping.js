@@ -3,6 +3,7 @@ var DataMapping = require("./data-mapping").DataMapping,
     parse = require("frb/parse"),
     compile = require("frb/compile-evaluator"),
     Scope = require("frb/scope"),
+    Promise = require("montage/core/promise").Promise,
     Set = require("collections/set");
 
 
@@ -40,6 +41,8 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         value: function (deserializer) {
             var value;
             this.objectDescriptorReference = deserializer.getProperty("objectDescriptor");
+            this.schemaReference = deserializer.getProperty("schema");
+
             value = deserializer.getProperty("objectMapping");
             if (value) {
                 this._objectMappingRules = value.rules;
@@ -67,6 +70,45 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
             this.objectDescriptor = objectDescriptor;
             this.service = service;
             return this;
+        }
+    },
+
+    resolveReferences: {
+        value: function () {
+            var self = this;
+            return this._resolveObjectDescriptorReferenceIfNecessary().then(function () {
+                return self._resolveSchemaReferenceIfNecessary();
+            });
+        }
+    },
+
+    _resolveObjectDescriptorReferenceIfNecessary: {
+        value: function () {
+            var self = this,
+                requiresInitialization = !this.objectDescriptor && this.objectDescriptorReference,
+                promise = requiresInitialization ?  this.objectDescriptorReference.promise(require) :
+                                                    Promise.resolve(null);
+            return promise.then(function (objectDescriptor) {
+                if (objectDescriptor) {
+                    self.objectDescriptor = objectDescriptor;
+                }
+                return null;
+            });
+        }
+    },
+
+    _resolveSchemaReferenceIfNecessary: {
+        value: function () {
+            var self = this,
+                requiresInitialization = !this.schema && this.schemaReference,
+                promise = requiresInitialization ?  this.schemaReference.promise(require) :
+                                                    Promise.resolve(null);
+            return promise.then(function (objectDescriptor) {
+                if (objectDescriptor) {
+                    self.schema = objectDescriptor;
+                }
+                return null;
+            });
         }
     },
 

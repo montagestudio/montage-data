@@ -313,22 +313,17 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
 
     _addMappingToChild: {
         value: function (mapping, child) {
-            var service = this,
-                objectDescriptor = mapping.objectDescriptor,
-                objectDescriptorReference = !objectDescriptor && mapping.objectDescriptorReference,
-                promise = objectDescriptor ?            Promise.resolve(objectDescriptor) :
-                          objectDescriptorReference ?   objectDescriptorReference.promise(require) :
-                                                        null;
-            return promise ? promise.then(function (objectDescriptor) {
-                var type = [objectDescriptor.module.id, objectDescriptor.name].join("/");
+            var service = this;
+            return mapping.resolveReferences().then(function () {
+                var objectDescriptor = mapping.objectDescriptor,
+                    type = [objectDescriptor.module.id, objectDescriptor.name].join("/");
                 objectDescriptor = service._objectDescriptorForType(type);
                 if (objectDescriptor) {
-                    mapping.objectDescriptor = objectDescriptor;
                     mapping.service = child;
                     child.addMappingForType(mapping, objectDescriptor);
                 }
                 return null;
-            }) : Promise.resolve(null);
+            });
         }
     },
 
