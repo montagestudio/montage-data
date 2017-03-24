@@ -283,27 +283,123 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * like addChildService.
      *
      * @method
+     * @param {DataService} child service to add to this service.
+     * @param {?Promise|ObjectDescriptor|Array<ObjectDescriptor>}
      * @return {Promise}
      */
     registerChildService: {
         value: function (child, types) {
-            var self = this,
-                types = types && Array.isArray(types) && types ||
+            // possible types
+            // -- types is passed in as an array or a single type.
+            // -- a model is set on the child.
+            // -- types is set on the child.
+            // any type can be asychronous or synchronous.
+            var types = types && Array.isArray(types) && types ||
                         types && [types] ||
                         child.model && child.model.objectDescriptors ||
-                        child.types;
-            return Promise.all(types.map(function (objectDescriptor) {
-                var module = objectDescriptor.module,
-                    moduleId = [module.id, objectDescriptor.exportName].join("/");
-                self._moduleIdToObjectDescriptorMap[moduleId] = objectDescriptor;
-                return self._initializePrototypeForModuleAndObjectDescriptor(module, objectDescriptor);
-            })).then(function () {
-                var childMappings = child.mappings || [];
-                return Promise.all(childMappings.map(function (mapping) {
-                    return self._addMappingToChild(mapping, child);
-                }));
+                        child.types && Array.isArray(child.types) && child.types ||
+                        child.types && [child.types] ||
+                        [],
+                mappings = child.mappings || [];
+            return this._registerChildServiceTypesAndMappings(child, types, mappings);
+        }
+    },
+
+    // #1 resolve asynchronous types
+    // -- types are arrays
+    // -- contents of the array can be:
+    // ---- an objectDescriptor or
+    // ---- a promise for an objectDescriptor or
+    // ---- a promise for an array of objectDescriptors
+    // -- flatten the result
+    // #2 map module id to object descriptor
+    // #3 register mapping to objectDescriptor
+    // -- resolve the mappings references
+    // -- map objectDescriptor to mapping
+    // #4 make prototype for object descriptor
+    // -- map constructor to prototype
+    // -- map objectDescriptor to prototype
+    // -- map objectDescriptor to dataTriggers
+
+    // -- TODO: dataTriggers should be derived from all properties - mapping requisitePropertyNames
+
+    _registerChildServiceTypesAndMappings: {
+        value: function (child, types, mappings) {
+            var self = this,
+                objectDescriptors;
+            return this._resolveAsynchronousTypes(types).then(function (descriptors) {
+                objectDescriptors = descriptors;
+                self._registerTypesByModuleId(objectDescriptors);
+                return self._registerChildServiceMappings(child, mappings);
+            }).then(function () {
+                return self._makePrototypesForTypes(objectDescriptors);
             }).then(function () {
                 self.addChildService(child, types);
+                return null;
+            });
+        }
+    },
+
+    _resolveAsynchronousTypes: {
+        value: function (types) {
+            var self = this;
+            return Promise.all(this._flattenArray(types).map(function (type) {
+                return type instanceof Promise ? type : Promise.resolve(type);
+            })).then(function (descriptors) {
+                return self._flattenArray(descriptors);
+            });
+        }
+    },
+
+    _flattenArray: {
+        value: function (array) {
+            return Array.prototype.concat.apply([], array);
+        }
+    },
+
+    _registerTypesByModuleId: {
+        value: function (types) {
+            var map = this._moduleIdToObjectDescriptorMap;
+            types.forEach(function (objectDescriptor) {
+                var module = objectDescriptor.module,
+                    moduleId = [module.id, objectDescriptor.exportName].join("/");
+                map[moduleId] = objectDescriptor;
+            });
+        }
+    },
+
+    _registerChildServiceMappings: {
+        value: function (child, mappings) {
+            var self = this;
+            return Promise.all(mappings.map(function (mapping) {
+                return self._addMappingToChild(mapping, child);
+            }));
+        }
+    },
+
+    _makePrototypesForTypes: {
+        value: function (types) {
+            var self = this;
+            return Promise.all(types.map(function (objectDescriptor) {
+                return self._makePrototypeForType(objectDescriptor);
+            }));
+        }
+    },
+
+    _makePrototypeForType: {
+        value: function (objectDescriptor) {
+            var self = this,
+                module = objectDescriptor.module;
+            return module.require.async(module.id).then(function (exports) {
+                var constructor = exports[objectDescriptor.exportName],
+                    prototype = Object.create(constructor.prototype),
+                    mapping = self.mappingWithType(objectDescriptor),
+                    requisitePropertyNames = mapping && mapping.requisitePropertyNames || new Set(),
+                    dataTriggers = DataTrigger.addTriggers(self, objectDescriptor, prototype, requisitePropertyNames);
+                self._dataObjectPrototypes.set(constructor, prototype);
+                self._dataObjectPrototypes.set(objectDescriptor, prototype);
+                self._dataObjectTriggers.set(objectDescriptor, dataTriggers);
+                self._constructorToObjectDescriptorMap.set(constructor, objectDescriptor);
                 return null;
             });
         }
@@ -312,40 +408,27 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     _addMappingToChild: {
         value: function (mapping, child) {
             var service = this;
-            return mapping.resolveReferences().then(function () {
-                var objectDescriptor = mapping.objectDescriptor,
-                    type = [objectDescriptor.module.id, objectDescriptor.name].join("/");
-                objectDescriptor = service._objectDescriptorForType(type);
-                if (objectDescriptor) {
-                    mapping.service = child;
-                    child.addMappingForType(mapping, objectDescriptor);
-                }
+            return Promise.all([
+                mapping.objectDescriptorReference,
+                mapping.schemaDescriptorReference
+            ]).spread(function (objectDescriptor, schemaDescriptor) {
+                // TODO -- remove looking up by string to unique.
+                var type = [objectDescriptor.module.id, objectDescriptor.name].join("/");
+                objectDescriptor = service._moduleIdToObjectDescriptorMap[type];
+                mapping.objectDescriptor = objectDescriptor;
+                mapping.schemeDescriptor = schemaDescriptor;
+                mapping.service = child;
+                child.addMappingForType(mapping, objectDescriptor);
                 return null;
             });
         }
     },
 
-    _initializePrototypeForModuleAndObjectDescriptor: {
-        value: function (module, objectDescriptor) {
-            var self = this;
-            return module.require.async(module.id).then(function (exports) {
-                var constructor = exports[objectDescriptor.exportName],
-                    prototype = Object.create(constructor.prototype);
-                self._dataObjectPrototypes.set(constructor, prototype);
-                self._dataObjectPrototypes.set(objectDescriptor, prototype);
-                self._dataObjectTriggers.set(objectDescriptor, DataTrigger.addTriggers(self, objectDescriptor, prototype));
-                self._constructorToObjectDescriptorMap.set(constructor, objectDescriptor);
-                return null;
-            });
-        }
-    },
-
-    _moduleIdToObjectDescriptorMap: {
-        get: function () {
-            if (!this.__moduleIdToObjectDescriptorMap) {
-                this.__moduleIdToObjectDescriptorMap = {};
-            }
-            return this.__moduleIdToObjectDescriptorMap;
+    _objectDescriptorForType: {
+        value: function (type) {
+            return  this._constructorToObjectDescriptorMap.get(type) ||
+                    typeof type === "string" && this._moduleIdToObjectDescriptorMap[type] ||
+                    type;
         }
     },
 
@@ -358,37 +441,14 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
-    _objectDescriptorForType: {
-        value: function (type) {
-            return  this._constructorToObjectDescriptorMap.get(type) ||
-                    typeof type === "string" && this._moduleIdToObjectDescriptorMap[type] ||
-                    type;
+    _moduleIdToObjectDescriptorMap: {
+        get: function () {
+            if (!this.__moduleIdToObjectDescriptorMap) {
+                this.__moduleIdToObjectDescriptorMap = {};
+            }
+            return this.__moduleIdToObjectDescriptorMap;
         }
     },
-
-    _createObjectDescriptorForBlueprint: {
-        value: function (blueprint) {
-            return blueprint.module.require.async(blueprint.module.id).then(function (exports) {
-                var properties = {};
-                blueprint.propertyBlueprints.forEach(function (propertyBlueprint) {
-                    if (propertyBlueprint.isAssociationBlueprint) {
-                        properties[propertyBlueprint.name] = {};
-                    }
-                });
-                Object.defineProperty(exports[blueprint.exportName], "TYPE", {
-                    get: DataObjectDescriptor.getterFor(exports, blueprint.exportName, properties)
-                });
-                return exports[blueprint.exportName].TYPE;
-            });
-        }
-    },
-
-    _createObjectDescriptorsForTypes: {
-        value: function (types) {
-            return Promise.all(types.map(this._createObjectDescriptorForBlueprint));
-        }
-    },
-
 
     /**
      * Remove a raw data service as a child of this service and clear its parent
@@ -738,9 +798,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     _getObjectType: {
         value: function (object) {
-            // var type = this._typeRegistry.get(object),
-            //     info = Montage.getInfoForObject(object),
-            //     moduleId = [info.moduleId, info.objectName].join("/");
             var type = this._typeRegistry.get(object),
                 moduleId = typeof object === "string" ? object : this._getModuleIdForObject(object);
             while (!type && object) {

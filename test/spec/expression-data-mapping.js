@@ -22,7 +22,8 @@ describe("An Expression Data Mapping", function() {
         movieService,
         plotSummaryModuleReference,
         plotSummaryObjectDescriptor,
-        plotSummaryPropertyDescriptor;
+        plotSummaryPropertyDescriptor,
+        registrationPromise;
 
     DataService.mainService = undefined;
     mainService = new DataService();
@@ -63,30 +64,36 @@ describe("An Expression Data Mapping", function() {
     it("can be created", function () {
         expect(new ExpressionDataMapping()).toBeDefined();
     });
-
-    it("properly registers the object descriptor type to the mapping object in a service", function () {
-        return Promise.all([
-            mainService.registerChildService(movieService, movieObjectDescriptor),
-            mainService.registerChildService(categoryService, categoryObjectDescriptor)
-        ]).then(function () {
+    registrationPromise = Promise.all([
+        mainService.registerChildService(movieService, movieObjectDescriptor),
+        mainService.registerChildService(categoryService, categoryObjectDescriptor)
+    ]);
+    it("properly registers the object descriptor type to the mapping object in a service", function (done) {
+        return registrationPromise.then(function () {
             expect(movieService.parentService).toBe(mainService);
             expect(movieService.mappingWithType(movieObjectDescriptor)).toBe(movieMapping);
+            done();
         });
     });
 
-    it("can map raw data to object properties", function () {
+    it("can map raw data to object properties", function (done) {
         var movie = {};
-        return movieMapping.mapRawDataToObject({name: "Star Wars", category_id: 1}, movie).then(function () {
+        return Promise.all([registrationPromise, movieMapping.mapRawDataToObject({name: "Star Wars", category_id: 1}, movie)])
+        .then(function () {
             expect(movie.title).toBe("Star Wars");
             expect(movie.category).toBeDefined();
             expect(movie.category && movie.category.name === "Action").toBeTruthy();
+            done();
         });
     });
 
-    it("can map objects to raw data", function () {
-        var data = {};
-        movieMapping.mapObjectToRawData({name: "Star Wars"}, data);
-        expect(data.name).toBe("Star Wars");
+    it("can map objects to raw data", function (done) {
+        return registrationPromise.then(function () {
+            var data = {};
+            movieMapping.mapObjectToRawData({name: "Star Wars"}, data);
+            expect(data.name).toBe("Star Wars");
+            done();
+        });
     });
 
 });

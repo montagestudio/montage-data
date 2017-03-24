@@ -1,4 +1,5 @@
 var Converter = require("montage/core/converter/converter").Converter,
+    Criteria = require("montage/core/criteria").Criteria,
     DataQuery = require("logic/model/data-query").DataQuery;
 /**
  * @class RawPropertyValueToObjectConverter
@@ -104,8 +105,10 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
             var self = this;
             return this.foreignDescriptor.then(function (objectDescriptor) {
                 var type = [objectDescriptor.module.id, objectDescriptor.name].join("/"),
-                    criteria = {};
-                criteria[self.foreignProperty] = self.expression(v);
+                    dataExpression = self.foreignProperty + " = $value",
+                    criteria = new Criteria().initWithExpression(dataExpression, {
+                        value: self.expression(v)
+                    });
                 return self.service.rootService.fetchData(DataQuery.withTypeAndCriteria(type, criteria));
             });
         }

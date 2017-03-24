@@ -3,6 +3,7 @@ var DataMapping = require("./data-mapping").DataMapping,
     parse = require("frb/parse"),
     compile = require("frb/compile-evaluator"),
     Scope = require("frb/scope"),
+    ObjectDescriptorReference = require("montage/core/meta/object-descriptor-reference").ObjectDescriptorReference,
     Promise = require("montage/core/promise").Promise,
     Set = require("collections/set");
 
@@ -40,8 +41,8 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     deserializeSelf: {
         value: function (deserializer) {
             var value;
-            this.objectDescriptorReference = deserializer.getProperty("objectDescriptor");
-            this.schemaReference = deserializer.getProperty("schema");
+            this._objectDescriptorReference = deserializer.getProperty("objectDescriptor");
+            this._schemaDescriptorReference = deserializer.getProperty("schema");
 
             value = deserializer.getProperty("objectMapping");
             if (value) {
@@ -73,45 +74,6 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         }
     },
 
-    resolveReferences: {
-        value: function () {
-            var self = this;
-            return this._resolveObjectDescriptorReferenceIfNecessary().then(function () {
-                return self._resolveSchemaReferenceIfNecessary();
-            });
-        }
-    },
-
-    _resolveObjectDescriptorReferenceIfNecessary: {
-        value: function () {
-            var self = this,
-                requiresInitialization = !this.objectDescriptor && this.objectDescriptorReference,
-                promise = requiresInitialization ?  this.objectDescriptorReference.promise(require) :
-                                                    Promise.resolve(null);
-            return promise.then(function (objectDescriptor) {
-                if (objectDescriptor) {
-                    self.objectDescriptor = objectDescriptor;
-                }
-                return null;
-            });
-        }
-    },
-
-    _resolveSchemaReferenceIfNecessary: {
-        value: function () {
-            var self = this,
-                requiresInitialization = !this.schema && this.schemaReference,
-                promise = requiresInitialization ?  this.schemaReference.promise(require) :
-                                                    Promise.resolve(null);
-            return promise.then(function (objectDescriptor) {
-                if (objectDescriptor) {
-                    self.schema = objectDescriptor;
-                }
-                return null;
-            });
-        }
-    },
-
     /***************************************************************************
      * Properties
      */
@@ -122,7 +84,23 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
      * @type {ObjectDescriptor}
      */
     objectDescriptor: {
-        value: undefined
+        get: function () {
+            return this._objectDescriptor;
+        },
+        set: function (value) {
+            this._objectDescriptor = value;
+            this._objectDescriptorReference = new ObjectDescriptorReference().initWithValue(value);
+        }
+    },
+
+    schemaDescriptor: {
+        get: function () {
+            return this._schemaDescriptor;
+        },
+        set: function (value) {
+            this._schemaDescriptor = value;
+            this._schemaDescriptorReference = new ObjectDescriptorReference().initWithValue(value);
+        }
     },
 
     /**
@@ -131,7 +109,17 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
      * @type {ObjectDescriptorReference}
      */
     objectDescriptorReference: {
-        value: undefined
+        get: function () {
+            return  this._objectDescriptorReference ?   this._objectDescriptorReference.promise(require) :
+                                                        Promise.resolve(null);
+        }
+    },
+
+    schemaDescriptorReference: {
+        get: function () {
+            return  this._schemaDescriptorReference ?   this._schemaDescriptorReference.promise(require) :
+                                                        Promise.resolve(null);
+        }
     },
 
     /**
@@ -159,6 +147,15 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                     this._requisitePropertyNames.add(arg);
                 }
             }
+        }
+    },
+
+    /**
+     *
+     */
+    requisitePropertyNames: {
+        get: function () {
+            return this._requisitePropertyNames;
         }
     },
 

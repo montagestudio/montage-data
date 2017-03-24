@@ -294,9 +294,9 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
     getObjectProperty: {
         value: function (object) {
             var status = this._getValueStatus(object);
-            return status ?          status.promise :
-                status === null ? this._service.nullPromise :
-                    this.updateObjectProperty(object);
+            return  status ?             status.promise :
+                    status === null ?   this._service.nullPromise :
+                                        this.updateObjectProperty(object);
         }
     },
 
@@ -366,17 +366,18 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */ {
      * @method
      * @argument {DataService} service
      * @argument {Object} prototype
+     * @argument {Set} property names to exclude from triggers.
      * @returns {Object.<string, DataTrigger>}
      */
     addTriggers: {
-        value: function (service, type, prototype) {
+        value: function (service, type, prototype, requisitePropertyNames) {
             // This function was split into two to provide backwards compatibility
             // to existing Montage data projects.  Future montage data projects
             // should base their object descriptors on Montage's version of object
             // descriptor.
             var isMontageDataType = type instanceof DataObjectDescriptor || type instanceof ObjectDescriptor;
             return isMontageDataType ?  this._addTriggersForMontageDataType(service, type, prototype, name) :
-                this._addTriggers(service, type, prototype, name);
+                this._addTriggers(service, type, prototype, requisitePropertyNames);
         }
     },
 
@@ -395,11 +396,11 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */ {
     },
 
     _addTriggers: {
-        value: function (service, objectDescriptor, prototype) {
+        value: function (service, objectDescriptor, prototype, requisitePropertyNames) {
             var triggers = {}, propertyDescriptor, trigger, name, i, n;
             for (i = 0, n = objectDescriptor.propertyDescriptors.length; i < n; i += 1) {
                 propertyDescriptor = objectDescriptor.propertyDescriptors[i];
-                if (propertyDescriptor.valueDescriptor) {
+                if (!requisitePropertyNames.has(propertyDescriptor.name)) {
                     name = propertyDescriptor.name;
                     trigger = this.addTrigger(service, objectDescriptor, prototype, name);
                     if (trigger) {
