@@ -16,14 +16,18 @@ describe("An Expression Data Mapping", function() {
         categoryPropertyDescriptor,
         categoryService,
         mainService,
+        budgetPropertyDescriptor,
         movieMapping,
         movieModuleReference,
         movieObjectDescriptor,
+        movieSchema,
+        movieSchemaModuleReference,
         movieService,
         plotSummaryModuleReference,
         plotSummaryObjectDescriptor,
         plotSummaryPropertyDescriptor,
-        registrationPromise;
+        registrationPromise,
+        schemaBudgetPropertyDescriptor;
 
     DataService.mainService = undefined;
     mainService = new DataService();
@@ -32,6 +36,8 @@ describe("An Expression Data Mapping", function() {
     movieModuleReference = new ModuleReference().initWithIdAndRequire("spec/data/model/logic/movie", require);
     movieObjectDescriptor = new ModuleObjectDescriptor().initWithModuleAndExportName(movieModuleReference, "Movie");
     movieObjectDescriptor.addPropertyDescriptor(new PropertyDescriptor().initWithNameObjectDescriptorAndCardinality("title", movieObjectDescriptor, 1));
+    movieSchemaModuleReference = new ModuleReference().initWithIdAndRequire("spec/data/schema/logic/movie", require);
+    movieSchema = new ModuleObjectDescriptor().initWithModuleAndExportName(movieSchemaModuleReference, "Movie");
     categoryService = new CategoryService();
 
     categoryModuleReference = new ModuleReference().initWithIdAndRequire("spec/data/model/logic/category", require);
@@ -48,15 +54,22 @@ describe("An Expression Data Mapping", function() {
     plotSummaryPropertyDescriptor.valueDescriptor = plotSummaryObjectDescriptor;
     movieObjectDescriptor.addPropertyDescriptor(plotSummaryPropertyDescriptor);
 
-    movieMapping = new ExpressionDataMapping().initWithObjectDescriptorAndService(movieObjectDescriptor, movieService);
-    movieMapping.addRequisitePropertyName("title", "category");
+    schemaBudgetPropertyDescriptor = new PropertyDescriptor().initWithNameObjectDescriptorAndCardinality("budget", movieSchema, 1);
+    movieSchema.addPropertyDescriptor(schemaBudgetPropertyDescriptor);
+    budgetPropertyDescriptor = new PropertyDescriptor().initWithNameObjectDescriptorAndCardinality("budget", movieObjectDescriptor, 1);
+    budgetPropertyDescriptor.valueType = "number";
+    movieObjectDescriptor.addPropertyDescriptor(budgetPropertyDescriptor);
+
+    movieMapping = new ExpressionDataMapping().initWithServiceObjectDescriptorAndSchema(movieService, movieObjectDescriptor, movieSchema);
+    movieMapping.addRequisitePropertyName("title", "category", "budget");
     movieMapping.addObjectMappingRule("title", {"<->": "name"});
     movieMapping.addObjectMappingRule("category", {
         "<-": "category_id",
         converter: new RawPropertyValueToObjectConverter().initWithForeignPropertyAndCardinality("category_id", 1)
     });
+    movieMapping.addObjectMappingRule("budget", {"<->": "budget"});
     movieService.addMappingForType(movieMapping, movieObjectDescriptor);
-    categoryMapping = new ExpressionDataMapping().initWithObjectDescriptorAndService(categoryObjectDescriptor, categoryService);
+    categoryMapping = new ExpressionDataMapping().initWithServiceObjectDescriptorAndSchema(categoryService, categoryObjectDescriptor);
     categoryMapping.addObjectMappingRule("name", {"<->": "name"});
     categoryMapping.addRequisitePropertyName("name");
     categoryService.addMappingForType(categoryMapping, categoryObjectDescriptor);
@@ -78,7 +91,7 @@ describe("An Expression Data Mapping", function() {
 
     it("can map raw data to object properties", function (done) {
         var movie = {};
-        return Promise.all([registrationPromise, movieMapping.mapRawDataToObject({name: "Star Wars", category_id: 1}, movie)])
+        return movieMapping.mapRawDataToObject({name: "Star Wars", category_id: 1, budget: "14000000.00"}, movie)
         .then(function () {
             expect(movie.title).toBe("Star Wars");
             expect(movie.category).toBeDefined();
@@ -86,6 +99,16 @@ describe("An Expression Data Mapping", function() {
             done();
         });
     });
+
+    it("can automatically convert raw data to the correct value", function (done) {
+        var movie = {};
+        return movieMapping.mapRawDataToObject({name: "Star Wars", category_id: 1, budget: "14000000.00"}, movie)
+            .then(function () {
+                expect(typeof movie.budget === "number").toBeTruthy();
+                done();
+            });
+    });
+
 
     it("can map objects to raw data", function (done) {
         return registrationPromise.then(function () {
