@@ -277,7 +277,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                     rule.converter.service = rule.converter.service || self.service;
                     promises.push(self._convertRelationshipToRawData());
                 } else if (propertyDescriptor) {
-                    data[key] = this._parseRawData(rule, scope);
+                    data[key] = this._parseObject(rule, scope);
                 }
             }
             return promises && promises.length && Promise.all(promises) || Promise.resolve(null);
@@ -411,6 +411,13 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         value: function (rule, scope) {
             var value = rule.expression(scope);
             return rule.converter && rule.converter.convert(value) || value;
+        }
+    },
+
+    _parseObject: {
+        value: function (rule, scope) {
+            var value = rule.expression(scope);
+            return rule.converter && rule.converter.revert(value) || value;
         }
     },
 

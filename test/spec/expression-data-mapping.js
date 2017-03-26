@@ -103,20 +103,29 @@ describe("An Expression Data Mapping", function() {
     it("can automatically convert raw data to the correct value", function (done) {
         var movie = {};
         return movieMapping.mapRawDataToObject({name: "Star Wars", category_id: 1, budget: "14000000.00"}, movie)
-            .then(function () {
-                expect(typeof movie.budget === "number").toBeTruthy();
-                done();
-            });
+        .then(function () {
+            expect(typeof movie.budget === "number").toBeTruthy();
+            done();
+        });
     });
 
-
     it("can map objects to raw data", function (done) {
-        return registrationPromise.then(function () {
-            var data = {};
-            movieMapping.mapObjectToRawData({name: "Star Wars"}, data);
+        var data = {};
+        movieMapping.mapObjectToRawData({name: "Star Wars", budget: 14000000}, data)
+        .then(function () {
             expect(data.name).toBe("Star Wars");
             done();
         });
     });
+
+    it("can automatically revert objects to raw data", function (done) {
+        var data = {};
+        movieMapping.mapObjectToRawData({name: "Star Wars", budget: 14000000}, data)
+        .then(function () {
+            expect(data.budget).toBe("14000000");
+            done();
+        });
+    });
+
 
 });
