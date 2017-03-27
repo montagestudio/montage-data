@@ -1,13 +1,8 @@
 var Montage = require("montage/core/core").Montage,
     Promise = require("montage/core/promise").Promise,
-    // Set = require("collections/set");
-    Map = require("collections/map"),
-    AuthorizationManager;
+    Map = require("collections/map");
 
-
-    if (typeof window !== "undefined") { // client-side
-        Map = window.Map || Map;
-    }
+    var MANAGER_PANEL_MODULE = "ui/authorization-manager-panel.reel";
 
 /**
  * Helps coordinates the needs for DataServices to get the authorization they
@@ -17,45 +12,203 @@ var Montage = require("montage/core/core").Montage,
  * @class
  * @extends external:Montage
  */
-AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.prototype */ {
+var AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.prototype */ {
 
     constructor: {
         value: function () {
-
-            this._registeredAuthorizationServicesByModuleId = new Map;
-            this._registeredAuthorizationPanelsByModuleId = new Map;
-            this._dataServicesForAuthorizationPanels = new Map;
-            this._pendingAuthorizationServices = [];
+            this._authorizationServicesByModuleId = new Map();
+            this._authorizationPanelsByModuleId = new Map();
+            this._authorizationByServiceModuleId = new Map();
             return this;
         }
     },
-    delegate: {
-        value: null
-    },
-    pendingAuthorizationServices: {
-        value: null
-    },
-    authorizationManagerPanel: {
-        value: null
-    },
-    _registeredAuthorizationServicesByModuleId: {
-        value: void 0
-    },
-    _registeredAuthorizationPanelsByModuleId: {
-        value: void 0
-    },
-    registerAuthorizationService: {
-        value: function(aDataService) {
-            var info = Montage.getInfoForObject(aDataService);
-            this._registeredAuthorizationServicesByModuleId.set(info.moduleId,aDataService);
 
+    /********************************************
+     * Caching
+     */
+
+    // Module ID to Panel
+    _authorizationPanelsByModuleId: {
+        value: undefined
+    },
+
+    // Module ID to Service
+    _authorizationServicesByModuleId: {
+        value: undefined
+    },
+
+    // Service Module ID to Promise that resolves with Authorization
+    _authorizationByServiceModuleId: {
+        value: undefined
+    },
+
+
+    /********************************************
+     * Panels
+     */
+
+    _getAuthorizationManagerPanel: {
+        value: function () {
+            var self = this,
+                moduleId;
+
+            if (!this._authorizationManagerPanelPromise && this.authorizationManagerPanel) {
+                this.authorizationManagerPanel.authorizationManager = this;
+                this._authorizationManagerPanelPromise = Promise.resolve(this.authorizationManagerPanel);
+            } else if (!this._authorizationManagerPanelPromise) {
+                moduleId = this.callDelegateMethod("authorizationManagerWillLoadAuthorizationManagerPanel", this, MANAGER_PANEL_MODULE) || MANAGER_PANEL_MODULE;
+                this._authorizationManagerPanelPromise = require.async(moduleId).bind(this).then(function (exports) {
+                    var panel = new exports.AuthorizationManagerPanel();
+                    self.authorizationManagerPanel = panel;
+                    panel.authorizationManager = self;
+                    return panel;
+                }).catch(function(error) {
+                    console.log(error);
+                });
+            }
+
+            return this._authorizationManagerPanelPromise;
         }
     },
+
+
+    _getAuthorizationPanelForService: {
+        value: function (authorizationService) {
+            var moduleId = this._getPanelModuleIdForService(authorizationService),
+                panel = this._authorizationPanelsByModuleId.get(moduleId);
+
+            return panel ? Promise.resolve(panel) : this._makePanelForService(moduleId, authorizationService);
+        }
+    },
+
+    _getPanelModuleIdForService: {
+        value: function (authorizationService) {
+            var moduleId = authorizationService.authorizationPanel;
+            return this.callDelegateMethod("authorizationManagerWillAuthorizeServiceWithPanelModuleId", this,  authorizationService, moduleId) || moduleId;
+        }
+    },
+
+    _getPanelForConstructorAndService: {
+        value: function (constructor, authorizationService) {
+            return this.callDelegateMethod("authorizationManagerWillInstantiateAuthorizationPanelForService", this, constructor, authorizationService) || new constructor();
+        }
+    },
+
+    _makePanelForService: {
+        value: function (panelModuleID, authorizationService) {
+            var self = this,
+                serviceInfo = Montage.getInfoForObject(authorizationService),
+                panelPromise;
+
+            if (panelModuleID) {
+                panelPromise = serviceInfo.require.async(panelModuleID).then(function (exports) {
+                    var exportNames = Object.keys(exports),
+                        panel, i, n;
+
+                    for (i = 0, n = exportNames.length; i < n && !panel; ++i) {
+                        panel = self._getPanelForConstructorAndService(exports[exportNames[i]], authorizationService)
+                    }
+                    panel.service = authorizationService;
+                    self._authorizationPanelsByModuleId.set(panelModuleID, panel);
+                    return panel;
+                });
+            }
+
+            return panelPromise;
+        }
+    },
+
+    /********************************************
+     * Services
+     */
+
+    _canNotifyDataService: {
+        value: function (dataService) {
+            return dataService.authorizationManagerWillAuthorizeWithService && typeof dataService.authorizationManagerWillAuthorizeWithService == "function";
+        }
+    },
+
+    _getAuthorizationServicesForDataService: {
+        value: function (dataService) {
+            var promises = [],
+                dataServiceInfo = Montage.getInfoForObject(dataService),
+                serviceIds = dataService.authorizationServices,
+                servicePromise, i, n;
+
+            for (i = 0, n = serviceIds.length; i < n; ++i) {
+                servicePromise = this._getAuthorizationServiceWithModuleId(serviceIds[i], dataServiceInfo);
+                promises.push(servicePromise);
+            }
+
+            return Promise.all(promises);
+        }
+    },
+
+    _getAuthorizationServiceWithModuleId: {
+        value: function (moduleId, dataServiceInfo) {
+            var existingService = this._authorizationServicesByModuleId.get(moduleId);
+
+            return existingService ? Promise.resolve(existingService) :
+                                     this._makeAuthorizationServiceWithModuleId(moduleId, dataServiceInfo);
+        }
+    },
+
+
+    _getAuthorizationWithService: {
+        value: function (moduleId, dataServiceInfo, managerPanel) {
+            var self = this;
+            return this._getAuthorizationServiceWithModuleId(moduleId, dataServiceInfo).then(function (service) {
+                return self._getAuthorizationPanelForService(service);
+            }).then(function (panel) {
+                return managerPanel.authorizeWithPanel(panel);
+            });
+        }
+    },
+
+    _makeAuthorizationServiceWithModuleId: {
+        value: function (moduleId, dataServiceInfo) {
+            var self = this;
+            return dataServiceInfo.require.async(moduleId).then(function (exports) {
+                var service, serviceName;
+                for (serviceName in exports) {
+                    service = service || new exports[serviceName]();
+                }
+                self.registerAuthorizationService(service);
+                return service;
+            });
+        }
+    },
+
+    _notifyDataService: {
+        value: function (dataService) {
+            var i, n;
+
+            if (this._canNotifyDataService(dataService)) {
+                return this._getAuthorizationServicesForDataService(dataService).then(function (services) {
+                    for (i = 0, n = services.length; i < n; i++) {
+                        //We tell the data service we're authorizing about authorizationService we create and are about to use.
+                        dataService.authorizationManagerWillAuthorizeWithService(this, services[i]);
+                    }
+                })
+            }
+
+            return Promise.resolve(null);
+        }
+    },
+
+    /********************************************
+     * Public
+     */
+
+    authorizationManagerPanel: {
+        value: undefined
+    },
+
     /**
-     * Takes care of obtaining authorization for a DataService. Returns a promis of Authorization
+     * Takes care of obtaining authorization for a DataService. Returns a promise of Authorization
      *
      * TODO:
-     * 1. Handle repeated calls: if a DataService authorizes on-demand it's likelily
+     * 1. Handle repeated calls: if a DataService authorizes on-demand it's likely
      * it would come from fetching data. Multiple independent fetches could trigger repeated
      * attempts to authorize: The promise should be cached and returned when pending.
      *
@@ -71,162 +224,57 @@ AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.protot
      * @method
      */
 
+
     authorizeService : {
-        value: function(aDataService) {
+        value: function(dataService) {
             var self = this,
-                aDataServiceInfo = Montage.getInfoForObject(aDataService),
-                authorizationPromise = new Promise(function(resolve,reject){
-                var authorizationServicesModuleIds = aDataService.authorizationServices,
-                iService, iServiceModuleId, i, countI, iAuthorizationService,
-                registeredAuthorizationServices = self._registeredAuthorizationServicesByModuleId,
-                authorizationServices = [];
+                dataServiceInfo = Montage.getInfoForObject(dataService),
+                authorizationPromises = [],
+                moduleId,
+                i, n;
 
-                for(i=0, countI = authorizationServicesModuleIds.length; i<countI; i++) {
-                    iServiceModuleId = authorizationServicesModuleIds[i];
-                    iService = registeredAuthorizationServices.get(iServiceModuleId);
+            this.hasPendingServices = true;
 
-                    //Looks like we don't have that service yet, we need to load it.
-                    if(!iService) {
-                        var iPromise = aDataServiceInfo.require.async(iServiceModuleId);
-                        authorizationServices[i] = iPromise;
+            return this._getAuthorizationManagerPanel().then(function (managerPanel) {
 
+                for (i = 0, n = dataService.authorizationServices.length; i < n; ++i) {
+                    moduleId = dataService.authorizationServices[i];
+                    if (!self._authorizationByServiceModuleId.has(moduleId)) {
+                        self._authorizationByServiceModuleId.set(moduleId, self._getAuthorizationWithService(moduleId, dataServiceInfo, managerPanel));
                     }
-                    else {
-                        authorizationServices[i] = Promise.resolve(iService);
-                    }
+
+                    authorizationPromises.push(self._authorizationByServiceModuleId.get(moduleId));
                 }
+                return self._notifyDataService(dataService)
+            }).then(function () {
+                return Promise.all(authorizationPromises);
+            }).then(function(authorizations) {
+                self.callDelegateMethod("authorizationManagerDidAuthorizeService", self, dataService);
+                self.hasPendingServices = false;
 
-                // TODO:
-                // This should work for one DataService but if multiple services ask for
-                // authorization, this will require more coordination among the multiple calls
-
-                // TODO: Needs instantiation of services
-
-                Promise.all(authorizationServices).bind(self).then(function(authorizationServicesExports) {
-                    var authorizationServices = [], i, countI, iService, authorizationPanels = [], iAuthorizationPanel, iAuthorizationPanelModuleId, iExport, exportSymbol;
-
-                    for(i=0, countI = authorizationServicesExports.length; i<countI; i++) {
-                        iExport = authorizationServicesExports[i];
-                        for(exportSymbol in iExport) {
-                            iAuthorizationService = new iExport[exportSymbol];
-                            //We tell the data service we're authorizing about authorizationService we create and are about to use.
-                            aDataService.authorizationManagerWillAuthorizeWithService(this,iAuthorizationService);
-                            authorizationServices.push(iAuthorizationService);
-                        }
-                    }
-
-                    // Now we have all the authorization DataServices, we're going to load their
-                    // AuthenticationPanel:
-                    for(i=0, countI = authorizationServices.length; i<countI; i++) {
-                        iService = authorizationServices[i];
-                        iAuthorizationPanelModuleId = iService.authorizationPanel;
-                        iAuthorizationPanelModuleId = this.callDelegateMethod("authorizationManagerWillAuthorizeServiceWithPanelModuleId", this,iService,iAuthorizationPanelModuleId) || iAuthorizationPanelModuleId;
-                        if(!iAuthorizationPanelModuleId) {
-                            continue;
-                        }
-                        iAuthorizationPanel = this._registeredAuthorizationPanelsByModuleId.get(iAuthorizationPanelModuleId)
-                        if(!iAuthorizationPanel) {
-                            // Lookup if already created, else ....
-                            var iPromise = Montage.getInfoForObject(iService).require.async(iAuthorizationPanelModuleId);
-
-                            authorizationPanels.push(iPromise);
-                            this._dataServicesForAuthorizationPanels.set(iAuthorizationPanelModuleId,iService);
-                        }
-                        else {
-                            authorizationPanels.push(Promise.resolve(iAuthorizationPanel));
-                            this._dataServicesForAuthorizationPanels.set(iAuthorizationPanel,iService);
-
-                        }
-
-                    }
-                    Promise.all(authorizationPanels).bind(this).then(function(authorizationPanelExports) {
-                        var i,
-                            countI,
-                            iAuthorizationPanelExport,
-                            iAuthorizationPanel,
-                            iAuthorizationPanelConstructor,
-                            authorizationPanels = [],
-                            iAuthorizationPanelInfo
-                            iService;
-
-                        for(i=0, countI = authorizationPanelExports.length; i<countI; i++) {
-                            iAuthorizationPanelExport = authorizationPanelExports[i];
-
-                            //FIXME
-                            //We need to be smarter about this as there could be multiple symbols on
-                            //an exports, for now we take the first one.
-                            for(var key in iAuthorizationPanelExport) {
-                                iAuthorizationPanelConstructor = iAuthorizationPanelExport[key];
-                                //Give our delgate a chance to give us an existing instance of an AuthorizationPanel
-                                iAuthorizationPanel = this.callDelegateMethod("authorizationManagerWillInstantiateAuthorizationPanelForService", this,iAuthorizationPanelConstructor,iService);
-                                if(!iAuthorizationPanel) iAuthorizationPanel = new iAuthorizationPanelConstructor;
-                                // WEAKNESS: The FreeNAS service returned a moduleId of "/ui/sign-in.reel", which worked to load
-                                // but the info conained "ui/sign-in.reel", causing the lookup to fail. We need to be careful and
-                                // investigate a possible solution.
-                                iService = this._dataServicesForAuthorizationPanels.get(Montage.getInfoForObject(iAuthorizationPanelConstructor).moduleId)
-                                this._dataServicesForAuthorizationPanels.set(iAuthorizationPanel,iService);
-                                iAuthorizationPanel.dataService = iService;
-                                // We need to cache/lookup if we already have one like that.
-                                authorizationPanels.push(iAuthorizationPanel);
-                                break;
-                            }
-                            // Now that we have the type, we need to:
-                            // 1. instantiate it
-                            // 2. Put it in an array
-                            // 3. Pass it to the AuthorizationManagerPanel
-
-
-                        }
-                        // var iPromise = mr.async(iAuthorizationPanel).then(function (exports) {
-                        //         console.log("loaded ",iAuthorizationPanel,exports)
-                        //                     });
-                        var self = this;
-                        var authorizationManagerPanelPromise = new Promise(function(resolve, reject) {
-                            if(!self.authorizationManagerPanel) {
-                                var authorizationManagerPanelModuleId = "montage-data/ui/authorization-manager-panel.reel";
-
-                                authorizationManagerPanelModuleId = self.callDelegateMethod("authorizationManagerWillLoadAuthorizationManagerPanel", self, authorizationManagerPanelModuleId) || authorizationManagerPanelModuleId;
-
-                                mr.async(authorizationManagerPanelModuleId).bind(self).then(function (exports) {
-                                        var AuthorizationManagerPanel = exports.AuthorizationManagerPanel;
-                                        this.authorizationManagerPanel = new AuthorizationManagerPanel();
-                                        this.authorizationManagerPanel.authorizationPanels = authorizationPanels;
-                                        resolve(this.authorizationManagerPanel);
-                                    },function(error) {
-                                        console.log(error);
-                                    });
-                            }
-                            else {
-                                resolve(self.authorizationManagerPanel);
-                            }
-                        });
-                        authorizationManagerPanelPromise.then(function(authorizationManagerPanel) {
-                            // Show in Modal.
-                            authorizationManagerPanel.runModal().then(function(authorization) {
-                                resolve(authorization);
-                            },
-                            function(authorizatinError) {
-                                reject(authorizatinError);
-                            })
-                            .then(function() {
-                                self.callDelegateMethod("authorizationManagerDidAuthorizeService", self,aDataService);
-                            });
-                        });
-
-                    });
-
-                });
-
+                //TODO [TJ] How to concatenate authorizations from different auth-services into a single Authorization Object for the data-service
+                return authorizations;
             });
 
 
-            //Now we need to loop on that, assess if they are instances or module-id
-            //Then ask if they have an AuthorizationPanel.
-            //And then once collected all, use the AuthorizationManagerPanel to
-            //put them on screen via the modal panel.
-            return authorizationPromise;
+        }
+    },
+
+    delegate: {
+        value: null
+    },
+
+    hasPendingServices: {
+        value: false
+    },
+
+    registerAuthorizationService: {
+        value: function(dataService) {
+            var info = Montage.getInfoForObject(dataService);
+            this._authorizationServicesByModuleId.set(info.moduleId, dataService);
         }
     }
+
 });
 
 var authorizationManager = new AuthorizationManager;

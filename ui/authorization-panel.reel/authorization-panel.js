@@ -1,15 +1,26 @@
 var Component = require("montage/ui/component").Component,
-    application = require("montage/core/application").application,
-    AuthorizationManager = require("logic/service/authorization-manager").AuthorizationManager;
+    AuthorizationManager = require("logic/service/authorization-manager").AuthorizationManager,
+    deprecate = require("montage/core/deprecate");
 
 /**
  * @class Main
  * @extends Component
  */
 exports.AuthorizationPanel = Component.specialize({
+
     dataService: {
+        get: deprecate.deprecateMethod(void 0, function () {
+            return !!this.service;
+        }, "dataService", "service"),
+        set: deprecate.deprecateMethod(void 0, function () {
+            return !!this.service;
+        }, "dataService", "service")
+    },
+
+    service: {
         value: null
     },
+
     authorizationManagerPanel: {
         get: function() {
             return AuthorizationManager.authorizationManagerPanel;
@@ -17,5 +28,3 @@ exports.AuthorizationPanel = Component.specialize({
     }
 
 });
-
-// FIXME: Selection needs to be managed by a selection controller

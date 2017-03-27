@@ -445,8 +445,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             }
             if (this.authorizationPolicy === AuthorizationPolicyType.UpfrontAuthorizationPolicy) {
                 var self = this;
-                this.authorizationPromise = exports.DataService.authorizationManager.authorizeService(this)
-                .then(function(authorization) {
+                this.authorizationPromise = exports.DataService.authorizationManager.authorizeService(this).then(function(authorization) {
                     self.authorization = authorization;
                     return authorization;
                 },
