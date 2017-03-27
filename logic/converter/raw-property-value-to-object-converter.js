@@ -117,7 +117,7 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
     /**
      * Reverts the relationship back to raw data.
      * @function
-     * @param {moment} v The value to revert.
+     * @param {Scope} v The value to revert.
      * @returns {string} v
      */
     revert: {

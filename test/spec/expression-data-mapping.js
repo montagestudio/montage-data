@@ -61,7 +61,7 @@ describe("An Expression Data Mapping", function() {
     budgetPropertyDescriptor = new PropertyDescriptor().initWithNameObjectDescriptorAndCardinality("budget", movieObjectDescriptor, 1);
     budgetPropertyDescriptor.valueType = "number";
     movieObjectDescriptor.addPropertyDescriptor(budgetPropertyDescriptor);
-    
+
     isFeaturedPropertyDescriptor = new PropertyDescriptor().initWithNameObjectDescriptorAndCardinality("isFeatured", movieObjectDescriptor, 1);
     isFeaturedPropertyDescriptor.valueType = "boolean";
     movieObjectDescriptor.addPropertyDescriptor(isFeaturedPropertyDescriptor);
@@ -92,7 +92,7 @@ describe("An Expression Data Mapping", function() {
         mainService.registerChildService(movieService, movieObjectDescriptor),
         mainService.registerChildService(categoryService, categoryObjectDescriptor)
     ]);
-    
+
     it("properly registers the object descriptor type to the mapping object in a service", function (done) {
         return registrationPromise.then(function () {
             expect(movieService.parentService).toBe(mainService);
@@ -149,7 +149,7 @@ describe("An Expression Data Mapping", function() {
         });
     });
 
-    it("can automatically revert objects to raw data", function (done) {
+    it("can automatically revert objects to raw data of the correct type", function (done) {
         var movie = {
                 title: "Star Wars",
                 budget: 14000000.00,
