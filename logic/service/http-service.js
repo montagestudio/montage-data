@@ -55,7 +55,7 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
             if (!this._getCachedFetchPromise(object, propertyName)) {
                 // Parse arguments.
                 if (arguments.length >= 4) {
-                    selector = DataSelector.withTypeAndCriteria(type, arguments[arguments.length - 1]);
+                    selector = DataSelector.withTypeAndCriteria(type, arguments[arguments.length - 1]);//RDW unclear if there's any special change required here for formal Criteria
                 } else {
                     selector = DataSelector.withTypeAndCriteria(type);
                 }

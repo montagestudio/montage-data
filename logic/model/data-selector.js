@@ -1,4 +1,5 @@
 var Montage = require("montage/core/core").Montage;
+    Criteria = require("montage/core/criteria").Criteria;
 
 /**
  * Defines the criteria that objects must satisfy to be included in a set of
@@ -30,13 +31,15 @@ exports.DataSelector = exports.DataQuery= Montage.specialize(/** @lends DataSele
      */
     criteria: {
         get: function () {
-            if (!this._criteria) {
-                this._criteria = {};
-            }
             return this._criteria;
         },
         set: function (criteria) {
-            this._criteria = criteria;
+            if (!criteria || criteria instanceof Criteria) {
+                this._criteria = criteria;
+            }
+            else {
+                throw new TypeError("can only set instances of Criteria");
+            }
         }
     },
 
@@ -125,7 +128,7 @@ exports.DataSelector = exports.DataQuery= Montage.specialize(/** @lends DataSele
     /**
      * An object defining a list of expressions to resolve at the same time as the query.
      * expressions are based on the content of results described by criteria. A common
-     * use is to preftch relationships off fetched objects.
+     * use is to prefetch relationships off fetched objects.
      * @type {Array}
      */
 
