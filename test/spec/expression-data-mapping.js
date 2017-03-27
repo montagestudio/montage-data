@@ -17,6 +17,7 @@ describe("An Expression Data Mapping", function() {
         categoryService,
         mainService,
         budgetPropertyDescriptor,
+        isFeaturedPropertyDescriptor,
         movieMapping,
         movieModuleReference,
         movieObjectDescriptor,
@@ -27,7 +28,8 @@ describe("An Expression Data Mapping", function() {
         plotSummaryObjectDescriptor,
         plotSummaryPropertyDescriptor,
         registrationPromise,
-        schemaBudgetPropertyDescriptor;
+        schemaBudgetPropertyDescriptor,
+        schemaIsFeaturedPropertyDescriptor;
 
     DataService.mainService = undefined;
     mainService = new DataService();
@@ -59,15 +61,23 @@ describe("An Expression Data Mapping", function() {
     budgetPropertyDescriptor = new PropertyDescriptor().initWithNameObjectDescriptorAndCardinality("budget", movieObjectDescriptor, 1);
     budgetPropertyDescriptor.valueType = "number";
     movieObjectDescriptor.addPropertyDescriptor(budgetPropertyDescriptor);
+    
+    isFeaturedPropertyDescriptor = new PropertyDescriptor().initWithNameObjectDescriptorAndCardinality("isFeatured", movieObjectDescriptor, 1);
+    isFeaturedPropertyDescriptor.valueType = "boolean";
+    movieObjectDescriptor.addPropertyDescriptor(isFeaturedPropertyDescriptor);
+    schemaIsFeaturedPropertyDescriptor = new PropertyDescriptor().initWithNameObjectDescriptorAndCardinality("is_featured", movieSchema, 1);
+    schemaIsFeaturedPropertyDescriptor.valueType = "string";
+    movieSchema.addPropertyDescriptor(schemaIsFeaturedPropertyDescriptor);
 
     movieMapping = new ExpressionDataMapping().initWithServiceObjectDescriptorAndSchema(movieService, movieObjectDescriptor, movieSchema);
-    movieMapping.addRequisitePropertyName("title", "category", "budget");
+    movieMapping.addRequisitePropertyName("title", "category", "budget", "isFeatured");
     movieMapping.addObjectMappingRule("title", {"<->": "name"});
     movieMapping.addObjectMappingRule("category", {
         "<-": "category_id",
         converter: new RawPropertyValueToObjectConverter().initWithForeignPropertyAndCardinality("category_id", 1)
     });
     movieMapping.addObjectMappingRule("budget", {"<->": "budget"});
+    movieMapping.addObjectMappingRule("isFeatured", {"<->": "is_featured"});
     movieService.addMappingForType(movieMapping, movieObjectDescriptor);
     categoryMapping = new ExpressionDataMapping().initWithServiceObjectDescriptorAndSchema(categoryService, categoryObjectDescriptor);
     categoryMapping.addObjectMappingRule("name", {"<->": "name"});
@@ -77,10 +87,12 @@ describe("An Expression Data Mapping", function() {
     it("can be created", function () {
         expect(new ExpressionDataMapping()).toBeDefined();
     });
+
     registrationPromise = Promise.all([
         mainService.registerChildService(movieService, movieObjectDescriptor),
         mainService.registerChildService(categoryService, categoryObjectDescriptor)
     ]);
+    
     it("properly registers the object descriptor type to the mapping object in a service", function (done) {
         return registrationPromise.then(function () {
             expect(movieService.parentService).toBe(mainService);
@@ -90,9 +102,14 @@ describe("An Expression Data Mapping", function() {
     });
 
     it("can map raw data to object properties", function (done) {
-        var movie = {};
-        return movieMapping.mapRawDataToObject({name: "Star Wars", category_id: 1, budget: "14000000.00"}, movie)
-        .then(function () {
+        var movie = {},
+            data = {
+                name: "Star Wars",
+                category_id: 1,
+                budget: "14000000.00",
+                is_featured: true
+            };
+        return movieMapping.mapRawDataToObject(data, movie).then(function () {
             expect(movie.title).toBe("Star Wars");
             expect(movie.category).toBeDefined();
             expect(movie.category && movie.category.name === "Action").toBeTruthy();
@@ -100,29 +117,49 @@ describe("An Expression Data Mapping", function() {
         });
     });
 
-    it("can automatically convert raw data to the correct value", function (done) {
-        var movie = {};
-        return movieMapping.mapRawDataToObject({name: "Star Wars", category_id: 1, budget: "14000000.00"}, movie)
-        .then(function () {
+    it("can automatically convert raw data to the correct type", function (done) {
+        var movie = {},
+            data = {
+                name: "Star Wars",
+                category_id: 1,
+                budget: "14000000.00",
+                is_featured: true
+            };
+        return movieMapping.mapRawDataToObject(data, movie).then(function () {
             expect(typeof movie.budget === "number").toBeTruthy();
+            expect(typeof movie.category === "object").toBeTruthy();
+            expect(typeof movie.isFeatured === "boolean").toBeTruthy();
+            expect(typeof movie.title === "string").toBeTruthy();
             done();
         });
     });
 
     it("can map objects to raw data", function (done) {
-        var data = {};
-        movieMapping.mapObjectToRawData({name: "Star Wars", budget: 14000000}, data)
-        .then(function () {
+        var movie = {
+                title: "Star Wars",
+                budget: 14000000.00,
+                isFeatured: true
+            },
+            data = {};
+        movieMapping.mapObjectToRawData(movie, data).then(function () {
             expect(data.name).toBe("Star Wars");
+            expect(data.budget).toBe("14000000");
+            expect(data.is_featured).toBe("true");
             done();
         });
     });
 
     it("can automatically revert objects to raw data", function (done) {
-        var data = {};
-        movieMapping.mapObjectToRawData({name: "Star Wars", budget: 14000000}, data)
-        .then(function () {
-            expect(data.budget).toBe("14000000");
+        var movie = {
+                title: "Star Wars",
+                budget: 14000000.00,
+                isFeatured: true
+            },
+            data = {};
+        movieMapping.mapObjectToRawData(movie, data).then(function () {
+            expect(typeof data.budget === "string").toBeTruthy();
+            expect(typeof data.is_featured).toBeTruthy();
+            expect(typeof data.name === "string").toBeTruthy();
             done();
         });
     });

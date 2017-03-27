@@ -157,7 +157,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     },
 
     /**
-     *
+     * @return {Set}
      */
     requisitePropertyNames: {
         get: function () {
@@ -327,7 +327,8 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 rawRule = rawRules[propertyName];
                 if (this._shouldMapRule(rawRule, addOneWayBindings)) {
                     targetPath = addOneWayBindings && propertyName || rawRule[TWO_WAY_BINDING];
-                    rule = addOneWayBindings ? this._mapRule(rawRule) : this._mapReverseRule(rawRule);
+                    rule = addOneWayBindings ?  this._mapRule(rawRule) :
+                        this._mapReverseRule({"<->": propertyName, converter: rawRule.converter});
                     rule.converter = rule.converter || this._defaultConverter(propertyName, targetPath);
                     rules[targetPath] = rule;
                 }
@@ -346,8 +347,8 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                         propertyName;
                     propertyDescriptor = this.objectDescriptor.propertyDescriptorForName(propertyDescriptorName);
                     targetPath = addOneWayBindings && propertyName || rawRule[TWO_WAY_BINDING];
-                    rule = addOneWayBindings ?     this._mapRule(rawRule) :
-                                                                this._mapReverseRule(rawRule);
+                    rule = addOneWayBindings ?  this._mapRule(rawRule) :
+                                                this._mapReverseRule({"<->": propertyName, converter: rawRule.converter});
                     rule.converter = rule.converter || this._defaultConverter(propertyName, targetPath);
                     rule.propertyDescriptor = propertyDescriptor;
                     rules[targetPath] = rule;
@@ -491,8 +492,40 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
 
     _addDefaultConvertersToMap: {
         value: function (converters) {
+            exports.ExpressionDataMapping._addDefaultBooleanConvertersToConverters(converters);
             exports.ExpressionDataMapping._addDefaultNumberConvertersToConverters(converters);
             exports.ExpressionDataMapping._addDefaultStringConvertersToConverters(converters);
+        }
+    },
+
+    _addDefaultBooleanConvertersToConverters: {
+        value: function (converters) {
+            var booleanConverters = {};
+            booleanConverters["string"] = Object.create({}, {
+                convert: {
+                    value: function (value) {
+                        return Boolean(value);
+                    }
+                },
+                revert: {
+                    value: function (value) {
+                        return String(value);
+                    }
+                }
+            });
+            booleanConverters["number"] = Object.create({}, {
+                convert: {
+                    value: function (value) {
+                        return Boolean(value);
+                    }
+                },
+                revert: {
+                    value: function (value) {
+                        return Number(value);
+                    }
+                }
+            });
+            converters["boolean"] = booleanConverters;
         }
     },
 
@@ -508,6 +541,18 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 revert: {
                     value: function (value) {
                         return String(value);
+                    }
+                }
+            });
+            numberConverters["boolean"] = Object.create({}, {
+                convert: {
+                    value: function (value) {
+                        return Number(value);
+                    }
+                },
+                revert: {
+                    value: function (value) {
+                        return Boolean(value);
                     }
                 }
             });
@@ -527,6 +572,18 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 revert: {
                     value: function (value) {
                         return Number(value);
+                    }
+                }
+            });
+            stringConverters["boolean"] = Object.create({}, {
+                convert: {
+                    value: function (value) {
+                        return String(value);
+                    }
+                },
+                revert: {
+                    value: function (value) {
+                        return Boolean(value);
                     }
                 }
             });

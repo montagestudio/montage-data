@@ -6,10 +6,23 @@ var Montage = require("montage").Montage;
  */
 exports.Movie = Montage.specialize({
 
+    /**
+     * @type {boolean}
+     */
+    isFeatured: {
+        value: undefined
+    },
+    
+    /**
+     * @type {PlotSummary}
+     */
     plotSummary: {
         value: undefined
     },
-
+    
+    /**
+     * @type {string}
+     */
     title: {
         value: undefined
     }
