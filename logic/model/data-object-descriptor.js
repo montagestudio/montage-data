@@ -1,5 +1,5 @@
-var ObjectDescriptor = require("logic/model/object-descriptor").ObjectDescriptor,
-    DataPropertyDescriptor = require("logic/model/data-property-descriptor").DataPropertyDescriptor;
+var ObjectDescriptor = require("./object-descriptor").ObjectDescriptor,
+    DataPropertyDescriptor = require("./data-property-descriptor").DataPropertyDescriptor;
 
 /**
  * Extends an object descriptor with the additional object information needed by
@@ -170,13 +170,15 @@ exports.DataObjectDescriptor = ObjectDescriptor.specialize(/** @lends DataObject
                 parsed = this._parseGetterForArguments.apply(this, arguments),
                 getter = ObjectDescriptor.getterFor.call(this, parsed.exports, parsed.name, parsed.types);
             return function () {
+                
                 if (!this.hasOwnProperty("_TYPE")) {
                     this._TYPE = getter.call(this);
                     this._TYPE.identifierNames = parsed.identifiers;
                     this._TYPE._addRelationships(parsed.relationships);
                 }
+
                 return this._TYPE;
-            }
+            };
         }
     },
 
@@ -210,8 +212,9 @@ exports.DataObjectDescriptor = ObjectDescriptor.specialize(/** @lends DataObject
                 parsed.identifiers = arguments[index];
                 index += 1;
             } else {
-                for (i = index, n = arguments.length; i < n && typeof arguments[i] === "string"; i += 1);
-                parsed.identifiers = Array.prototype.slice.call(arguments, index, i);
+                for (i = index, n = arguments.length; i < n && typeof arguments[i] === "string"; i += 1) {
+                    parsed.identifiers = Array.prototype.slice.call(arguments, index, i);
+                }
                 index = i;
             }
             // Parse the relationship information.

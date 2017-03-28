@@ -1,3 +1,4 @@
+/* global __dirname */
 var jasmineRequire = require('jasmine-core/lib/jasmine-core/jasmine.js');
 var JasmineConsoleReporter = require('jasmine-console-reporter');
 global.XMLHttpRequest = require('xhr2');
@@ -11,8 +12,10 @@ var jasmineInterface = jasmineRequire.interface(jasmine, jasmineEnv);
 global.jasmine = jasmine;
 global.jasmineRequire = jasmineRequire;
 for (var property in jasmineInterface) {
-	global[property] = jasmineInterface[property];
-}	
+    if (jasmineInterface.hasOwnProperty(property)) {
+       global[property] = jasmineInterface[property];
+    }
+} 
 
 // Default reporter
 jasmineEnv.addReporter(jasmineInterface.jsApiReporter);
@@ -30,8 +33,10 @@ jasmineEnv.addReporter(consoleReporter);
 // Execute
 var mrRequire = require('mr/bootstrap-node');
 var PATH = require("path");
-
 mrRequire.loadPackage(PATH.join(__dirname, ".")).then(function (mr) {
     return mr.async("all");
+}).then(function () {
+	console.log('Done');
 }).thenReturn();
+
 

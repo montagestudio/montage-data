@@ -233,7 +233,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
                 stream.selector = self.mapSelectorToRawDataSelector(streamSelector);
                 self.fetchRawData(stream);
                 stream.selector = streamSelector;
-            })
+            });
         }
     },
     fetchRawData: {
@@ -439,7 +439,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             if (offline) {
                 offline.push.apply(offline, records);
             } else if (records && !this.isOffline) {
-                this._streamRawData.set(stream, records.slice())
+                this._streamRawData.set(stream, records.slice());
             }
             // Convert the raw data to appropriate data objects. The conversion
             // will be done in place to avoid creating any unnecessary array.
