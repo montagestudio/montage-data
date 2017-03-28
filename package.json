@@ -33,9 +33,15 @@
     "karma-jasmine": "^1.1.0",
     "karma-phantomjs-launcher": "^1.0.2",
     "montage-testing": "hthetiot/montage-testing#upgrade",
-    "mr": "hthetiot/mr#npmv3"
+    "mr": "hthetiot/mr#npmv3",
+    "concurrently": "^3.4.0",
+    "http-server": "^0.9.0",
+    "open": "0.0.5"
   },
   "scripts": {
-    "test": "node test/run-node.js"
+    "test": "node test/run-node.js",
+    "test:karma": "karma start --no-auto-watch --single-run",
+    "test:karma-dev": "karma start --auto-watch --no-single-run",
+    "test:jasmine": "concurrently \"http-server -a localhost -p 8084\" \"open http://localhost:8084/test/run.html\""
   }
 }
