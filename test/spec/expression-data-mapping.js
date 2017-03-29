@@ -77,7 +77,8 @@ describe("An Expression Data Mapping", function() {
         converter: new RawPropertyValueToObjectConverter().initWithForeignPropertyAndCardinality("category_id", 1)
     });
     movieMapping.addObjectMappingRule("budget", {"<->": "budget"});
-    movieMapping.addObjectMappingRule("isFeatured", {"<->": "is_featured"});
+    movieMapping.addObjectMappingRule("isFeatured", {"<-": "is_featured"});
+    movieMapping.addRawDataMappingRule("is_featured", {"<-": "isFeatured"});
     movieService.addMappingForType(movieMapping, movieObjectDescriptor);
     categoryMapping = new ExpressionDataMapping().initWithServiceObjectDescriptorAndSchema(categoryService, categoryObjectDescriptor);
     categoryMapping.addObjectMappingRule("name", {"<->": "name"});
@@ -107,7 +108,7 @@ describe("An Expression Data Mapping", function() {
                 name: "Star Wars",
                 category_id: 1,
                 budget: "14000000.00",
-                is_featured: true
+                is_featured: "true"
             };
         return movieMapping.mapRawDataToObject(data, movie).then(function () {
             expect(movie.title).toBe("Star Wars");
@@ -123,7 +124,7 @@ describe("An Expression Data Mapping", function() {
                 name: "Star Wars",
                 category_id: 1,
                 budget: "14000000.00",
-                is_featured: true
+                is_featured: "true"
             };
         return movieMapping.mapRawDataToObject(data, movie).then(function () {
             expect(typeof movie.budget === "number").toBeTruthy();
@@ -158,7 +159,7 @@ describe("An Expression Data Mapping", function() {
             data = {};
         movieMapping.mapObjectToRawData(movie, data).then(function () {
             expect(typeof data.budget === "string").toBeTruthy();
-            expect(typeof data.is_featured).toBeTruthy();
+            expect(typeof data.is_featured === "string").toBeTruthy();
             expect(typeof data.name === "string").toBeTruthy();
             done();
         });

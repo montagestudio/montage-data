@@ -291,7 +291,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                     rule.converter.service = rule.converter.service || self.service;
                     promises.push(self._resolveRelationship(object, propertyDescriptor, rule, scope));
                 } else if (propertyDescriptor) {
-                    object[propertyName] = self._parseRawData(rule, scope);
+                    object[propertyName] = self._parse(rule, scope);
                 } else {
                     console.warn("---------------------------------------------------");
                     console.warn("Did not map property with name (", propertyName, ")");
@@ -323,7 +323,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                     rule.converter.service = rule.converter.service || self.service;
                     promises.push(self._convertRelationshipToRawData());
                 } else if (propertyDescriptor) {
-                    data[key] = this._parseObject(rule, scope);
+                    data[key] = this._parse(rule, scope);
                 }
             }
             return promises && promises.length && Promise.all(promises) || Promise.resolve(null);
@@ -368,14 +368,15 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     _mapObjectMappingRules: {
         value: function (rawRules, addOneWayBindings) {
             var rules = this._compiledObjectMappingRules,
-                propertyName, rawRule, rule, targetPath;
+                propertyName, rawRule, rule, sourcePath, targetPath, converter;
             for (propertyName in rawRules) {
                 rawRule = rawRules[propertyName];
                 if (this._shouldMapRule(rawRule, addOneWayBindings)) {
                     targetPath = addOneWayBindings && propertyName || rawRule[TWO_WAY_BINDING];
-                    rule = addOneWayBindings ?  this._mapRule(rawRule) :
-                        this._mapReverseRule({"<->": propertyName, converter: rawRule.converter});
-                    rule.converter = rule.converter || this._defaultConverter(propertyName, targetPath);
+                    sourcePath = addOneWayBindings ? rawRule[ONE_WAY_BINDING] || rawRule[TWO_WAY_BINDING] : propertyName;
+                    rule = this._makeRule(sourcePath);
+                    rule.converter = rawRule.converter || this._defaultConverter(sourcePath, targetPath, true);
+                    rule.isReverter = rawRule.converter && !addOneWayBindings;
                     rules[targetPath] = rule;
                 }
             }
@@ -385,7 +386,8 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     _mapRawDataMappingRules: {
         value: function (rawRules, addOneWayBindings) {
             var rules = this._compiledRawDataMappingRules,
-                propertyName, propertyDescriptorName, propertyDescriptor, rawRule, rule, targetPath;
+                propertyName, propertyDescriptorName, propertyDescriptor,
+                rawRule, rule, targetPath, sourcePath;
             for (propertyName in rawRules) {
                 rawRule = rawRules[propertyName];
                 if (this._shouldMapRule(rawRule, addOneWayBindings)) {
@@ -393,9 +395,10 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                         propertyName;
                     propertyDescriptor = this.objectDescriptor.propertyDescriptorForName(propertyDescriptorName);
                     targetPath = addOneWayBindings && propertyName || rawRule[TWO_WAY_BINDING];
-                    rule = addOneWayBindings ?  this._mapRule(rawRule) :
-                                                this._mapReverseRule({"<->": propertyName, converter: rawRule.converter});
-                    rule.converter = rule.converter || this._defaultConverter(propertyName, targetPath);
+                    sourcePath = addOneWayBindings ? rawRule[ONE_WAY_BINDING] || rawRule[TWO_WAY_BINDING] : propertyName;
+                    rule = this._makeRule(sourcePath);
+                    rule.converter = rawRule.converter || this._defaultConverter(sourcePath, targetPath);
+                    rule.isReverter = rawRule.converter && !addOneWayBindings;
                     rule.propertyDescriptor = propertyDescriptor;
                     rules[targetPath] = rule;
                 }
@@ -403,25 +406,33 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         }
     },
 
-    _mapRule: {
-        value: function (rawRule) {
-            var sourcePath = rawRule[ONE_WAY_BINDING] || rawRule[TWO_WAY_BINDING];
+    _makeRule: {
+        value: function (sourcePath) {
             return {
-                converter: rawRule.converter,
                 expression: this._compileRuleExpression(sourcePath)
-            };
+            }
         }
     },
 
-    _mapReverseRule: {
-        value: function (rawRule) {
-            var sourcePath = rawRule[TWO_WAY_BINDING];
-            return {
-                converter: rawRule.converter,
-                expression: this._compileRuleExpression(sourcePath)
-            };
-        }
-    },
+    // _mapRule: {
+    //     value: function (rawRule) {
+    //         var sourcePath = rawRule[ONE_WAY_BINDING] || rawRule[TWO_WAY_BINDING];
+    //         return {
+    //             converter: rawRule.converter,
+    //             expression: this._compileRuleExpression(sourcePath)
+    //         };
+    //     }
+    // },
+    //
+    // _mapReverseRule: {
+    //     value: function (rawRule) {
+    //         var sourcePath = rawRule[TWO_WAY_BINDING];
+    //         return {
+    //             converter: rawRule.converter,
+    //             expression: this._compileRuleExpression(sourcePath)
+    //         };
+    //     }
+    // },
 
     _convertRelationshipToRawData: {
         value: function (object, propertyDescriptor, rule) {
@@ -454,10 +465,13 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         }
     },
 
-    _parseRawData: {
+    _parse: {
         value: function (rule, scope) {
             var value = rule.expression(scope);
-            return rule.converter && rule.converter.convert(value) || value;
+            return rule.converter ? rule.isReverter ?
+                                    rule.converter.revert(value) :
+                                    rule.converter.convert(value) :
+                                    value;
         }
     },
 
@@ -477,16 +491,18 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     },
 
     _defaultConverter: {
-        value: function (sourcePath, targetPath) {
-            var sourceDescriptor = this.objectDescriptor && this.objectDescriptor.propertyDescriptorForName(sourcePath),
-                targetDescriptor = this.schemaDescriptor && this.schemaDescriptor.propertyDescriptorForName(targetPath),
+        value: function (sourcePath, targetPath, isObjectMappingRule) {
+            var sourceObjectDescriptor = isObjectMappingRule ? this.schemaDescriptor : this.objectDescriptor,
+                targetObjectDescriptor = isObjectMappingRule ? this.objectDescriptor : this.schemaDescriptor,
+                sourceDescriptor = sourceObjectDescriptor && sourceObjectDescriptor.propertyDescriptorForName(sourcePath),
+                targetDescriptor = targetObjectDescriptor && targetObjectDescriptor.propertyDescriptorForName(targetPath),
                 sourceDescriptorValueType = sourceDescriptor && sourceDescriptor.valueType,
-                targetDescriptorValueType = targetDescriptor && targetDescriptor.valueType;
+                targetDescriptorValueType = targetDescriptor && targetDescriptor.valueType,
+                shouldUseDefaultConverter = sourceDescriptor && targetDescriptor &&
+                                            sourceDescriptorValueType !== targetDescriptorValueType;
 
-            return  sourceDescriptor && targetDescriptor &&
-                    sourceDescriptorValueType !== targetDescriptorValueType ?
-                        this._converterForValueTypes(sourceDescriptorValueType, targetDescriptorValueType) :
-                        null;
+            return  shouldUseDefaultConverter ? this._converterForValueTypes(targetDescriptorValueType, sourceDescriptorValueType) :
+                                                null;
 
         }
     },
