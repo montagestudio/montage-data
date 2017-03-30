@@ -12,14 +12,21 @@ exports.Movie = Montage.specialize({
     isFeatured: {
         value: undefined
     },
-    
+
     /**
      * @type {PlotSummary}
      */
     plotSummary: {
         value: undefined
     },
-    
+
+    /**
+     * @type {Date}
+     */
+    releaseDate: {
+        value: undefined
+    },
+
     /**
      * @type {string}
      */
