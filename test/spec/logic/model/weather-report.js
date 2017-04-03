@@ -6,7 +6,8 @@ var Montage = require("montage").Montage,
  * @class AreaBriefReport
  * @extends Montage
  */
-exports.WeatherReport = Montage.specialize(/** @lends AreaBriefReport.prototype */ {
+
+exports.WeatherReport = WeatherReport = Montage.specialize(/** @lends AreaBriefReport.prototype */ {
     temp: {
         value: null
     },
@@ -15,17 +16,27 @@ exports.WeatherReport = Montage.specialize(/** @lends AreaBriefReport.prototype 
     }
 }, {
 
-    //////////////////////////////////////////////////////////////////////
-    // Montage data
-
     /**
-     * The Montage Data type of features.
-     *
-     * @type {external:ObjectDescriptor}
+     * @type {external:DataObjectDescriptor}
      */
     TYPE: {
-        get: DataObjectDescriptor.getterFor(exports, "WeatherReport", {
-            sections: []
+        //get: DataObjectDescriptor.getterFor(exports, "WeatherReport"),
+        get: function () {
+            WeatherReport.objectPrototype = WeatherReport;
+            return WeatherReport;
+        }
+    },
+
+    /***************************************************************************
+     * Types
+     */
+
+    /**
+     * @class
+     */
+    Type: {
+        get: Enumeration.getterFor("_Type", "", "id", "name", /** @lends Feature.Type */ {
+            WEATHERREPORT: ["WEATHERREPORT", "WeatherReport"]
         })
-    }
+    },
 });
