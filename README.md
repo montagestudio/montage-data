@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/montagestudio/montage-data.svg?branch=master)](http://travis-ci.org/montagestudio/montage-data)
+
 ## Overview
 
 Montage Data is a framework that allows

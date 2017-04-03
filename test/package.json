@@ -6,7 +6,7 @@
         "# project. npm only generates files with 2 space indents",
         "# (see https://github.com/npm/npm/pull/3180#issuecomment-16336516)."
     ],
-    "name": "montage-data-tests",
+    "name": "run",
     "version": "1.0.0-alpha.1",
     "license": "BSD-3-Clause",
     "author": "Montage Studio, inc. (http://montagestudio.com/)",
@@ -17,9 +17,13 @@
     "scripts": {
         "postinstall": "npm link ./.."
     },
+    "mappings": {
+        "montage": "../node_modules/montage",
+        "montage-testing": "../node_modules/montage-testing",
+        "montage-data": "../"
+    },
     "dependencies": {
-        "montage": "~16.0.x",
-        "montage-data": "montagestudio/montage-data"
+        "montage": "~16.0.x"
     },
     "private": true
 }

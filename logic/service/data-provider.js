@@ -1,4 +1,4 @@
-var Montage = require("montage").Montage;
+var Montage = require("montage/core/core").Montage;
 
 /**
  * This class documents the properties and methods of objects that support the

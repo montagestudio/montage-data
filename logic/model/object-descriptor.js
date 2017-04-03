@@ -1,4 +1,4 @@
-var Montage = require("montage").Montage,
+var Montage = require("montage/core/core").Montage,
     PropertyDescriptor = require("logic/model/property-descriptor").PropertyDescriptor;
 
 /**
@@ -113,7 +113,7 @@ exports.ObjectDescriptor = Montage.specialize(/** @lends ObjectDescriptor.protot
     _setPropertyDescriptorsFromPrototype: {
         value: function (prototype) {
             var names, descriptor, i, n;
-            for (; prototype !== Montage.prototype; prototype = Object.getPrototypeOf(prototype)) {
+            for (; prototype !== Montage.prototype && prototype !== null; prototype = Object.getPrototypeOf(prototype)) {
                 names = Object.getOwnPropertyNames(prototype);
                 for (i = 0, n = names.length; i < n; i += 1) {
                     if (!this.propertyDescriptors[names[i]]) {

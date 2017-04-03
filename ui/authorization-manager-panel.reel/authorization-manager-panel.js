@@ -1,4 +1,5 @@
 var Component = require("montage/ui/component").Component,
+    Promise  = require("montage/core/promise").Promise,
     application = require("montage/core/application").application,
     //This will be re-factored
     AuthorizationManager = require("logic/service/authorization-manager").AuthorizationManager;
@@ -21,7 +22,7 @@ exports.AuthorizationManagerPanel = Component.specialize({
     approveAuthorization: {
         value: function(authorization) {
             if(application.applicationModal) {
-                application.applicationModal.hide(self);
+                application.applicationModal.hide(global);
             }
             this._authorizationResolve(authorization);
         }
@@ -31,7 +32,7 @@ exports.AuthorizationManagerPanel = Component.specialize({
     },
     cancelAuthorization: {
         value: function() {
-            application.applicationModal.hide(self);
+            application.applicationModal.hide(global);
             this._authorizationReject("CANCEL");
         }
     },
@@ -41,16 +42,16 @@ exports.AuthorizationManagerPanel = Component.specialize({
     runModal: {
         value: function() {
 
-            var self = this,
-                authorizationPromise = new Promise(function(resolve, reject) {
-                    self._authorizationResolve = resolve;
-                    self._authorizationReject = reject;
-                    // FIXME This is temporary shortcut for FreeNAS while we fix Montage's modal.
-                    if(application.applicationModal) {
-                        application.applicationModal.show(self);
-                    }
+            var that = this;
+        
+            return new Promise(function(resolve, reject) {
+                that._authorizationResolve = resolve;
+                that._authorizationReject = reject;
+                // FIXME This is temporary shortcut for FreeNAS while we fix Montage's modal.
+                if(application.applicationModal) {
+                    application.applicationModal.show(that);
+                }
             });
-            return authorizationPromise;
         }
     },
     enterDocument: {

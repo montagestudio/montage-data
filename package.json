@@ -1,24 +1,47 @@
 {
-    "_comment": [
-        "# If you use npm to generate or modify this file, make sure",
-        "# to restore the file's 4 space indents after the generation",
-        "# or modification so it matches other source files in the",
-        "# project. npm only generates files with 2 space indents",
-        "# (see https://github.com/npm/npm/pull/3180#issuecomment-16336516)."
-    ],
-    "name": "montage-data",
-    "version": "1.0.0-alpha1",
-    "license": "BSD-3-Clause",
-    "author": "Montage Studio, inc. (http://montagestudio.com/)",
-    "repository": {
-        "type": "git",
-        "url": "montagestudio/montage-data"
-    },
-    "dependencies": {
-        "collections": "~5.0.x",
-        "dexie": "~1.4.1",
-        "frb":"~3.0.x",
-        "montage": "~16.0.x"
-    },
-    "private": true
+  "_comment": [
+    "# If you use npm to generate or modify this file, make sure",
+    "# to restore the file's 4 space indents after the generation",
+    "# or modification so it matches other source files in the",
+    "# project. npm only generates files with 2 space indents",
+    "# (see https://github.com/npm/npm/pull/3180#issuecomment-16336516)."
+  ],
+  "name": "montage-data",
+  "version": "1.0.0-alpha2",
+  "private": true,
+  "license": "BSD-3-Clause",
+  "author": "Montage Studio, inc. (http://montagestudio.com/)",
+  "repository": {
+    "type": "git",
+    "url": "montagestudio/montage-data"
+  },
+  "dependencies": {
+    "collections": "~5.0.x",
+    "dexie": "~1.4.1",
+    "frb": "~4.0.x",
+    "montage": "montagejs/montage#master",
+    "weak-map": "^1.0.5",
+    "xhr2": "^0.1.4"
+  },
+  "devDependencies": {
+    "concurrently": "^3.4.0",
+    "http-server": "^0.9.0",
+    "jasmine-console-reporter": "^1.2.7",
+    "jasmine-core": "^2.5.2",
+    "karma": "^1.5.0",
+    "karma-chrome-launcher": "^2.0.0",
+    "karma-coverage": "^1.1.1",
+    "karma-firefox-launcher": "^1.0.1",
+    "karma-jasmine": "^1.1.0",
+    "karma-phantomjs-launcher": "^1.0.2",
+    "montage-testing": "hthetiot/montage-testing#upgrade",
+    "mr": "montagejs/mr#master",
+    "open": "0.0.5"
+  },
+  "scripts": {
+    "test": "node test/run-node.js",
+    "test:karma": "karma start --no-auto-watch --single-run",
+    "test:karma-dev": "karma start --auto-watch --no-single-run",
+    "test:jasmine": "concurrently \"http-server -a localhost -p 8084\" \"open http://localhost:8084/test/run.html\""
+  }
 }

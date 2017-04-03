@@ -380,12 +380,15 @@ describe("A DataService", function() {
         });
 
         // Test that parent references are added and removed correctly
-        registerPromises = [syncChild, asyncChild].map(function (c) { parent.registerChildService(c); });
-        return Promise.all(registerPromises)
-            .then(function () {
+        registerPromises = [syncChild, asyncChild].map(function (c) { 
+            return parent.registerChildService(c); 
+        });
+        return Promise.all(registerPromises).then(function () {
                 expect(syncChild.parentService).toBe(parent);
                 expect(asyncChild.parentService).toBe(parent);
-                unregisterPromises = [syncChild, asyncChild].map(function (c) { parent.unregisterChildService(c); });
+                unregisterPromises = [syncChild, asyncChild].map(function (c) { 
+                    return parent.unregisterChildService(c); 
+                });
                 return Promise.all(unregisterPromises);
             })
             .then(function () {

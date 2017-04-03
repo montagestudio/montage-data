@@ -1,4 +1,4 @@
-var Montage = require("montage").Montage,
+var Montage = require("montage/core/core").Montage,
     Promise = require("montage/core/promise").Promise,
     // Set = require("collections/set");
     Map = require("collections/map"),
