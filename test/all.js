@@ -1,6 +1,4 @@
 console.log('montage-testing', 'Start');
-
-
 module.exports = require("montage-testing").run(require, [
     "spec/data-selector",
     "spec/data-mapping",
