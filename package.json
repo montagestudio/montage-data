@@ -19,7 +19,7 @@
     "collections": "~5.0.x",
     "dexie": "~1.4.1",
     "frb": "~4.0.x",
-    "montage": "montagejs/montage#master",
+    "montage": "git://github.com/montagejs/montage.git#master",
     "weak-map": "^1.0.5",
     "xhr2": "^0.1.4"
   },
