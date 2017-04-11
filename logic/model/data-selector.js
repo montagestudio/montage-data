@@ -37,9 +37,6 @@ exports.DataSelector = exports.DataQuery= Montage.specialize(/** @lends DataSele
             if (criteria) {
                 this._criteria = criteria;
             }
-            else {
-                throw new TypeError("can only set instances of Criteria");
-            }
         }
     },
 
