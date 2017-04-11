@@ -34,7 +34,7 @@ exports.DataSelector = exports.DataQuery= Montage.specialize(/** @lends DataSele
             return this._criteria;
         },
         set: function (criteria) {
-            if (!criteria || criteria instanceof Criteria) {
+            if (criteria) {
                 this._criteria = criteria;
             }
             else {
