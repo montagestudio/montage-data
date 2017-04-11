@@ -48,7 +48,7 @@ describe("A DataSelector", function() {
             unit: 'imperial'
         };
         
-        var dataType = WeatherReportType; //WeatherReport.TYPE;
+        var dataType = WeatherReport.TYPE;
         var dataCriteria = new Criteria().initWithExpression(dataExpression, dataParameters);
 
         var dataQuerySource  = DataSelector.withTypeAndCriteria(dataType, dataCriteria);
@@ -56,17 +56,17 @@ describe("A DataSelector", function() {
 
         try {
             expect(dataQueryJson).toBeDefined();
-
             var dataQueryJsonObj = JSON.parse(dataQueryJson);
-            //debugger;
-            //expect(dataQueryJsonObj.weatherreport).toBeDefined();
-            //expect(dataQueryJsonObj.weatherreport.object).toBe('spec/logic/model/weather-report');
+            expect(dataQueryJsonObj.weatherreport).toBeDefined();
+            expect(dataQueryJsonObj.weatherreport.object).toBe('spec/logic/model/weather-report');
 
             expect(dataQueryJsonObj.criteria).toBeDefined();
             expect(dataQueryJsonObj.criteria.prototype).toBe('montage/core/criteria');
             var dataQuery = deserialize(dataQueryJson, require).then(function (dataQueryFromJson) {   
                 expect(dataQueryJson).toBeDefined();
                 done(); 
+            }, function (err) {
+                fail(err);
             });
                
         } catch (err) {

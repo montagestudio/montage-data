@@ -1,5 +1,4 @@
 var Montage = require("montage").Montage,
-    Enumeration = require("montage-data/logic/model/enumeration").Enumeration,
     DataObjectDescriptor = require("montage-data/logic/model/data-object-descriptor").DataObjectDescriptor;
 
 /**
@@ -25,18 +24,5 @@ exports.WeatherReport = WeatherReport = Montage.specialize(/** @lends AreaBriefR
             WeatherReport.objectPrototype = WeatherReport;
             return WeatherReport;
         }
-    },
-
-    /***************************************************************************
-     * Types
-     */
-
-    /**
-     * @class
-     */
-    Type: {
-        get: Enumeration.getterFor("_Type", "", "id", "name", /** @lends Feature.Type */ {
-            WEATHERREPORT: ["WEATHERREPORT", "WeatherReport"]
-        })
-    },
+    }
 });
