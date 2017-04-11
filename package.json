@@ -34,8 +34,8 @@
     "karma-firefox-launcher": "^1.0.1",
     "karma-jasmine": "^1.1.0",
     "karma-phantomjs-launcher": "^1.0.2",
-    "montage-testing": "hthetiot/montage-testing#upgrade",
-    "mr": "montagejs/mr#master",
+    "montage-testing": "git://github.com/montagejs/montage-testing.git#master",
+    "mr": "git://github.com/montagejs/mr.git#master",
     "open": "0.0.5"
   },
   "scripts": {
