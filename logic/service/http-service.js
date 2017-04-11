@@ -61,7 +61,7 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                 }
                 if (arguments.length < 5 || !prerequisitePropertyNames) {
                     prerequisites = [];
-                } else if (!Array.isArray(prerequisites)) {
+                } else if (!Array.isArray(prerequisitePropertyNames)) {
                     prerequisites = Array.prototype.slice.call(arguments, 3, -1);
                 } else {
                     prerequisites = prerequisitePropertyNames;
