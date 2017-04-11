@@ -8,12 +8,13 @@ var RawDataService = require("logic/service/raw-data-service").RawDataService,
     evaluate = require("frb/evaluate"),
     Map = require("collections/map"),
     OfflineService;
+
 /**
- * TODO: Document
- *
- * @class
- * @extends RawDataService
- */
+* TODO: Document
+*
+* @class
+* @extends RawDataService
+*/
 exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends OfflineService.prototype */ {
 
     /***************************************************************************
@@ -26,25 +27,153 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
         }
     },
 
-   _db : {
-        value: void 0
-    },
-   schema : {
-        value: void 0
-    },
-   name : {
+    _db : {
         value: void 0
     },
 
-     /**
-     * Main initialiation method
+    schema : {
+        value: void 0
+    },
+
+    name : {
+        value: void 0
+    },
+
+    /**
+     * @type {string}
+     */
+    _is_safari_10_1_upgrade_issue_fixed: {
+        value: "is_IOS_10_3_upgrade_issue_fixed"
+    },
+
+    _faulty_safari_versions: {
+        get: function () {
+            return [
+                ["iPhone OS 10_3_0", "AppleWebKit/603.1.30"],
+                ["iPhone OS 10_3_1", "AppleWebKit/603.1.30"],
+                ["Mac OS X 10_12_4", "AppleWebKit/603.1.30"]
+            ]
+        }
+    },
+
+    _isFaultySafariVersion: {
+        get: function () {
+            return this._faulty_safari_versions.some(function (userAgentStrings) {
+                return userAgentStrings.every(function (userAgentString) {
+                    return navigator.userAgent.indexOf(userAgentString) !== -1;
+                })
+            });
+        }
+    },
+
+    _isIndexedDBMigrated: {
+        value: function (name) {
+            return !!localStorage.getItem(name + "." + this._is_safari_10_1_upgrade_issue_fixed);
+        }
+    },
+
+    _checkAndFixSafariTenOneUpgradeIssue: {
+        value: function (name) {
+            var self = this;
+            return this._databaseExists(name).then(function (isInitialized) {
+                return  isInitialized &&
+                        self._isFaultySafariVersion &&
+                        !self._isIndexedDBMigrated(name) ? self._recreateDatabase(name) : Promise.resolve(null);
+            });
+        }
+    },
+
+    _databaseExists: {
+        value: function (name) {
+            return Dexie.exists(name);
+        }
+    },
+
+    _recreateDatabase: {
+        value: function recreateDatabase (name) {
+            var self = this,
+                tempName = name + "_tmp";
+            return this._copyDatabase(name, tempName).then(function() {
+                return Dexie.delete(name);
+            }).then(function(){
+                return self._copyDatabase(tempName, name);
+            }).then(function(){
+                return Dexie.delete(tempName);
+            }).then(function () {
+                localStorage.setItem(name + "." + self._is_safari_10_1_upgrade_issue_fixed, true);
+                return null;
+            });
+        }
+    },
+
+    _buildIndexes: {
+        value: function (indexes) {
+            return indexes.map(function (index) {
+                return index.src;
+            });
+        }
+    },
+
+    _makeSchema: {
+        value: function (tables) {
+            var self = this,
+                schema = {},
+                primaryKey,
+                indexes,
+                table;
+
+            for (var i = 0, n = tables.length; i < n; i += 1) {
+                table = tables[i];
+                primaryKey = [table.schema.primKey.src];
+                indexes = self._buildIndexes(table.schema.indexes);
+                if (indexes.length) {
+                    primaryKey = primaryKey.concat(indexes);
+                }
+                schema[table.name] = primaryKey.join(",");
+            }
+
+            return schema;
+        }
+    },
+
+    _copyDatabase: {
+        value: function copyDatabase(fromDbName, toDbName) {
+            var self = this,
+                dexie = new Dexie(fromDbName);
+            return dexie.open().then(function (db) {
+                var schema = self._makeSchema(db.tables),
+                    dbCopy = new Dexie(toDbName);
+
+                dbCopy.version(db.verno).stores(schema);
+
+                return dbCopy.open().then(function () {
+                    // dbCopy is now successfully created with same version and schema as source db.
+                    // Now also copy the data
+                    return Promise.all(db.tables.map(function (table) {
+                        return table.toArray().then(function (rows) {
+                            return dbCopy.table(table.name).bulkAdd(rows);
+                        })
+                    }));
+                }).catch(function (error) {
+                    console.log("Error copying database (", error, ")");
+                }).finally(function(){
+                    db.close();
+                    dbCopy.close();
+                });
+            })
+        }
+    },
+
+
+    /**
+     * Main initialization method
      *
      * @method
      * @argument {String} name          - Defines the name of the database offline service will create/use.
      * @argument {Number} version       - Storage version
      * @argument {Object} scheme        - A schema with the following structure:
      *
-     *           {
+     *   {
      *      "Person": {
      *           primaryKey: "id",
      *           indexes: ["firstName","lastName],
@@ -56,93 +185,100 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
      *   }
      *
      */
-
     initWithName: {
         value: function(name, version, schema) {
-            var localVersion = version || 1;
+            var self = this;
             if (!this._db) {
-                var db = this._db = new Dexie(name),
-                    table, tableSchema, dbTable, dbSchema, dbIndexes,
-                    shouldUpgradeToNewVersion = false, newDbSchema,
-                    schemaDefinition, tableIndexes, tablePrimaryKey;
-
-                this.name = name;
-                this.schema = schema;
-
-                //db.open().then(function (db) {
-                newDbSchema = {};
-
-                //We automatically create an extra table that will track offline operations the record was last updated
-                schemaDefinition = "++id";
-                schemaDefinition += ",";
-                schemaDefinition += "dataID";
-                schemaDefinition += ",";
-                schemaDefinition += this.typePropertyName;
-                schemaDefinition += ",";
-                schemaDefinition += this.lastFetchedPropertyName;
-                schemaDefinition += ",";
-                schemaDefinition += this.lastModifiedPropertyName;
-                schemaDefinition += ",";
-                schemaDefinition += this.operationPropertyName;
-                schemaDefinition += ",";
-                schemaDefinition += this.changesPropertyName;
-                schemaDefinition += ",";
-                schemaDefinition += this.contextPropertyName;
-                newDbSchema[this.operationTableName] = schemaDefinition;
-
-                if (schema) {
-
-                    for (table in schema) {
-                        tableSchema = schema[table];
-                        tableIndexes = tableSchema.indexes;
-                        tablePrimaryKey = tableSchema.primaryKey;
-                        dbTable = db[table];
-                        if (dbTable) {
-                            //That table is defined, now let's compare primaryKey and indexes
-                            dbSchema = dbTable.schema;
-                            if (dbSchema.primKey !== tablePrimaryKey) {
-                                //Existing table has different primaryKey, needs new version
-                                shouldUpgradeToNewVersion = true;
-                            }
-                            //test if indexes aren't the same.
-                            dbIndexes = dbSchema.indexes;
-                            if (dbIndexes !== tableSchema.indexes) {
-                                //Existing table has different indexes, needs new version
-                                shouldUpgradeToNewVersion = true;
-                            }
-
-
-                        } else {
-                            //That table doesn't exists, which means we need to update.
-                            shouldUpgradeToNewVersion = true;
-                        }
-                        if (shouldUpgradeToNewVersion) {
-                            //We automatically add an index for lastUpdatedPropertyName ("montage-online-last-updated")
-                            schemaDefinition = tablePrimaryKey;
-                            for(var i=0, iIndexName;(iIndexName = tableIndexes[i]);i++) {
-                                if(iIndexName !== tablePrimaryKey) {
-                                    schemaDefinition += ",";
-                                    schemaDefinition +=  iIndexName;
-                                }
-                            }
-                            newDbSchema[table] = schemaDefinition;
-                        }
-                    }
-
-                    if (shouldUpgradeToNewVersion) {
-                        //db.close();
-                        //Add upgrade here
-                        //console.log("newDbSchema:",newDbSchema);
-                        db.version(db.verno+1).stores(newDbSchema);
-                        //db.open();
-                    }
-
-                    OfflineService.registerOfflineService(this);
-                }
-                //});
-
+                this._db = this._checkAndFixSafariTenOneUpgradeIssue(name).then(function() {
+                    return self._initWithName(name, version, schema);
+                });
             }
             return this;
+        }
+    },
+
+    _initWithName: {
+        value: function(name, version, schema) {
+            var localVersion = version || 1,
+                db = new Dexie(name),
+                table, tableSchema, dbTable, dbSchema, dbIndexes,
+                shouldUpgradeToNewVersion = false, newDbSchema,
+                schemaDefinition, tableIndexes, tablePrimaryKey;
+
+            this.name = name;
+            this.schema = schema;
+
+            //db.open().then(function (db) {
+            newDbSchema = {};
+
+            //We automatically create an extra table that will track offline operations the record was last updated
+            schemaDefinition = "++id";
+            schemaDefinition += ",";
+            schemaDefinition += "dataID";
+            schemaDefinition += ",";
+            schemaDefinition += this.typePropertyName;
+            schemaDefinition += ",";
+            schemaDefinition += this.lastFetchedPropertyName;
+            schemaDefinition += ",";
+            schemaDefinition += this.lastModifiedPropertyName;
+            schemaDefinition += ",";
+            schemaDefinition += this.operationPropertyName;
+            schemaDefinition += ",";
+            schemaDefinition += this.changesPropertyName;
+            schemaDefinition += ",";
+            schemaDefinition += this.contextPropertyName;
+            newDbSchema[this.operationTableName] = schemaDefinition;
+
+            if (schema) {
+
+                for (table in schema) {
+                    tableSchema = schema[table];
+                    tableIndexes = tableSchema.indexes;
+                    tablePrimaryKey = tableSchema.primaryKey;
+                    dbTable = db[table];
+                    if (dbTable) {
+                        //That table is defined, now let's compare primaryKey and indexes
+                        dbSchema = dbTable.schema;
+                        if (dbSchema.primKey !== tablePrimaryKey) {
+                            //Existing table has different primaryKey, needs new version
+                            shouldUpgradeToNewVersion = true;
+                        }
+                        //test if indexes aren't the same.
+                        dbIndexes = dbSchema.indexes;
+                        if (dbIndexes !== tableSchema.indexes) {
+                            //Existing table has different indexes, needs new version
+                            shouldUpgradeToNewVersion = true;
+                        }
+
+
+                    } else {
+                        //That table doesn't exists, which means we need to update.
+                        shouldUpgradeToNewVersion = true;
+                    }
+                    if (shouldUpgradeToNewVersion) {
+                        //We automatically add an index for lastUpdatedPropertyName ("montage-online-last-updated")
+                        schemaDefinition = tablePrimaryKey;
+                        for(var i=0, iIndexName;(iIndexName = tableIndexes[i]);i++) {
+                            if(iIndexName !== tablePrimaryKey) {
+                                schemaDefinition += ",";
+                                schemaDefinition +=  iIndexName;
+                            }
+                        }
+                        newDbSchema[table] = schemaDefinition;
+                    }
+                }
+
+                if (shouldUpgradeToNewVersion) {
+                    //db.close();
+                    //Add upgrade here
+                    //console.log("newDbSchema:",newDbSchema);
+                    db.version(db.verno + 1).stores(newDbSchema);
+                    //db.open();
+                }
+
+                OfflineService.registerOfflineService(this);
+            }
+            return db;
         }
     },
 
@@ -179,6 +315,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
     operationTableName: {
         value: "Operation"
     },
+
     /**
      * name of the schema property that stores the name of the type/object store
      * of the object the operation impacts
@@ -199,7 +336,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
         value: "lastFetched"
     },
 
-   /**
+    /**
      * name of the schema property that stores the last time the operation's
      * object was last modified.
      *
@@ -209,7 +346,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
         value: "lastModified"
     },
 
-     /**
+    /**
      * name of the schema property that stores the type of operation:
      * This will be create or update or delete
      *
@@ -218,17 +355,20 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
     operationPropertyName: {
         value: "operation"
     },
+
     operationCreateName: {
         value: "create"
     },
-   operationUpdateName: {
+
+    operationUpdateName: {
         value: "update"
     },
+
     operationDeleteName: {
         value: "delete"
     },
 
-   /**
+    /**
      * name of the schema property that stores the  changes made to the object in this operation
      *
      * @returns {String}
@@ -246,7 +386,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
         value: "dataID"
     },
 
-   /**
+    /**
      * name of the schema property that stores unstructured/custom data for a service
      * to stash what it may need for further use.
      *
@@ -256,47 +396,44 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
         value: "context"
     },
 
-
-    /*
-        returns all records, ordered by time, that reflect what hapened when offline.
-        We shoud
-        [{
-            // NO primaryKey: uuid-uuid-uuid,
-            lastFetched: Date("08-02-2016"),
-            lastModified: Date("08-02-2016"),
-            operation: "create",
-            data: {
-                hazard_id:  uuid-uuid-uuid,
-                "foo":"abc",
-                "bla":23
-            }
-        },
-        {
-            lastFetched: Date("08-02-2016"),
-            lastModified: Date("08-02-2016"),
-            operation: "update"
-        },
-        {
-            lastFetched: Date("08-02-2016"),
-            lastModified: Date("08-02-2016"),
-            operation: "update"
-        },
-        ]
-    */
-
+    /**
+     *
+     *  Returns all records, ordered by time, that reflect what happened when offline.
+     *  We should
+     *  [{
+     *      // NO primaryKey: uuid-uuid-uuid,
+     *      lastFetched: Date("08-02-2016"),
+     *      lastModified: Date("08-02-2016"),
+     *      operation: "create",
+     *      data: {
+     *          hazard_id:  uuid-uuid-uuid,
+     *          "foo":"abc",
+     *          "bla":23
+     *      }
+     *  },
+     *  {
+     *      lastFetched: Date("08-02-2016"),
+     *      lastModified: Date("08-02-2016"),
+     *      operation: "update"
+     *  },
+     *  {
+     *      lastFetched: Date("08-02-2016"),
+     *      lastModified: Date("08-02-2016"),
+     *      operation: "update"
+     *  }]
+     */
     offlineOperations: {
         get: function() {
             //Fetch
         }
-
     },
 
     clearOfflineOperations: {
         value: function(operations) {
             //Fetch
-
         }
     },
+
     /* Feels like that should return the data, in case it's called with null and created inside?*/
     mapToRawSelector: {
         value: function (object, data) {
@@ -306,23 +443,27 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
     },
 
     _tableByName: {
-        value: void 0
-    },
-    tableNamed: {
-        value: function(tableName) {
-            var table;
-            if(!this._tableByName) {
-                this._tableByName = new Map();
+        get: function () {
+            if (!this.__tableByName) {
+                this.__tableByName = new Map();
             }
-            table = this._tableByName.get(tableName);
+            return this.__tableByName;
+        }
+    },
+
+    tableNamed: {
+        value: function(db, tableName) {
+            var table = this._tableByName.get(tableName);
             if(!table) {
-                table = this._db[tableName];
+                table = db[tableName];
                 if(!table) {
-                    var tables = this._db.tables;
-                    for(var i=0, iTable; (iTable = tables[i]); i++) {
+                    var tables = db.tables,
+                        iTable, i, length;
+                    for(i = 0, length = tables.length; i < length && !table; i++) {
+                        iTable = tables[i];
                         if(iTable.name === tableName) {
-                            this._tableByName.set(tableName,(table = iTable));
-                            break;
+                            table = iTable;
+                            this._tableByName.set(tableName, table);
                         }
                     }
                 }
@@ -334,10 +475,11 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
     _operationTable: {
         value: void 0
     },
+
     operationTable: {
-        get:function() {
-            if(!this._operationTable) {
-                this._operationTable = this.tableNamed(this.operationTableName);
+        value: function (db) {
+            if (!this._operationTable) {
+                this._operationTable = this.tableNamed(db, this.operationTableName);
             }
             return this._operationTable;
         }
@@ -345,22 +487,22 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
 
     fetchData: {
         value: function (selector, stream) {
-            var db = this._db,
-                criteria = selector.criteria,
+
+            var criteria = selector.criteria,
                 orderings = selector.orderings,
                 self = this;
 
-              /*
-                    The idea here (to finish) is to use the first criteria in the where, assuming it's the most
-                    important, and then filter the rest in memory by looping on remaining
-                    whereProperties amd whereEqualValues, index matches. Not sure how Dexie's Collection fits there
-                    results in the then is an Array... This first pass fetches offline Hazards with status === "A",
-                    which seems to be the only fetch for Hazards on load when offline.
-                */
-                db.open().then(function (db) {
-                    var table = self.tableNamed(selector.type);
-
-                    var whereProperties = (criteria && criteria.parameters) ? Object.keys(criteria.parameters) : undefined;
+            /*
+             The idea here (to finish) is to use the first criteria in the where, assuming it's the most
+             important, and then filter the rest in memory by looping on remaining
+             whereProperties amd whereEqualValues, index matches. Not sure how Dexie's Collection fits there
+             results in the then is an Array... This first pass fetches offline Hazards with status === "A",
+             which seems to be the only fetch for Hazards on load when offline.
+             */
+            this._db.then(function (myDB) {
+                myDB.open().then(function () {
+                    var table = self.tableNamed(myDB, selector.type),
+                        whereProperties = (criteria && criteria.parameters) ? Object.keys(criteria.parameters) : undefined;
 
                     if(whereProperties && whereProperties.length) {
                         var wherePromise,
@@ -369,70 +511,55 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                             whereValue = criteria.parameters[whereProperty];
 
                         if(whereProperties.length > 0) {
-                                //db.table1.where("key1").between(8,12).and(function (x) { return x.key2 >= 3 && x.key2 < 18; }).toArray();
+                            //db.table1.where("key1").between(8,12).and(function (x) { return x.key2 >= 3 && x.key2 < 18; }).toArray();
 
+                            wherePromise = Array.isArray(whereValue) ?  table.where(whereProperty).anyOf(whereValue) :
+                                                                        table.where(whereProperty).equals(whereValue);
 
-                            if(Array.isArray(whereValue)) {
-                                wherePromise = table
-                                                .where(whereProperty)
-                                                .anyOf(whereValue);
-                            }
-                            else {
-                                wherePromise = table
-                                                .where(whereProperty)
-                                                .equals(whereValue);
-                            }
+                            resultPromise = wherePromise.and(function (aRecord) {
+                                var result = true;
+                                for(var i = 0, iKey, iValue, iKeyMatchValue, iOrValue; (iKey = whereProperties[i]); i++) {
+                                    iValue = criteria.parameters[iKey];
+                                    iKeyMatchValue = false;
+                                    if (Array.isArray(iValue)) {
+                                        iOrValue = false;
+                                        for (var j = 0, jValue; (jValue = iValue[j]); j++) {
+                                            if(aRecord[iKey] === jValue) {
+                                                if(!iKeyMatchValue) iKeyMatchValue = true;
+                                            }
+                                        }
+                                    } else {
+                                        iKeyMatchValue = aRecord[iKey] === iValue;
+                                    }
 
-                            resultPromise = wherePromise
-                                            .and(function (aRecord) {
-                                                var result = true;
-                                                for(var i=0, iKey, iValue, iKeyMatchValue, iOrValue;(iKey = whereProperties[i]);i++) {
-                                                    iValue = criteria.parameters[iKey];
-                                                    iKeyMatchValue = false;
-                                                    if(Array.isArray(iValue)) {
-                                                        iOrValue = false;
-                                                        for(var j=0, jValue;(jValue = iValue[j]);j++) {
-                                                            if(aRecord[iKey] === jValue) {
-                                                                if(!iKeyMatchValue) iKeyMatchValue = true;
-                                                            }
-                                                        }
-                                                    }
-                                                    else {
-                                                        if(aRecord[iKey] !== iValue) {
-                                                            iKeyMatchValue = false;
-                                                        }
-                                                        else {
-                                                            iKeyMatchValue = true;
-                                                        }
-                                                    }
-
-                                                    if(!(result = result && iKeyMatchValue)) {
-                                                        break;
-                                                    }
-                                                }
-                                                return result;
-                                            });
-                        }
-                        else {
-                            if(Array.isArray(whereValue)) {
+                                    if(!(result = result && iKeyMatchValue)) {
+                                        break;
+                                    }
+                                }
+                                return result;
+                            });
+                        } else {
+                            if (Array.isArray(whereValue)) {
                                 resultPromise = table
-                                                .where(whereProperty)
-                                                .anyOf(whereValue);
-                            }
-                            else {
+                                    .where(whereProperty)
+                                    .anyOf(whereValue);
+                            } else {
                                 resultPromise = table
-                                                .where(whereProperty)
-                                                .equals(whereValue);
+                                    .where(whereProperty)
+                                    .equals(whereValue);
+
+                                // if(selector.type === "Hazard") {
+                                //     global.DEBUG = true;
+                                //     //debugger;
+                                // }
+
                             }
                         }
                         resultPromise.toArray(function(results) {
-                            //Creates an infinite loop, we don't need what's there
-                            //self.addRawData(stream, results);
-                            //self.rawDataDone(stream);
-                            if(orderings) {
+                            if (orderings) {
                                 var expression = "";
                                 //Build combined expression
-                                for(var i=0,iDataOrdering,iExpression;(iDataOrdering = orderings[i]);i++) {
+                                for (var i = 0, iDataOrdering, iExpression; (iDataOrdering = orderings[i]); i++) {
                                     iExpression = iDataOrdering.expression;
 
                                     if(expression.length)
@@ -453,10 +580,8 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
 
                         });
 
-                    }
-                    else {
-                        table.toArray()
-                        .then(function(results) {
+                    } else {
+                        table.toArray().then(function(results) {
                             stream.addData(results);
                             stream.dataDone();
                         });
@@ -468,13 +593,14 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                 }).catch(function (e) {
                     stream.dataError(e);
                 });
+            });
 
             // Return the passed in or created stream.
             return stream;
         }
     },
 
-     /**
+    /**
      * Called every time [addRawData()]{@link RawDataService#addRawData} is
      * called while online to optionally cache that data for offline use.
      *
@@ -502,54 +628,63 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
         value: function (rawDataArray, selector) {
 
             var self = this,
-                tableName = selector.type,
-                table = this.tableNamed(tableName),
                 clonedArray = [],
-                i,countI,iRawData, iLastUpdated,
-                lastUpdated = Date.now(),
                 updateOperationArray = [],
-                dataID = this.dataIDPropertyName,
-                primaryKey = table.schema.primKey.name,
-                lastUpdatedPropertyName = this.lastFetchedPropertyName,
-                j, jRawData,
-                rawDataMapByPrimaryKey,
-                offlineObjectsToClear = [],
-                rawDataStream = new DataStream();
+                primaryKey;
 
+            // if (selector.type === "ProductThumbnail") {
+            //     console.log("Writing offline data (", rawDataArray, ")");
+            // }
+
+            return this._db.then(function (db) {
+                var tableName = selector.type,
+                    table = self.tableNamed(db, tableName),
+                    lastUpdated = Date.now(),
+                    dataID = this.dataIDPropertyName,
+                    lastUpdatedPropertyName = this.lastFetchedPropertyName,
+                    rawDataStream = new DataStream(),
+                    i, countI, iRawData, iLastUpdated;
+
+                primaryKey = table.schema.primKey.name;
                 rawDataStream.selector = selector;
 
-            //Make a clone of the array and create the record to track the online Last Updated date
-            for(i=0, countI = rawDataArray.length; i<countI; i++) {
-                if((iRawData = rawDataArray[i])) {
-                    clonedArray.push(iRawData);
+                //Make a clone of the array and create the record to track the online Last Updated date
+                for(i = 0, countI = rawDataArray.length; i < countI; i++) {
+                    if((iRawData = rawDataArray[i])) {
+                        clonedArray.push(iRawData);
 
-                    //Create the record to track the online Last Updated date
-                    iLastUpdated = {};
-                    iLastUpdated[dataID] = iRawData[primaryKey];
-                    iLastUpdated[lastUpdatedPropertyName] = lastUpdated;
-                    iLastUpdated[this.typePropertyName] = tableName;
-                    updateOperationArray.push(iLastUpdated);
+                        //Create the record to track the online Last Updated date
+                        iLastUpdated = {};
+                        iLastUpdated[dataID] = iRawData[primaryKey];
+                        iLastUpdated[lastUpdatedPropertyName] = lastUpdated;
+                        iLastUpdated[self.typePropertyName] = tableName;
+                        updateOperationArray.push(iLastUpdated);
+                    }
                 }
-            }
 
-            // 1) First we need to execute the equivalent of stream's selector to find what we have matching locally
-            return this.fetchData(selector,rawDataStream).then(function (offlineSelectedRecords) {
-                // 2) Loop on offline results and if we can't find it in the recent rawDataArray:
-                //    2.0) Remove the non-matching record so it doesn't show up in results
-                //         if that query were immediately done next as offline.
-                // Not ideal as we're going to do at worse a full lookup of rawDataArray, every iteration
-                for(var i=0, countI = offlineSelectedRecords.length, iRecord, iRecordPrimaryKey;(iRecord = offlineSelectedRecords[i]);i++) {
+                return self.fetchData(selector, rawDataStream);
+
+            }).then(function (offlineSelectedRecords) {
+
+                var offlineObjectsToClear = [],
+                    iRecord, iRecordPrimaryKey, rawDataMapByPrimaryKey, i, countI;
+
+                for(i = 0, countI = offlineSelectedRecords.length; i < countI; i++) {
+
+                    iRecord = offlineSelectedRecords[i];
                     iRecordPrimaryKey = iRecord[self.dataIDPropertyName];
-                    // move above loop? remove conditional? saves case where countI = 0?
+
                     if(!rawDataMapByPrimaryKey) {
                         rawDataMapByPrimaryKey = new Map();
-                        for(j=0;(jRawData = rawDataArray[j]);j++) {
-                            rawDataMapByPrimaryKey.set(jRawData[primaryKey],jRawData);
-                        }
+                        rawDataArray.forEach(function (rawData) {
+                            rawDataMapByPrimaryKey.set(rawData[primaryKey], rawData);
+                        });
                     }
+
                     if(!rawDataMapByPrimaryKey.has(iRecord[primaryKey])) {
                         offlineObjectsToClear.push(primaryKey);
                     }
+
                 }
 
                 //Now we now what to delete: offlineObjectsToClear, what to put: rawDataArray.
@@ -558,12 +693,10 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                 // 3) Put new objects
                 return self.performOfflineSelectorChanges(selector, clonedArray, updateOperationArray, offlineObjectsToClear);
 
-            })
-            .catch(function(e) {
-                console.log(selector.type + ": performOfflineSelectorChanges failed",e);
+            }).catch(function(e) {
+                console.log(selector.type + ": performOfflineSelectorChanges failed", e);
                 console.error(e);
             });
-
         }
     },
 
@@ -571,15 +704,16 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
         value: function (/* operationMapToService */) {
             var self = this;
             return new Promise(function (resolve, reject) {
-                var myDB = self._db;
-                myDB.open().then(function (/* db */) {
-                    self.operationTable.where("operation").anyOf("create", "update", "delete").toArray(function (offlineOperations) {
-                        resolve(offlineOperations);
-                    }).catch(function (e) {
-                        console.log(selector.type + ": performOfflineSelectorChanges failed", e);
-                        console.error(e);
-                        reject(e);
-                    });
+                self._db.then(function (db) {
+                    db.open().then(function () {
+                        self.operationTable(db).where("operation").anyOf("create", "update", "delete").toArray(function (offlineOperations) {
+                            resolve(offlineOperations);
+                        }).catch(function (e) {
+                            console.log(selector.type + ": performOfflineSelectorChanges failed", e);
+                            console.error(e);
+                            reject(e);
+                        });
+                    })
                 });
             });
         }
@@ -587,42 +721,40 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
 
     performOfflineSelectorChanges: {
         value: function (selector, rawDataArray, updateOperationArray, offlineObjectsToClear) {
-            var myDB = this._db,
-                self = this,
+            var self = this,
                 clonedRawDataArray = rawDataArray.slice(0), // why clone twice?
                 clonedUpdateOperationArray = updateOperationArray.slice(0),
-                clonedOfflineObjectsToClear = offlineObjectsToClear.slice(0);
+                clonedOfflineObjectsToClear = offlineObjectsToClear.slice(0),
+                indexedDB;
 
-            return myDB
-            .open()
-            .then(function (db) {
-
+            return this._db.then(function (myDb) {
+                indexedDB = myDb;
+                return myDb.open();
+            }).then(function (db) {
                 var table = db[selector.type],
-                    operationTable = self.operationTable;
+                    operationTable = self.operationTable(indexedDB);
 
-            //Transaction:
+                //Transaction:
                 //Objects to put:
                 //      rawDataArray
                 //      updateOperationArray
                 //Objects to delete:
                 //      offlineObjectsToClear in table and operationTable
 
-                db.transaction('rw', table, operationTable, function () {
-
-                        return Dexie.Promise.all(
-                            [table.bulkPut(clonedRawDataArray),
+                return db.transaction('rw', table, operationTable, function () {
+                    return Dexie.Promise.all(
+                        [table.bulkPut(clonedRawDataArray),
                             operationTable.bulkPut(clonedUpdateOperationArray),
                             table.bulkDelete(clonedOfflineObjectsToClear),
                             operationTable.bulkDelete(clonedOfflineObjectsToClear)]);
 
-                }).then(function(value) {
-                    //console.log(selector.type + ": performOfflineSelectorChanges succesful: "+rawDataArray.length+" rawDataArray, "+clonedUpdateOperationArray.length+" updateOperationArray");
-                }).catch(function(e) {
-                        console.log(selector.type + ": performOfflineSelectorChanges failed", e);
-                        console.error(e);
+                // }).then(function(value) {
+                //     //console.log(selector.type + ": performOfflineSelectorChanges succesful: "+rawDataArray.length+" rawDataArray, "+clonedUpdateOperationArray.length+" updateOperationArray");
                 });
+            }).catch(function(e) {
+                console.log(selector.type + ": performOfflineSelectorChanges failed", e);
+                console.error(e);
             });
-
         }
     },
 
@@ -638,7 +770,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
     //TODO
     deleteOfflinePrimaryKeyDependenciesForData: {
         value: function(data, tableName, primaryKeyPropertyName) {
-                        if(data.length === 0) return;
+            if(data.length === 0) return;
 
             var tableSchema = this.schema[tableName],
                 //if we don't have a known list of foreign keys, we'll consider all potential candidate
@@ -661,41 +793,37 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
     createData: {
         value: function (objects, type, context) {
             var self = this;
-
             return new Promise(function (resolve, reject) {
-                var myDB = self._db,
-                table = self.tableNamed(type),
-                operationTable = self.operationTable,
-                clonedObjects = [],
-                operations = [],
-                primaryKey = table.schema.primKey.name,
-                dataID = self.dataIDPropertyName,
-                lastModifiedPropertyName = self.lastModifiedPropertyName,
-                lastModified = Date.now(),
-                typePropertyName = self.typePropertyName,
-                changesPropertyName = self.changesPropertyName,
-                operationPropertyName = self.operationPropertyName,
-                operationCreateName = self.operationCreateName,
-                primaryKeys = [];
+                self._db.then(function (myDB) {
+
+                    var table = self.tableNamed(myDB, type),
+                        operationTable = self.operationTable(myDB),
+                        clonedObjects = [],
+                        operations = [],
+                        primaryKey = table.schema.primKey.name,
+                        dataID = self.dataIDPropertyName,
+                        lastModifiedPropertyName = self.lastModifiedPropertyName,
+                        lastModified = Date.now(),
+                        typePropertyName = self.typePropertyName,
+                        changesPropertyName = self.changesPropertyName,
+                        operationPropertyName = self.operationPropertyName,
+                        operationCreateName = self.operationCreateName,
+                        primaryKeys = [];
 
 
-                myDB.open().then(function (db) {
-                    db.transaction('rw', table, operationTable,
-                        function () {
-
+                    return myDB.open().then(function (db) {
+                        db.transaction('rw', table, operationTable, function () {
                             //Assign primary keys and build operations
-                            for(var i=0, countI = objects.length, iRawData, iPrimaryKey;i<countI;i++) {
+                            for(var i = 0, countI = objects.length, iRawData, iPrimaryKey, iOperation; i<countI;i++) {
                                 if((iRawData = objects[i])) {
 
-                                    if(typeof iRawData[primaryKey] === "undefined"
-                                        || iRawData[primaryKey] === "") {
+                                    if(typeof iRawData[primaryKey] === "undefined" || iRawData[primaryKey] === "") {
                                         //Set offline uuid based primary key
                                         iRawData[primaryKey] = iPrimaryKey = uuid.generate();
 
                                         //keep track of primaryKeys:
                                         primaryKeys.push(iPrimaryKey);
-                                    }
-                                    else {
+                                    } else {
                                         console.log("### OfflineService createData ",type,": iRaData ",iRawData," already have a primaryKey[",primaryKey,"]");
                                     }
 
@@ -714,12 +842,11 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                                 }
                             }
 
-                            return Dexie.Promise.all([table.bulkAdd(clonedObjects),operationTable.bulkAdd(operations)]);
+                            return Dexie.Promise.all([table.bulkAdd(clonedObjects), operationTable.bulkAdd(operations)]);
 
                         }).then(function(value) {
                             //Now write new offline primaryKeys
-                            OfflineService.writeOfflinePrimaryKeys(primaryKeys)
-                            .then(function() {
+                            OfflineService.writeOfflinePrimaryKeys(primaryKeys).then(function () {
                                 //To verify it's there
                                 // OfflineService.fetchOfflinePrimaryKeys()
                                 // .then(function(offlinePrimaryKeys) {
@@ -732,8 +859,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                                 .then(function() {
                                     resolve(objects);
                                 });
-                            })
-                            .catch(function(e) {
+                            }).catch(function(e) {
                                 reject(e);
                                 console.error(e);
                             });
@@ -741,40 +867,37 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                             reject(e);
                             console.error(e);
                         });
-                    }
-                );
+                    });
+                });
             });
         }
     },
 
     updatePrimaryKey: {
         value: function (currentPrimaryKey, newPrimaryKey, type) {
+            var self = this;
+            return this._db.then(function (myDB) {
+                var table = self.tableNamed(myDB, type),
+                    primaryKeyProperty = table.schema.primKey.name,
+                    record;
 
-            var myDB = this._db,
-            table = this.tableNamed(type),
-            primaryKeyProperty = table.schema.primKey.name,
-            record,
-            updateRecord = {};
-
-            //because it's a primary key, we need to delete the record and re-create it...
-            //We fetch it first
-            return table.where(primaryKeyProperty).equals(currentPrimaryKey)
-                .first(function(record) {
-                    table.delete(currentPrimaryKey)
-                    .then(function() {
+                //because it's a primary key, we need to delete the record and re-create it...
+                //We fetch it first
+                return table.where(primaryKeyProperty).equals(currentPrimaryKey).first(function (record) {
+                    table.delete(currentPrimaryKey).then(function () {
                         //Assign the new one
                         record[primaryKeyProperty] = newPrimaryKey;
-
                         //Re-save
                         return table.put(record);
-                    })
-                    .catch(function(e) {
-                            // console.log("tableName:failed to addO ffline Data",e)
-                            console.error(table.name,": failed to delete record with primaryKwy ",currentPrimaryKey,e);
-                        });
+                    }).catch(function(e) {
+                        // console.log("tableName:failed to addO ffline Data",e)
+                        console.error(table.name,": failed to delete record with primaryKwy ", currentPrimaryKey, e);
+                    });
                 });
+            });
         }
     },
+
     /**
      * Save updates made to an array of existing data objects.
      *
@@ -791,29 +914,27 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
             if(!objects || objects.length === 0) return Dexie.Promise.resolve();
 
             return new Promise(function (resolve, reject) {
-                var myDB = self._db,
-                table = self.tableNamed(type),
-                operationTable = self.operationTable,
-                clonedObjects = objects.slice(0),
-                operations = [],
-                primaryKey = table.schema.primKey.name,
-                dataID = self.dataIDPropertyName,
-                lastModifiedPropertyName = self.lastModifiedPropertyName,
-                lastModified = Date.now(),
-                updateDataPromises = [],
-                typePropertyName = self.typePropertyName,
-                changesPropertyName = self.changesPropertyName,
-                operationPropertyName = self.operationPropertyName,
-                operationUpdateName = self.operationUpdateName;
+                self._db.then(function (myDB) {
+                    var table = self.tableNamed(myDB, type),
+                        operationTable = self.operationTable(myDB),
+                        clonedObjects = objects.slice(0),
+                        primaryKey = table.schema.primKey.name,
+                        dataID = self.dataIDPropertyName,
+                        lastModifiedPropertyName = self.lastModifiedPropertyName,
+                        lastModified = Date.now(),
+                        updateDataPromises = [],
+                        typePropertyName = self.typePropertyName,
+                        changesPropertyName = self.changesPropertyName,
+                        operationPropertyName = self.operationPropertyName,
+                        operationUpdateName = self.operationUpdateName;
 
-                myDB.open().then(function (db) {
-                    db.transaction('rw', table, operationTable,
-                        function () {
+                    myDB.open().then(function (db) {
+                        db.transaction('rw', table, operationTable, function () {
                             //Make a clone of the array and create the record to track the online Last Updated date
-                            for(var i=0, countI = objects.length, iRawData,iPrimaryKey;i<countI;i++) {
+                            var iOperation, iRawData, iPrimaryKey;
+                            for(var i = 0, countI = objects.length; i < countI; i++) {
                                 if((iRawData = objects[i])) {
                                     iPrimaryKey = iRawData[primaryKey];
-                                    console.log("updateData ",iPrimaryKey,iRawData);
                                     updateDataPromises.push(table.update(iPrimaryKey, iRawData));
 
                                     //Create the record to track of last modified date
@@ -824,28 +945,21 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                                     iOperation[changesPropertyName] = iRawData;
                                     iOperation[operationPropertyName] = operationUpdateName;
                                     iOperation.context = context;
-
                                     updateDataPromises.push(operationTable.put(iOperation));
                                 }
                             }
                             return Dexie.Promise.all(updateDataPromises);
-
                         }).then(function(value) {
                             //Once this succedded, we need to add our temporary primary keys bookeeping:
                             //Register potential temporary primaryKeys
                             self.registerOfflinePrimaryKeyDependenciesForData(objects, table.name, primaryKey);
-
-
                             resolve(clonedObjects);
-                            //console.log(table.name,": updateData for ",objects.length," objects succesfully",value);
                         }).catch(function(e) {
                             reject(e);
-                            // console.log("tableName:failed to addO ffline Data",e)
                             console.error(table.name,": failed to updateData for ",objects.length," objects with error",e);
                         });
-                    }
-                );
-
+                    });
+                });
             });
         }
     },
@@ -866,23 +980,22 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
             if(!objects || objects.length === 0) return Dexie.Promise.resolve();
 
             return new Promise(function (resolve, reject) {
-                var myDB = self._db,
-                table = self.tableNamed(type),
-                operationTable = self.operationTable,
-                clonedObjects = objects.slice(0),
-                primaryKey = table.schema.primKey.name,
-                dataID = self.dataIDPropertyName,
-                lastModifiedPropertyName = self.lastModifiedPropertyName,
-                lastModified = Date.now(),
-                changesPropertyName = self.changesPropertyName,
-                typePropertyName = self.typePropertyName,
-                operationPropertyName = self.operationPropertyName,
-                operationDeleteName = self.operationDeleteName,
-                updateDataPromises = [];
+                self._db.then(function (myDB) {
+                    var table = self.tableNamed(myDB, type),
+                        operationTable = self.operationTable(myDB),
+                        clonedObjects = objects.slice(0),
+                        primaryKey = table.schema.primKey.name,
+                        dataID = self.dataIDPropertyName,
+                        lastModifiedPropertyName = self.lastModifiedPropertyName,
+                        lastModified = Date.now(),
+                        changesPropertyName = self.changesPropertyName,
+                        typePropertyName = self.typePropertyName,
+                        operationPropertyName = self.operationPropertyName,
+                        operationDeleteName = self.operationDeleteName,
+                        updateDataPromises = [];
 
-                myDB.open().then(function (db) {
-                    db.transaction('rw', table, operationTable,
-                        function () {
+                    myDB.open().then(function (db) {
+                        db.transaction('rw', table, operationTable, function () {
                             //Make a clone of the array and create the record to track the online Last Updated date
                             for (var i=0, countI = objects.length, iRawData, iOperation, iPrimaryKey; i<countI; i++) {
                                 if ((iRawData = objects[i])) {
@@ -903,8 +1016,7 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                             }
                             return Dexie.Promise.all(updateDataPromises);
 
-                        }).then(function(value) {
-
+                        }).then(function () {
                             //Once this succeeded, we need to add our temporary primary keys bookkeeping:
                             //Register potential temporary primaryKeys
                             self.deleteOfflinePrimaryKeyDependenciesForData(objects, type, primaryKey);
@@ -915,397 +1027,390 @@ exports.OfflineService = OfflineService = RawDataService.specialize(/** @lends O
                             // console.log("tableName:failed to add Offline Data",e)
                             console.error(table.name,": failed to updateData for ",objects.length," objects with error",e);
                         });
-                    }
-                );
-
+                    });
+                });
             });
         }
     },
 
     deleteOfflineOperations: {
         value: function (operations) {
-            var self = this;
 
+            var self = this;
             if(!operations || operations.length === 0) return Promise.resolve();
 
             return new Promise(function (resolve, reject) {
-                var myDB = self._db,
-                operationTable = self.operationTable,
-                primaryKey = operationTable.schema.primKey.name,
-                deleteOperationPromises = [];
+                self._db.then(function (myDB) {
+                    var operationTable = self.operationTable(myDB),
+                        primaryKey = operationTable.schema.primKey.name,
+                        deleteOperationPromises = [];
 
-                myDB.open().then(function (db) {
-                    db.transaction('rw', operationTable,
-                        function () {
+                    myDB.open().then(function (db) {
+                        db.transaction('rw', operationTable, function () {
                             //Make a clone of the array and create the record to track the online Last Updated date
-                            for(var i=0, countI = operations.length, iOperation;i<countI;i++) {
+                            for(var i=0, countI = operations.length, iOperation; i < countI; i++) {
                                 if((iOperation = operations[i])) {
                                     deleteOperationPromises.push(operationTable.delete(iOperation[primaryKey], iOperation));
                                 }
                             }
                             return Dexie.Promise.all(deleteOperationPromises);
-
-                    }).then(function(value) {
-                        resolve();
-                        //console.log(table.name,": updateData for ",objects.length," objects succesfully",value);
-                    }).catch(function(e) {
-                        reject(e);
-                        // console.log("tableName:failed to add Offline Data",e)
-                        console.error(table.name,": failed to updateData for ",objects.length," objects with error",e);
+                        }).then(function(value) {
+                            resolve();
+                            //console.log(table.name,": updateData for ",objects.length," objects succesfully",value);
+                        }).catch(function(e) {
+                            reject(e);
+                            // console.log("tableName:failed to add Offline Data",e)
+                            console.error(table.name,": failed to updateData for ", objects.length, " objects with error",e);
+                        });
                     });
                 });
-
             });
         }
     },
+
     onlinePrimaryKeyForOfflinePrimaryKey: {
         value: function(offlinePrimaryKey) {
             return OfflineService.onlinePrimaryKeyForOfflinePrimaryKey(offlinePrimaryKey);
         }
     },
+
     replaceOfflinePrimaryKey: {
-            value: function(offlinePrimaryKey,onlinePrimaryKey, type, service) {
-                return OfflineService.replaceOfflinePrimaryKey(offlinePrimaryKey,onlinePrimaryKey, type, service);
-            }
+        value: function(offlinePrimaryKey,onlinePrimaryKey, type, service) {
+            return OfflineService.replaceOfflinePrimaryKey(offlinePrimaryKey,onlinePrimaryKey, type, service);
+        }
     }
-},
-    {
-        _registeredOfflineServiceByName: {
-            value: new Map()
-        },
-        registerOfflineService: {
-            value: function(anOfflineService) {
-                this._registeredOfflineServiceByName.set(anOfflineService.name, anOfflineService);
-            }
-        },
-        registeredOfflineServiceNamed: {
-            value: function(anOfflineServiceName) {
-                return this._registeredOfflineServiceByName.get(anOfflineServiceName);
-            }
-        },
-        __offlinePrimaryKeyDB: {
-            value:null
-        },
-        _offlinePrimaryKeyDB: {
-            get: function() {
-                if(!this.__offlinePrimaryKeyDB) {
-                    var db = this.__offlinePrimaryKeyDB = new Dexie("OfflinePrimaryKeys"),
-                        primaryKeysTable = db["PrimaryKeys"];
 
-                    if(!primaryKeysTable) {
-                        /*   PrimaryKeys has offlinePrimaryKey and a property "dependencies" that contains an array of
-                            {
-                                offlinePrimaryKey:"uuid-1111-4444-5555",
-                                dependencies:[
-                                    {
-                                        serviceName: "AServiceName",
-                                        tableName:"BlahTable",
-                                        primaryKey:"uuid-1233-3455",
-                                        foreignKeyName:"foo_ID"
-                                    }
-                                ]
-                            }
-                                This tells us that the primaryKey "uuid-1111-4444-5555" appears as a foreignKey named "foo_ID" of the record in "BlahTable" that has the primaryKey value of "uuid-1233-3455"
-                        */
+}, {
+    _registeredOfflineServiceByName: {
+        value: new Map()
+    },
 
-                        var newDbSchema = {
-                            PrimaryKeys: "offlinePrimaryKey,dependencies.serviceName, dependencies.tableName, dependencies.primaryKey, dependencies.foreignKeyName"
-                        };
-                        db.version(db.verno+1).stores(newDbSchema);
-                    }
+    registerOfflineService: {
+        value: function(anOfflineService) {
+            this._registeredOfflineServiceByName.set(anOfflineService.name, anOfflineService);
+        }
+    },
 
+    registeredOfflineServiceNamed: {
+        value: function(anOfflineServiceName) {
+            return this._registeredOfflineServiceByName.get(anOfflineServiceName);
+        }
+    },
+
+    __offlinePrimaryKeyDB: {
+        value:null
+    },
+
+    _offlinePrimaryKeyDB: {
+        get: function() {
+            if(!this.__offlinePrimaryKeyDB) {
+
+                var db = this.__offlinePrimaryKeyDB = new Dexie("OfflinePrimaryKeys"),
+                    primaryKeysTable = db["PrimaryKeys"];
+
+                if(!primaryKeysTable) {
+                    /**
+                     *  PrimaryKeys has offlinePrimaryKey and a property "dependencies" that contains an array of
+                     *  {
+                     *      offlinePrimaryKey:"uuid-1111-4444-5555",
+                     *      dependencies:[{
+                     *          serviceName: "AServiceName",
+                     *          tableName:"BlahTable",
+                     *          primaryKey:"uuid-1233-3455",
+                     *          foreignKeyName:"foo_ID"
+                     *      }]
+                     *  }
+                     *  This tells us that the primaryKey "uuid-1111-4444-5555" appears as a foreignKey
+                     *  named "foo_ID" of the record in "BlahTable" that has the primaryKey value of
+                     *  "uuid-1233-3455"
+                     */
+                    var newDbSchema = {
+                        PrimaryKeys: "offlinePrimaryKey,dependencies.serviceName, dependencies.tableName, dependencies.primaryKey, dependencies.foreignKeyName"
+                    };
+                    db.version(db.verno+1).stores(newDbSchema);
                 }
-                return this.__offlinePrimaryKeyDB;
+
             }
-        },
-        _primaryKeysTable: {
-            value:null
-        },
+            return this.__offlinePrimaryKeyDB;
+        }
+    },
 
-        primaryKeysTable: {
-            get: function() {
-                return this._primaryKeysTable || (this._primaryKeysTable = this._offlinePrimaryKeyDB.PrimaryKeys);
-            }
-        },
+    _primaryKeysTable: {
+        value:null
+    },
 
-        writeOfflinePrimaryKey: {
-            value: function(aPrimaryKey) {
-                return this.writeOfflinePrimaryKeys([aPrimaryKey]);
-            }
-        },
+    primaryKeysTable: {
+        get: function() {
+            return this._primaryKeysTable || (this._primaryKeysTable = this._offlinePrimaryKeyDB.PrimaryKeys);
+        }
+    },
 
-        writeOfflinePrimaryKeys: {
-            value: function(primaryKeys) {
-                var db = this._offlinePrimaryKeyDB,
-                    table = this.primaryKeysTable,
-                    primaryKeysRecords = [],
-                    self = this;
+    writeOfflinePrimaryKey: {
+        value: function(aPrimaryKey) {
+            return this.writeOfflinePrimaryKeys([aPrimaryKey]);
+        }
+    },
 
-                for(var i=0, countI = primaryKeys.length, iRawData, iPrimaryKey;i<countI;i++) {
-                    primaryKeysRecords.push({
-                        offlinePrimaryKey: primaryKeys[i]
-                    });
-                }
-                return new Promise(function (resolve, reject) {
-                    var i, iPrimaryKey,
-                        _offlinePrimaryKeys = self._offlinePrimaryKeys;
+    writeOfflinePrimaryKeys: {
+        value: function(primaryKeys) {
+            var db = this._offlinePrimaryKeyDB,
+                table = this.primaryKeysTable,
+                primaryKeysRecords = [],
+                self = this;
 
-                    table.bulkAdd(primaryKeysRecords)
-                    .then(function(lastKey) {
-                        self.fetchOfflinePrimaryKeys()
-                        .then(function(offlinePrimaryKeys) {
-
-                            //Update local cache:
-                            for(i=0;(iPrimaryKey = primaryKeys[i]);i++) {
-                                offlinePrimaryKeys.add(iPrimaryKey.offlinePrimaryKey,primaryKeysRecords[i]);
-                            }
-                            resolve(lastKey);
-                        });
-                    })
-                    .catch(function(e){
-                        console.error("deleteOfflinePrimaryKeys failed",e);
-                        reject(e);
-                    });
-
+            for(var i=0, countI = primaryKeys.length, iRawData, iPrimaryKey;i<countI;i++) {
+                primaryKeysRecords.push({
+                    offlinePrimaryKey: primaryKeys[i]
                 });
             }
-        },
+            return new Promise(function (resolve, reject) {
+                var i, iPrimaryKey;
+                    // _offlinePrimaryKeys = self._offlinePrimaryKeys;
 
-        registerOfflinePrimaryKeyDependenciesForData: {
-            value: function(data, tableName, primaryKeyPropertyName, service) {
+                table.bulkAdd(primaryKeysRecords).then(function(lastKey) {
+                    self.fetchOfflinePrimaryKeys().then(function(offlinePrimaryKeys) {
+                        //Update local cache:
+                        for (i = 0; (iPrimaryKey = primaryKeys[i]); i++) {
+                            offlinePrimaryKeys.add(iPrimaryKey.offlinePrimaryKey, primaryKeysRecords[i]);
+                        }
+                        resolve(lastKey);
+                    });
+                }).catch(function(e){
+                    console.error("deleteOfflinePrimaryKeys failed", e);
+                    reject(e);
+                });
+            });
+        }
+    },
 
-                if(data.length === 0) return;
+    registerOfflinePrimaryKeyDependenciesForData: {
+        value: function(data, tableName, primaryKeyPropertyName, service) {
 
-                var keys = Object.keys(data[0]),
-                    i, iData, countI, iPrimaryKey,
-                    j, jForeignKey, jForeignKeyValue,
-                    offlineService = OfflineService,
-                    tableSchema = service.schema[tableName],
-                    //if we don't have a known list of foreign keys, we'll consider all potential candidate
-                    foreignKeys = tableSchema.foreignKeys,
-                    updatedRecord, updatedRecords,
-                    self = this;
+            if(data.length === 0) return;
 
-                if(!foreignKeys) {
-                    foreignKeys = tableSchema._computedForeignKeys
-                                    || (tableSchema._computedForeignKeys = keys);
-                }
+            var keys = Object.keys(data[0]),
+                i, iData, countI, iPrimaryKey,
+                j, jForeignKey, jForeignKeyValue,
+                offlineService = OfflineService,
+                tableSchema = service.schema[tableName],
+                //if we don't have a known list of foreign keys, we'll consider all potential candidate
+                foreignKeys = tableSchema.foreignKeys,
+                updatedRecord, updatedRecords,
+                self = this;
 
-                //We need the cache populated from storage before we can do this:
-                return this.fetchOfflinePrimaryKeys()
-                    .then(function(offlinePrimaryKeys) {
+            if(!foreignKeys) {
+                foreignKeys = tableSchema._computedForeignKeys
+                    || (tableSchema._computedForeignKeys = keys);
+            }
 
-                        for(i=0, countI = data.length;(i<countI);i++) {
-                            iData = data[i];
-                            iPrimaryKey = iData[primaryKeyPropertyName];
-                            for(j=0;(jForeignKey = foreignKeys[j]);j++) {
-                                jForeignKeyValue = iData[jForeignKey];
-                                //if we have a value in this foreignKey:
-                                if(jForeignKeyValue) {
-                                    if(updatedRecord = self.addPrimaryKeyDependency(jForeignKeyValue, tableName,iPrimaryKey,jForeignKey, service.name)) {
-                                        updatedRecords = updatedRecords || [];
-                                        updatedRecords.push(updatedRecord);
-                                    }
+            //We need the cache populated from storage before we can do this:
+            return this.fetchOfflinePrimaryKeys()
+                .then(function(offlinePrimaryKeys) {
+
+                    for (i=0, countI = data.length;(i<countI);i++) {
+                        iData = data[i];
+                        iPrimaryKey = iData[primaryKeyPropertyName];
+                        for (j=0;(jForeignKey = foreignKeys[j]);j++) {
+                            jForeignKeyValue = iData[jForeignKey];
+                            //if we have a value in this foreignKey:
+                            if (jForeignKeyValue) {
+                                if (updatedRecord = self.addPrimaryKeyDependency(jForeignKeyValue, tableName,iPrimaryKey,jForeignKey, service.name)) {
+                                    updatedRecords = updatedRecords || [];
+                                    updatedRecords.push(updatedRecord);
                                 }
                             }
                         }
+                    }
 
-
-                        if(updatedRecords && updatedRecords.length) {
-                            //We need to save:
-                            self.primaryKeysTable.bulkPut(updatedRecords)
+                    if(updatedRecords && updatedRecords.length) {
+                        //We need to save:
+                        self.primaryKeysTable.bulkPut(updatedRecords)
                             .then(function(lastKey) {
                                 console.log("Updated  offline primaryKeys dependencies" + lastKey); // Will be 100000.
                             }).catch(Dexie.BulkError, function (e) {
-                                console.error (e);
-                            });
-
-                        }
-                });
-            }
-        },
-
-        deleteOfflinePrimaryKeyDependenciesForData: {
-            value: function(data, tableName, primaryKeyPropertyName, tableForeignKeys) {
-
-            }
-        },
-
-       /**
-        * this assumes this._offlinePrimaryKeys has already been fetched
-        * @returns {Object} - if we found a record to update, returns it
-        * otherwise returns null
-        */
-
-        addPrimaryKeyDependency: {
-            value: function(aPrimaryKey, tableName, tablePrimaryKey, tableForeignKey, serviceName) {
-
-                if(this._offlinePrimaryKeys.has(aPrimaryKey)) {
-                    var aPrimaryKeyRecord = this._offlinePrimaryKeys.get(aPrimaryKey),
-                        dependencies = aPrimaryKeyRecord.dependencies,
-                        i, iDependency, found = false,
-                        primaryKeysRecord;
-
-                    //Now we search for a match... whish we could use an in-memory
-                    //compound-index...
-                    if(dependencies) {
-                        for(i=0;(iDependency = dependencies[i]);i++) {
-                            if( iDependency.tableName === tableName
-                                && iDependency.primaryKey === tablePrimaryKey
-                                && iDependency.foreignKeyName === tableForeignKey) {
-                                    found = true;
-                                    break;
-                                }
-                        }
-                    }
-
-                    if(!found) {
-                        primaryKeysRecord = {
-                            serviceName: serviceName,
-                            tableName: tableName,
-                            primaryKey: tablePrimaryKey,
-                            foreignKeyName: tableForeignKey
-                        };
-                        if(!dependencies) {
-                            dependencies = aPrimaryKeyRecord.dependencies = [];
-                        }
-                        dependencies.push(primaryKeysRecord);
-                        return aPrimaryKeyRecord;
-                    }
-                    return null;
-                }
-            }
-        },
-        _offlinePrimaryKeyToOnlinePrimaryKey: {
-            value: new Map()
-        },
-        onlinePrimaryKeyForOfflinePrimaryKey: {
-            value: function(offlinePrimaryKey) {
-                return this._offlinePrimaryKeyToOnlinePrimaryKey.get(offlinePrimaryKey);
-            }
-        },
-
-        /*
-        * Returns a promise resolved when onlinePrimaryKey has replaced offlinePrimaryKey
-        * both in memory and in IndexedDB
-        * @type {Promise}
-        */
-
-        replaceOfflinePrimaryKey: {
-            value: function(offlinePrimaryKey,onlinePrimaryKey, type, service) {
-                var self = this;
-                //Update the central table used by DataService's performOfflineOperations
-                //to update operations are they are processed
-                this._offlinePrimaryKeyToOnlinePrimaryKey.set(offlinePrimaryKey,onlinePrimaryKey);
-
-                //Update the stored primaryKey
-                return service.offlineService.updatePrimaryKey(offlinePrimaryKey, onlinePrimaryKey, type)
-                .then(function() {
-                    //Now we need to update stored data as well and we need the cache populated from storage before we can do this:
-                    //We shouldn't just rely on the fact that the app will immediately refetch everything and things would be broken
-                    //if somehow the App would get offline again before a full refetch is done across every kind of data.
-                    return self.fetchOfflinePrimaryKeys()
-                        .then(function(offlinePrimaryKeys) {
-
-                            if(offlinePrimaryKeys.has(offlinePrimaryKey)) {
-                                var aPrimaryKeyRecord = offlinePrimaryKeys.get(offlinePrimaryKey),
-                                    dependencies = aPrimaryKeyRecord.dependencies;
-
-                                if(dependencies) {
-                                    var i, iDependency, iOfflineService, iTableName, iPrimaryKey, iForeignKeyName, iUpdateRecord, updateArray = [];
-
-                                    for(i=0;(iDependency = dependencies[i]);i++) {
-                                        //The service that handles iTableName
-                                        iOfflineService = OfflineService.registeredOfflineServiceNamed(iDependency.serviceName);
-                                        iTableName = iDependency.tableName;
-                                        iPrimaryKey = iDependency.primaryKey;
-                                        iForeignKeyName = iDependency.foreignKeyName;
-
-                                        iUpdateRecord = {};
-                                        // updateArray[0] = iUpdateRecord;
-                                        iUpdateRecord[iOfflineService.schema[iTableName].primaryKey] = iPrimaryKey;
-                                        iUpdateRecord[iForeignKeyName] = onlinePrimaryKey;
-
-                                        return iOfflineService.tableNamed(iTableName).update(iPrimaryKey, iUpdateRecord);
-                                        //Using updateData creates offlineOperations we don't want here, hence direct use of table:
-                                        //This is internal to OfflineService and descendants.
-                                        // iOfflineService.updateData(updateArray, iTableName, null);
-
-
-                                    }
-                                }
-
-                            }
-
+                            console.error (e);
                         });
 
-                })
-                .catch(function(e){
-                    console.error("updatePrimaryKey failed",e);
-                    reject(e);
-                });
-
-
-
-            }
-        },
-        /**
-         * caches the primary keys only
-         */
-
-        _offlinePrimaryKeys: {
-            value: null
-        },
-        _offlinePrimaryKeysPromise: {
-            value: null
-        },
-        fetchOfflinePrimaryKeys: {
-            value: function() {
-                if(!this._offlinePrimaryKeys) {
-                    var _offlinePrimaryKeys = this._offlinePrimaryKeys = new Map(),
-                        self = this;
-                    return new Promise(function (resolve, reject) {
-                        self._offlinePrimaryKeyDB.PrimaryKeys.each(function (item, cursor) {
-                            _offlinePrimaryKeys.set(item.offlinePrimaryKey,item);
-                         })
-                         .then(function() {
-                             resolve(_offlinePrimaryKeys);
-                         })
-                         .catch(function(e){
-                             console.error("fetchOfflinePrimaryKeys failed",e);
-                             reject(e);
-                         });
-                    });
-                }
-                else {
-                    if(!this._offlinePrimaryKeysPromise) {
-                        this._offlinePrimaryKeysPromise = Promise.resolve(this._offlinePrimaryKeys);
                     }
-                    return this._offlinePrimaryKeysPromise;
-                }
-            }
-        },
-        deleteOfflinePrimaryKeys: {
-            value: function (primaryKeys) {
-                var self = this,
-                    _offlinePrimaryKeys = this._offlinePrimaryKeys;
+                });
+        }
+    },
 
-                if(!primaryKeys || primaryKeys.length === 0) return Promise.resolve();
+    deleteOfflinePrimaryKeyDependenciesForData: {
+        value: function(data, tableName, primaryKeyPropertyName, tableForeignKeys) {
 
-                return new Promise(function (resolve, reject) {
-                    self._offlinePrimaryKeyDB.PrimaryKeys.bulkDelete(primaryKeys)
-                    .then(function() {
-                        //Update local cache:
-                        for(var i=0, iPrimaryKey;(iPrimaryKey = primaryKeys[i]);i++) {
-                            _offlinePrimaryKeys.delete(iPrimaryKey.offlinePrimaryKey);
+        }
+    },
+
+    /**
+     * this assumes this._offlinePrimaryKeys has already been fetched
+     * @returns {Object} - if we found a record to update, returns it
+     * otherwise returns null
+     */
+
+    addPrimaryKeyDependency: {
+        value: function(aPrimaryKey, tableName, tablePrimaryKey, tableForeignKey, serviceName) {
+
+            if(this._offlinePrimaryKeys.has(aPrimaryKey)) {
+                var aPrimaryKeyRecord = this._offlinePrimaryKeys.get(aPrimaryKey),
+                    dependencies = aPrimaryKeyRecord.dependencies,
+                    i, iDependency, found = false,
+                    primaryKeysRecord;
+
+                //Now we search for a match... whish we could use an in-memory
+                //compound-index...
+                if(dependencies) {
+                    for(i=0;(iDependency = dependencies[i]);i++) {
+                        if( iDependency.tableName === tableName
+                            && iDependency.primaryKey === tablePrimaryKey
+                            && iDependency.foreignKeyName === tableForeignKey) {
+                            found = true;
+                            break;
                         }
-                        resolve();
-                    })
-                    .catch(function(e){
-                        console.error("deleteOfflinePrimaryKeys failed",e);
-                        reject(e);
-                    });
-                })
+                    }
+                }
+
+                if(!found) {
+                    primaryKeysRecord = {
+                        serviceName: serviceName,
+                        tableName: tableName,
+                        primaryKey: tablePrimaryKey,
+                        foreignKeyName: tableForeignKey
+                    };
+                    if(!dependencies) {
+                        dependencies = aPrimaryKeyRecord.dependencies = [];
+                    }
+                    dependencies.push(primaryKeysRecord);
+                    return aPrimaryKeyRecord;
+                }
+                return null;
             }
         }
-    });
+    },
+
+    _offlinePrimaryKeyToOnlinePrimaryKey: {
+        value: new Map()
+    },
+
+    onlinePrimaryKeyForOfflinePrimaryKey: {
+        value: function(offlinePrimaryKey) {
+            return this._offlinePrimaryKeyToOnlinePrimaryKey.get(offlinePrimaryKey);
+        }
+    },
+
+    /*
+     * Returns a promise resolved when onlinePrimaryKey has replaced offlinePrimaryKey
+     * both in memory and in IndexedDB
+     * @type {Promise}
+     */
+
+    replaceOfflinePrimaryKey: {
+        value: function(offlinePrimaryKey,onlinePrimaryKey, type, service) {
+
+            var self = this;
+            //Update the central table used by DataService's performOfflineOperations
+            //to update operations are they are processed
+            this._offlinePrimaryKeyToOnlinePrimaryKey.set(offlinePrimaryKey,onlinePrimaryKey);
+
+            //Update the stored primaryKey
+            return service.offlineService.updatePrimaryKey(offlinePrimaryKey, onlinePrimaryKey, type).then(function() {
+                //Now we need to update stored data as well and we need the cache populated from storage before we can do this:
+                //We shouldn't just rely on the fact that the app will immediately refetch everything and things would be broken
+                //if somehow the App would get offline again before a full refetch is done across every kind of data.
+                return self.fetchOfflinePrimaryKeys().then(function(offlinePrimaryKeys) {
+                    if(offlinePrimaryKeys.has(offlinePrimaryKey)) {
+                        var aPrimaryKeyRecord = offlinePrimaryKeys.get(offlinePrimaryKey),
+                            dependencies = aPrimaryKeyRecord.dependencies;
+
+                        if(dependencies) {
+                            var i, iDependency, iOfflineService, iTableName, iPrimaryKey, iForeignKeyName, iUpdateRecord, updateArray = [];
+
+                            for (i = 0; (iDependency = dependencies[i]); i++) {
+                                //The service that handles iTableName
+                                iOfflineService = OfflineService.registeredOfflineServiceNamed(iDependency.serviceName);
+                                iTableName = iDependency.tableName;
+                                iPrimaryKey = iDependency.primaryKey;
+                                iForeignKeyName = iDependency.foreignKeyName;
+
+                                iUpdateRecord = {};
+                                // updateArray[0] = iUpdateRecord;
+                                iUpdateRecord[iOfflineService.schema[iTableName].primaryKey] = iPrimaryKey;
+                                iUpdateRecord[iForeignKeyName] = onlinePrimaryKey;
+
+                                return iOfflineService.tableNamed(iTableName).update(iPrimaryKey, iUpdateRecord);
+                                //Using updateData creates offlineOperations we don't want here, hence direct use of table:
+                                //This is internal to OfflineService and descendants.
+                                // iOfflineService.updateData(updateArray, iTableName, null);
+
+
+                            }
+                        }
+
+                    }
+
+                });
+            }).catch(function(e){
+                console.error("updatePrimaryKey failed with exception (", e, ")");
+                reject(e);
+            });
+        }
+    },
+
+    /**
+     * caches the primary keys only
+     */
+    _offlinePrimaryKeys: {
+        value: null
+    },
+
+    _offlinePrimaryKeysPromise: {
+        value: null
+    },
+
+    fetchOfflinePrimaryKeys: {
+        value: function() {
+            if(!this._offlinePrimaryKeys) {
+                var _offlinePrimaryKeys = this._offlinePrimaryKeys = new Map(),
+                    self = this;
+                return new Promise(function (resolve, reject) {
+                    self._offlinePrimaryKeyDB.PrimaryKeys.each(function (item, cursor) {
+                        _offlinePrimaryKeys.set(item.offlinePrimaryKey,item);
+                    }).then(function() {
+                        resolve(_offlinePrimaryKeys);
+                    }).catch(function(e){
+                        console.error("fetchOfflinePrimaryKeys failed",e);
+                        reject(e);
+                    });
+                });
+            } else {
+                if(!this._offlinePrimaryKeysPromise) {
+                    this._offlinePrimaryKeysPromise = Promise.resolve(this._offlinePrimaryKeys);
+                }
+                return this._offlinePrimaryKeysPromise;
+            }
+        }
+    },
+
+    deleteOfflinePrimaryKeys: {
+        value: function (primaryKeys) {
+
+            var self = this,
+                _offlinePrimaryKeys = this._offlinePrimaryKeys;
+
+            if(!primaryKeys || primaryKeys.length === 0) return Promise.resolve();
+
+            return new Promise(function (resolve, reject) {
+                self._offlinePrimaryKeyDB.PrimaryKeys.bulkDelete(primaryKeys).then(function() {
+                    //Update local cache:
+                    for (var i = 0, iPrimaryKey; (iPrimaryKey = primaryKeys[i]); i++) {
+                        _offlinePrimaryKeys.delete(iPrimaryKey.offlinePrimaryKey);
+                    }
+                    resolve();
+                }).catch(function(e){
+                    console.error("deleteOfflinePrimaryKeys failed",e);
+                    reject(e);
+                });
+            })
+        }
+    }
+});
