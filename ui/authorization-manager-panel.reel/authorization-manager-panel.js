@@ -34,9 +34,9 @@ exports.AuthorizationManagerPanel = Component.specialize({
             }
             this._panels.get(authorizationPanel).resolve(authorization);
 
-            // if (this._authorizedPanels.length === this.authorizationPanels.length) {
-            //     this._authorizationResolve(this._authorizations.slice());
-            // }
+            if (!this.authorizationPanels.length) {
+                this._authorizationResolve(authorization);
+            }
         }
     },
 

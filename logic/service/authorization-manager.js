@@ -1,8 +1,9 @@
 var Montage = require("montage/core/core").Montage,
     Promise = require("montage/core/promise").Promise,
-    Map = require("collections/map");
+    Map = require("collections/map"),
+    application = require("montage/core/application").application,
 
-    var MANAGER_PANEL_MODULE = "ui/authorization-manager-panel.reel";
+    MANAGER_PANEL_MODULE = "ui/authorization-manager-panel.reel";
 
 /**
  * Helps coordinates the needs for DataServices to get the authorization they
@@ -247,11 +248,11 @@ var AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.pr
                 }
                 return self._notifyDataService(dataService)
             }).then(function () {
-                return Promise.all(authorizationPromises);
+                var useModal = application.applicationModal && self.authorizationManagerPanel.runModal;
+                return useModal ? self.authorizationManagerPanel.runModal() : Promise.all(authorizationPromises);
             }).then(function(authorizations) {
                 self.callDelegateMethod("authorizationManagerDidAuthorizeService", self, dataService);
                 self.hasPendingServices = false;
-
                 //TODO [TJ] How to concatenate authorizations from different auth-services into a single Authorization Object for the data-service
                 return authorizations;
             });
@@ -277,5 +278,4 @@ var AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.pr
 
 });
 
-var authorizationManager = new AuthorizationManager;
-exports.AuthorizationManager = authorizationManager;
+exports.AuthorizationManager = new AuthorizationManager();
