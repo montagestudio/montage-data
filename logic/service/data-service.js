@@ -154,6 +154,18 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
+
+    /**
+     * Convenience method to assess if a dataService is the rootService
+     *
+     * @type {Boolean}
+     */
+    isRootService: {
+        get: function () {
+            return this === this.rootService;
+        }
+    },
+
     /**
      * The child services of this service.
      *
@@ -680,6 +692,17 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: undefined
     },
 
+    /**
+     * The maximum amount of time a DataService's data will be considered fresh.
+     * ObjectDescriptor's maxAge should take precedence over this and a DataStream's dataMaxAge should
+     * take precedence over a DataService's dataMaxAge global default value.
+     *
+     * @type {Number}
+     */
+    dataMaxAge: {
+        value: undefined
+    },
+
     /***************************************************************************
      * Authorization
      */
@@ -933,16 +956,22 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     decacheObjectProperties: {
         value: function (object, propertyNames) {
-            var names = Array.isArray(propertyNames) ? propertyNames : arguments,
-                start = names === propertyNames ? 0 : 1,
-                triggers = this._getTriggersForObject(object),
-                trigger, i, n;
-            for (i = start, n = names.length; i < n; i += 1) {
-                trigger = triggers && triggers[names[i]];
-                if (trigger) {
-                    trigger.decacheObjectProperty(object);
+            if(this.isRootService) {
+                var names = Array.isArray(propertyNames) ? propertyNames : arguments,
+                    start = names === propertyNames ? 0 : 1,
+                    triggers = this._getTriggersForObject(object),
+                    trigger, i, n;
+                for (i = start, n = names.length; i < n; i += 1) {
+                    trigger = triggers && triggers[names[i]];
+                    if (trigger) {
+                        trigger.decacheObjectProperty(object);
+                    }
                 }
             }
+            else {
+                this.rootService.decacheObjectProperties(object, propertyNames);
+            }
+
         }
     },
 
@@ -989,11 +1018,16 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     getObjectProperties: {
         value: function (object, propertyNames) {
-            // Get the data, accepting property names as an array or as a list
-            // of string arguments while avoiding the creation of any new array.
-            var names = Array.isArray(propertyNames) ? propertyNames : arguments,
-                start = names === propertyNames ? 0 : 1;
-            return this._getOrUpdateObjectProperties(object, names, start, false);
+             if(this.isRootService) {
+                // Get the data, accepting property names as an array or as a list
+                // of string arguments while avoiding the creation of any new array.
+                var names = Array.isArray(propertyNames) ? propertyNames : arguments,
+                    start = names === propertyNames ? 0 : 1;
+                return this._getOrUpdateObjectProperties(object, names, start, false);
+            }
+            else {
+                return this.rootService.getObjectProperties(object, propertyNames);
+            }
         }
     },
 
@@ -1029,11 +1063,16 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     updateObjectProperties: {
         value: function (object, propertyNames) {
-            // Get the data, accepting property names as an array or as a list
-            // of string arguments while avoiding the creation of any new array.
-            var names = Array.isArray(propertyNames) ? propertyNames : arguments,
-                start = names === propertyNames ? 0 : 1;
-            return this._getOrUpdateObjectProperties(object, names, start, true);
+              if(this.isRootService) {
+                // Get the data, accepting property names as an array or as a list
+                // of string arguments while avoiding the creation of any new array.
+                var names = Array.isArray(propertyNames) ? propertyNames : arguments,
+                    start = names === propertyNames ? 0 : 1;
+                return this._getOrUpdateObjectProperties(object, names, start, true);
+              }
+              else {
+                return this.rootService.updateObjectProperties(object, propertyNames);
+              }
         }
     },
 
@@ -1073,9 +1112,48 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     fetchObjectProperty: {
         value: function (object, propertyName) {
-            var service = this._getChildServiceForObject(object);
-            return service ? service.fetchObjectProperty(object, propertyName) :
-                             this.nullPromise;
+            if(this.parentService && this.parentService._getChildServiceForObject(object) === this) {
+                    //If service decides to implemment fetchRawObjectProperty
+                    //it takes matter in its own hands
+                    if(typeof this.fetchRawObjectProperty === "function") {
+                        return this.fetchRawObjectProperty(object, propertyName);
+                    }
+                    //Otherwise we're going to use model, property descriptor, mappings
+                    //to make it happen.
+                    else {
+                        var propertyDescriptor = this._propertyDescriptorForObjectAndName(object, propertyName),
+                            destinationReference = propertyDescriptor && propertyDescriptor.valueDescriptor;
+                        return destinationReference ?   this._fetchObjectPropertyWithPropertyDescriptor(object, propertyName, propertyDescriptor) :
+                                                        this.nullPromise;
+
+                    }
+            }
+            else {
+                var service = this._getChildServiceForObject(object);
+                return service ? service.fetchObjectProperty(object, propertyName) :
+                                this.nullPromise;
+            }
+        }
+    },
+    _fetchObjectPropertyWithPropertyDescriptor: {
+        value: function (object, propertyName, propertyDescriptor) {
+            var self = this, service = this.rootService,
+                objectDescriptor = propertyDescriptor.owner,
+                mapping = objectDescriptor && this.mappingWithType(objectDescriptor),
+                data = this.snapshotForObject(object);
+
+            if (!mapping) {
+                mapping = BlueprintDataMapping.withBlueprint(objectDescriptor);
+                this._objectDescriptorMappings.set(objectDescriptor, mapping);
+            }
+            data = {}
+            Object.assign(data,this.snapshotForObject(object));
+            return mapping.mapObjectToRawData(object,data, propertyName)
+            .then(function() {
+                return mapping.mapRawDataToObjectProperty(data,object, propertyName);
+            })
+            //return mapping.mapObjectToRawDataProperty(object,{}, propertyName);
+
         }
     },
 
@@ -1148,22 +1226,37 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     getDataObject: {
         value: function (type, data, context, dataIdentifier) {
-            var dataObject;
-            // TODO [Charles]: Object uniquing.
-            if(this.isUniquing && dataIdentifier) {
-                dataObject = this.objectForDataIdentifier(dataIdentifier);
-            }
-            if(!dataObject) {
-                dataObject = this._createDataObject(type, dataIdentifier);
-            }
+            if(this.isRootService) {
+                var dataObject;
+                // TODO [Charles]: Object uniquing.
+                if(this.isUniqueing && dataIdentifier) {
+                    dataObject = this.objectForDataIdentifier(dataIdentifier);
+                }
+                if(!dataObject) {
+                    dataObject = this._createDataObject(type, dataIdentifier);
+                }
 
-            return dataObject;
+                return dataObject;
+            }
+            else {
+                return this.rootService.getDataObject(type, data, context, dataIdentifier);
+            }
 
         }
     },
 
     isUniquing: {
         value: false
+    },
+
+    _identifier: {
+        value: undefined
+    },
+
+    identifier: {
+        get: function() {
+            return this._identifier || (this._identifier = Montage.getInfoForObject(this).moduleId);
+        }
     },
 
     __dataIdentifierByObject: {
@@ -1280,9 +1373,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     //TODO add the creation of a temporary identifier to pass to _createDataObject
     createDataObject: {
         value: function (type) {
-            var object = this._createDataObject(type);
-            this.createdDataObjects.add(object);
-            return object;
+            if(this.isRootService) {
+                var object = this._createDataObject(type);
+                this.createdDataObjects.add(object);
+                return object;
+            }
+            else this.rootService.createDataObject(type);
+
         }
     },
 
@@ -1336,10 +1433,15 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     createdDataObjects: {
         get: function () {
-            if (!this._createdDataObjects) {
-                this._createdDataObjects = new Set();
+            if(this.isRootService) {
+                if (!this._createdDataObjects) {
+                    this._createdDataObjects = new Set();
+                }
+                return this._createdDataObjects;
             }
-            return this._createdDataObjects;
+            else {
+                return this.rootService.createdDataObjects();
+            }
         }
     },
 
@@ -1357,8 +1459,13 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     changedDataObjects: {
         get: function () {
-            this._changedDataObjects = this._changedDataObjects || new Set();
-            return this._changedDataObjects;
+            if(this.isRootService) {
+                this._changedDataObjects = this._changedDataObjects || new Set();
+                return this._changedDataObjects;
+            }
+            else {
+                return this.rootService.changedDataObjects();
+            }
         }
     },
 
@@ -1434,20 +1541,32 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             // Set up the stream.
             stream = stream || new DataStream();
             stream.query = query;
-            this._dataServiceForDataStream.set(stream, this._childServiceRegistrationPromise.then(function() {
-                // Use a child service to fetch the data.
+            this._dataServiceByDataStream.set(stream, this._childServiceRegistrationPromise.then(function() {
                 var service;
-                try {
-                    service = self._getChildServiceForType(query.type);
-                    if (service) {
-                        stream = service.fetchData(query, stream) || stream;
-                        self._dataServiceForDataStream.set(stream, service);
-                    } else {
-                        throw new Error("Can't fetch data of unknown type - " + query.type.typeName + "/" + query.type.uuid);
-                    }
-                } catch (e) {
-                    stream.dataError(e);
+                //This is a workaround, we should clean that up so we don't
+                //have to go up to answer that question. The difference between
+                //.TYPE and Objectdescriptor still creeps-in when it comes to
+                //the service to answer that to itself
+                if(self.parentService && self.parentService._getChildServiceForType(query.type) === self && typeof self.fetchRawData === "function") {
+                    service = self;
+                    service._fetchRawData(stream);
                 }
+                else {
+
+                    // Use a child service to fetch the data.
+                    try {
+                        service = self._getChildServiceForType(query.type);
+                        if (service) {
+                            stream = service.fetchData(query, stream) || stream;
+                            self._dataServiceByDataStream.set(stream, service);
+                        } else {
+                            throw new Error("Can't fetch data of unknown type - " + query.type.typeName + "/" + query.type.uuid);
+                        }
+                    } catch (e) {
+                        stream.dataError(e);
+                    }
+                }
+
                 return service;
             }));
             // Return the passed in or created stream.
@@ -1455,13 +1574,32 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
-    __dataServiceForDataStream: {
+    _fetchRawData: {
+        value: function (stream) {
+            var self = this;
+            this.authorizationPromise.then(function (authorization) {
+                var streamSelector = stream.query;
+                stream.query = self.mapSelectorToRawDataQuery(streamSelector);
+                self.fetchRawData(stream);
+                stream.query = streamSelector;
+            })
+        }
+    },
+
+
+    __dataServiceByDataStream: {
         value: null
     },
 
-    _dataServiceForDataStream: {
+    _dataServiceByDataStream: {
         get: function() {
-            return this.__dataServiceForDataStream || (this.__dataServiceForDataStream = new WeakMap());
+            return this.__dataServiceByDataStream || (this.__dataServiceByDataStream = new WeakMap());
+        }
+    },
+
+    dataServiceForDataStream: {
+        get: function(dataStream) {
+            return this._dataServiceByDataStream.get(dataStream);
         }
     },
 
@@ -1477,7 +1615,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     cancelDataStream: {
         value: function (dataStream, reason) {
             if(dataStream) {
-              var  rawDataService = this._dataServiceForDataStream.get(dataStream),
+              var  rawDataService = this._dataServiceByDataStream.get(dataStream),
                 self = this;
 
               if(Promise.is(rawDataService)) {
@@ -1496,7 +1634,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     _cancelServiceDataStream: {
         value: function (rawDataService, dataStream, reason) {
             rawDataService.cancelRawDataStream(dataStream, reason);
-            this._dataServiceForDataStream.delete(dataStream);
+            this._dataServiceByDataStream.delete(dataStream);
         }
     },
 

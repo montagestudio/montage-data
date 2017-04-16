@@ -283,7 +283,40 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */ 
             delete this._reject;
             delete this._resolve;
         }
+    },
+
+    /**
+     * The time at which data was received by the DataStream
+     *
+     * @type {Date}
+     */
+    dataReceptionTime: {
+        value: undefined
+    },
+
+    /**
+     * The maximum amount of time a DataStream's data will be considered fresh.
+     * This should take precedence over an ObjectDescriptor's maxAge which should
+     * take precedence over a DataService's dataMaxAge global default value.
+     *
+     * @type {Number}
+     */
+    _dataMaxAge: {
+        value: undefined
+    },
+    dataMaxAge: {
+        get: function() {
+            //The third default should be the service's dataMaxAge, but:
+            //DataService.[mainService||rootService].dataServiceForDataStream(this) should work
+            //but is maintained on a per DataService basis and there's no cascading lookup.
+            //#FixMe So we need to fix this as a DataStream doesn't know which service created it.
+            return this._dataMaxAge || this.query.type.maxAge;
+        },
+        set: function(value) {
+            this._dataMaxAge = value;
+        }
     }
+
 
 }, /** @lends DataStream */ {
 

@@ -275,31 +275,16 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
      */
     mapRawDataToObject: {
         value: function (data, object) {
-            var requisitePropertyNames = this._requisitePropertyNames,
-                self = requisitePropertyNames.size && this,
-                rules = self && this._compiledObjectMappingRules || [],
-                scope = self && new Scope(data),
-                promises, rule, propertyDescriptor;
+            var requisitePropertyNames = this.requisitePropertyNames,
+                iterator = requisitePropertyNames.values(),
+                rules = requisitePropertyNames.length && this._compiledObjectMappingRules || [],
+                iPromise,
+                promises, rule, propertyName, propertyDescriptor;
 
-            requisitePropertyNames.forEach(function (propertyName) {
-                rule = rules.hasOwnProperty(propertyName) && rules[propertyName];
-                propertyDescriptor = rule && self.objectDescriptor.propertyDescriptorForName(propertyName);
-                if (propertyDescriptor && propertyDescriptor.valueDescriptor && rule.converter) {
-                    promises = promises || [];
-                    rule.converter.expression = rule.converter.expression || rule.expression;
-                    rule.converter.foreignDescriptor = rule.converter.foreignDescriptor || propertyDescriptor.valueDescriptor;
-                    rule.converter.service = rule.converter.service || self.service;
-                    promises.push(self._resolveRelationship(object, propertyDescriptor, rule, scope));
-                } else if (propertyDescriptor) {
-                    object[propertyName] = self._parse(rule, scope);
-                } else {
-                    console.warn("---------------------------------------------------");
-                    console.warn("Did not map property with name (", propertyName, ")");
-                    console.warn("Property not defined on this object descriptor (", self.objectDescriptor, ")");
-                    console.warn("---------------------------------------------------");
-                }
-            });
-
+            while (propertyName = iterator.next().value) {
+                iPromise = this.mapRawDataToObjectProperty(data, object, propertyName);
+                (promises || []).push(iPromise);
+            }
             return promises && promises.length && Promise.all(promises) || Promise.resolve(null);
         }
     },
@@ -312,21 +297,33 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
             var self = this,
                 rules = this._compiledRawDataMappingRules,
                 scope = new Scope(object),
-                promises, propertyDescriptor, rule, key;
+                promises = [], propertyDescriptor, rule, key;
             for (key in rules) {
-                rule = rules[key];
-                propertyDescriptor = rule.propertyDescriptor;
-                if (propertyDescriptor && propertyDescriptor.valueDescriptor && rule.converter) {
-                    promises = promises || [];
-                    rule.converter.expression = rule.converter.expression || rule.expression;
-                    rule.converter.foreignDescriptor = rule.converter.foreignDescriptor || propertyDescriptor.valueDescriptor;
-                    rule.converter.service = rule.converter.service || self.service;
-                    promises.push(self._convertRelationshipToRawData());
-                } else if (propertyDescriptor) {
-                    data[key] = this._parse(rule, scope);
-                }
+                promises.push(this.mapObjectToRawDataProperty(object, data, key));
             }
             return promises && promises.length && Promise.all(promises) || Promise.resolve(null);
+        }
+    },
+
+    mapObjectToRawDataProperty: {
+        value: function(object, data, property) {
+            var rules = this._compiledRawDataMappingRules,
+                scope = new Scope(object),
+                rule = rules[property],
+                propertyDescriptor = rule && rule.propertyDescriptor,
+                promise;
+
+                if (propertyDescriptor && propertyDescriptor.valueDescriptor && rule.converter) {
+                    rule.converter.expression = rule.converter.expression || rule.expression;
+                    rule.converter.foreignDescriptor = rule.converter.foreignDescriptor || propertyDescriptor.valueDescriptor;
+                    rule.converter.service = rule.converter.service || this.service;
+                    promise = this._convertRelationshipToRawData(object, propertyDescriptor, rule, scope);
+                } else /*if (propertyDescriptor)*/ { //relaxing this for now
+                    promise = Promise.resolve(this._parse(rule, scope));
+                }
+                return promise && promise.then(function(value){
+                    data[property] = value;
+                }) || Promise.resolve(null);
         }
     },
 
@@ -434,17 +431,72 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     //     }
     // },
 
+    // _convertRelationshipToRawData: {
+    //     value: function (object, propertyDescriptor, rule) {
+    //         return this._resolveRelationshipIfNecessary(object, propertyDescriptor).then(function (destination) {
+    //             return rule.converter.revert(new Scope(destination));
+    //         });
+    //     }
+    // },
     _convertRelationshipToRawData: {
-        value: function (object, propertyDescriptor, rule) {
-            return this._resolveRelationshipIfNecessary(object, propertyDescriptor).then(function (destination) {
-                return rule.converter.revert(new Scope(destination));
-            });
+        value: function (object, propertyDescriptor, rule, scope) {
+            return rule.converter.revert(rule.expression(scope));
+        }
+    },
+
+
+    __scope: {
+        value: null
+    },
+    _scope: {
+        get: function() {
+            return this.__scope || new Scope();
+        }
+    },
+
+    mapRawDataToObjectProperty: {
+        value: function(data, object, propertyName) {
+            //We should probably shift rules to be a Map rather than an anonymous object.
+            var rules = this._compiledObjectMappingRules,
+                rule = rules.hasOwnProperty(propertyName) && rules[propertyName],
+                propertyDescriptor = rule && this.objectDescriptor.propertyDescriptorForName(propertyName),
+                scope = this._scope,
+                self = this;
+
+                scope.value = data;
+
+            if (propertyDescriptor && propertyDescriptor.valueDescriptor) {
+                //We may need to test for
+                //rule.converter.foreignDescriptor || propertyDescriptor.valueDescriptor
+                //before resolving the promise to make sure we have the
+                //right one. Need to add testing for this ASAP
+                return propertyDescriptor.valueDescriptor.then(
+                    function (valueDescriptor) {
+                        if(rule.converter) {
+                            rule.converter.expression = rule.converter.expression || rule.expression;
+                            rule.converter.foreignDescriptor = rule.converter.foreignDescriptor || propertyDescriptor.valueDescriptor;
+                            rule.converter.service = rule.converter.service || self.service;
+                        }
+                        return self._resolveRelationship(object, propertyDescriptor, rule, scope);
+                    }
+                );
+            } else if (propertyDescriptor) {
+                object[propertyName] = this._parse(rule, scope);
+                return Promise.resolve();
+            } else {
+                console.warn("---------------------------------------------------");
+                console.warn("Did not map property with name (", propertyName, ")");
+                console.warn("Property not defined on this object descriptor (", this.objectDescriptor, ")");
+                console.warn("---------------------------------------------------");
+                //Shall we return Promise.fail() instead?
+                return Promise.resolve();
+          }
         }
     },
 
     _resolveRelationship: {
         value: function (object, propertyDescriptor, rule, scope) {
-            return rule.converter.convert(scope).then(function (data) {
+            return rule.converter.convert(rule.expression(scope)).then(function (data) {
                 object[propertyDescriptor.name] = propertyDescriptor.cardinality === 1 ? data[0] : data;
                 return null;
             });
@@ -454,8 +506,9 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     _resolveRelationshipIfNecessary: {
         value: function (object, propertyDescriptor) {
             var wasPropertyFetched = this._requisitePropertyNames.has(propertyDescriptor.name);
-            return wasPropertyFetched ?     Promise.resolve(object[propertyDescriptor.name]) :
-                                            object[propertyDescriptor.name]; // should be data trigger.
+            return wasPropertyFetched
+                ? Promise.resolve(object[propertyDescriptor.name])
+                : object[propertyDescriptor.name]; // should be data trigger.
         }
     },
 

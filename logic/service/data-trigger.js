@@ -1,7 +1,8 @@
 var Montage = require("montage/core/core").Montage,
     DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
     ObjectDescriptor = require("logic/model/object-descriptor").ObjectDescriptor,
-    WeakMap = require("collections/weak-map");
+    WeakMap = require("collections/weak-map"),
+    DataTrigger;
 
 /**
  * Intercepts all calls to get and set an object's property and triggers any
@@ -18,7 +19,7 @@ var Montage = require("montage/core/core").Montage,
  * @class
  * @extends Object
  */
-exports.DataTrigger = function () {};
+DataTrigger = exports.DataTrigger = function () {};
 
 exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototype */ {
 
@@ -202,6 +203,10 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
      * @method
      * @argument {Object} object
      * @returns {Object}
+     *
+     * #Performance #ToDo: Looks like the same walk-up logic
+     * is going to be done many times for individual instances,
+     * we should improve that.
      */
     _getValue: {
         configurable: true,
@@ -453,6 +458,37 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */ {
         }
     },
 
+    /**
+     * #Performance #ToDO: Here we're creating a trigger instance right away
+     * when we could do it only when the defineProperty get/set are called.
+     * This means this method woudn't return the trigger which is added
+     * by caller in service._getTriggersForObject. Instead, when createdin the
+     * get/set, we would added it to the service's ._getTriggersForObject.
+     * First draft is bellow, working with bugs, need baking
+     *
+     * @private
+     * @method
+     * @argument {DataService} service
+     * @argument {ObjectDescriptor} objectDescriptor
+     * @argument {Object} prototype
+     * @argument {String} name
+     * @returns {DataTrigger}
+     */
+    _createTrigger: {
+        value: function(service, objectDescriptor, prototype, name, propertyDescriptor) {
+            var trigger = Object.create(this._getTriggerPrototype(service)),
+                serviceTriggers = service._dataObjectTriggers.get(objectDescriptor);
+            trigger._objectPrototype = prototype;
+            trigger._propertyName = name;
+            trigger._isGlobal = propertyDescriptor.isGlobal;
+            if(!serviceTriggers) {
+                serviceTriggers = {};
+                service._dataObjectTriggers.set(objectDescriptor,serviceTriggers)
+            }
+            serviceTriggers[name] = trigger;
+            return trigger;
+        }
+    },
     _addTrigger: {
         value: function (service, objectDescriptor, prototype, name) {
             var descriptor = objectDescriptor.propertyDescriptorForName(name),
@@ -465,9 +501,11 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */ {
                 Montage.defineProperty(prototype, name, {
                     get: function () {
                         return trigger._getValue(this);
+                        // return (trigger||(trigger = DataTrigger._createTrigger(service, objectDescriptor, prototype, name,descriptor)))._getValue(this);
                     },
                     set: function (value) {
                         trigger._setValue(this, value);
+                        // (trigger||(trigger = DataTrigger._createTrigger(service, objectDescriptor, prototype, name,descriptor)))._setValue(this, value);
                     }
                 });
             }

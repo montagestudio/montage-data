@@ -102,23 +102,23 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * Data Object Properties
      */
 
-    decacheObjectProperties: {
-        value: function (object, propertyNames) {
-            return this.rootService.decacheObjectProperties(object, propertyNames);
-        }
-    },
+    // decacheObjectProperties: {
+    //     value: function (object, propertyNames) {
+    //         return this.rootService.decacheObjectProperties(object, propertyNames);
+    //     }
+    // },
 
-    getObjectProperties: {
-        value: function (object, propertyNames) {
-            return this.rootService.getObjectProperties(object, propertyNames);
-        }
-    },
+    // getObjectProperties: {
+    //     value: function (object, propertyNames) {
+    //         return this.rootService.getObjectProperties(object, propertyNames);
+    //     }
+    // },
 
-    updateObjectProperties: {
-        value: function (object, propertyNames) {
-            return this.rootService.updateObjectProperties(object, propertyNames);
-        }
-    },
+    // updateObjectProperties: {
+    //     value: function (object, propertyNames) {
+    //         return this.rootService.updateObjectProperties(object, propertyNames);
+    //     }
+    // },
 
     /**
      * Fetch the value of a data object's property, possibly asynchronously.
@@ -132,14 +132,14 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *
      * @method
      */
-    fetchObjectProperty: {
-        value: function (object, propertyName) {
-            var propertyDescriptor = this._propertyDescriptorForObjectAndName(object, propertyName),
-                destinationReference = propertyDescriptor && propertyDescriptor.valueDescriptor;
-            return destinationReference ?   this._fetchObjectPropertyWithPropertyDescriptor(object, propertyName, propertyDescriptor) :
-                                            this.nullPromise;
-        }
-    },
+    // fetchObjectProperty: {
+    //     value: function (object, propertyName) {
+    //         var propertyDescriptor = this._propertyDescriptorForObjectAndName(object, propertyName),
+    //             destinationReference = propertyDescriptor && propertyDescriptor.valueDescriptor;
+    //         return destinationReference ?   this._fetchObjectPropertyWithPropertyDescriptor(object, propertyName, propertyDescriptor) :
+    //                                         this.nullPromise;
+    //     }
+    // },
 
     _propertyDescriptorForObjectAndName: {
         value: function (object, propertyName) {
@@ -148,23 +148,58 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         }
     },
 
-    _fetchObjectPropertyWithPropertyDescriptor: {
-        value: function (object, propertyName, propertyDescriptor) {
-            var self = this, moduleId, cachedDescriptor, service = this.rootService;
-            return propertyDescriptor.valueDescriptor.then(function (objectDescriptor) {
-                moduleId = [objectDescriptor.module.id, objectDescriptor.exportName].join("/");
-                cachedDescriptor = self.rootService._moduleIdToObjectDescriptorMap[moduleId];
-                var selector = DataQuery.withTypeAndCriteria(cachedDescriptor, {
-                    // snapshot: self._snapshots.get(object),
-                    source: object,
-                    relationshipKey: propertyName
-                });
-                return service.fetchData(selector);
-            }).then(function (data) {
-                return self._mapObjectPropertyValue(object, propertyDescriptor, data);
-            });
+    _objectDescriptorForObject: {
+        value: function (object) {
+            var types = this.types,
+                objectInfo = Montage.getInfoForObject(object),
+                moduleId = objectInfo.moduleId,
+                objectName = objectInfo.objectName,
+                module, exportName, objectDescriptor, i, n;
+            for (i = 0, n = types.length; i < n && !objectDescriptor; i += 1) {
+                module = types[i].module;
+                exportName = module && types[i].exportName;
+                if (module && moduleId === module.id && objectName === exportName) {
+                    objectDescriptor = types[i];
+                }
+            }
+            return objectDescriptor;
+            // var typeName = object.constructor.TYPE.typeName,
+            //     isModel = this.model instanceof Model,
+            //     isObjectDescriptor = !isModel && this.model instanceof ObjectDescriptor,
+            //     isObjectsObjectDescriptor = isObjectDescriptor && this.model.name === typeName;
+            // return  isModel ?                       this.model.objectDescriptorForName(typeName) :
+            //     isObjectsObjectDescriptor ?     this.model :
+            //         undefined;
         }
     },
+
+    // _fetchObjectPropertyWithPropertyDescriptor: {
+    //     value: function (object, propertyName, propertyDescriptor) {
+    //         var self = this, moduleId, cachedDescriptor, service = this.rootService;
+    //         return propertyDescriptor.valueDescriptor.then(function (objectDescriptor) {
+    //             moduleId = [objectDescriptor.module.id, objectDescriptor.exportName].join("/");
+    //             cachedDescriptor = self.rootService._moduleIdToObjectDescriptorMap[moduleId];
+    //             var selector = DataQuery.withTypeAndCriteria(cachedDescriptor, {
+    //                 // snapshot: self._snapshots.get(object),
+    //                 source: object,
+    //                 relationshipKey: propertyName
+    //             });
+    //             return service.fetchData(selector);
+    //         }).then(function (data) {
+    //             return self._mapObjectPropertyValue(object, propertyDescriptor, data);
+    //         });
+    //         // return this._objectDescriptorTypeForValueDescriptor(propertyDescriptor.valueDescriptor).then(function (type) {
+    //         //     var selector = DataQuery.withTypeAndCriteria(type, {
+    //         //         snapshot: self._snapshots.get(object),
+    //         //         source: object,
+    //         //         relationshipKey: propertyName
+    //         //     });
+    //         //     return service.fetchData(selector);
+    //         // }).then(function (data) {
+    //         //     return self._mapObjectPropertyValue(object, propertyDescriptor, data);
+    //         // });
+    //     }
+    // },
 
     _mapObjectPropertyValue: {
         value: function (object, propertyDescriptor, value) {
@@ -206,33 +241,33 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *
      */
 
-    getDataObject: {
-        value: function (type, record, context, iDataIdentifier) {
-            return this.rootService.getDataObject(type, record, context, iDataIdentifier);
-        }
-    },
+    // getDataObject: {
+    //     value: function (type, data, context, dataIdentifier) {
+    //         return this.rootService.getDataObject(type, data, context, dataIdentifier);
+    //     }
+    // },
 
-    createDataObject: {
-        value: function (type) {
-            return this.rootService.createDataObject(type);
-        }
-    },
+    // createDataObject: {
+    //     value: function (type) {
+    //         return this.rootService.createDataObject(type);
+    //     }
+    // },
 
     /***************************************************************************
      * Data Object Changes
      */
 
-    createdDataObjects: {
-        get: function () {
-            return this.rootService.createdDataObjects();
-        }
-    },
+    // createdDataObjects: {
+    //     get: function () {
+    //         return this.rootService.createdDataObjects();
+    //     }
+    // },
 
-    changedDataObjects: {
-        get: function () {
-            return this.rootService.changedDataObjects();
-        }
-    },
+    // changedDataObjects: {
+    //     get: function () {
+    //         return this.rootService.changedDataObjects();
+    //     }
+    // },
 
     /***************************************************************************
      * Fetching Data
@@ -277,17 +312,49 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * were or will be added, whether this stream was provided to or created by
      * this method.
      */
-    fetchData: {
-        value: function (typeOrSelector, stream) {
-            var isSupportedType = typeOrSelector instanceof DataObjectDescriptor || typeOrSelector instanceof ObjectDescriptor,
-                type = isSupportedType && typeOrSelector,
-                selector = type && DataQuery.withTypeAndCriteria(type) || typeOrSelector;
-            stream = stream || new DataStream();
-            stream.query = selector;
-            this._fetchRawData(stream);
-            return stream;
-        }
-    },
+    // fetchData: {
+    //     value: function (queryOrType, stream) {
+    //         var isSupportedType = queryOrType instanceof DataObjectDescriptor || queryOrType instanceof ObjectDescriptor,
+    //             type = isSupportedType && queryOrType,
+    //             query = type && DataQuery.withTypeAndCriteria(type) || queryOrType;
+    //         stream = stream || new DataStream();
+    //         stream.query = query;
+    //         this._fetchRawData(stream);
+    //         return stream;
+    //     }
+    // },
+
+    // fetchData: {
+    //     value: function (queryOrType, stream) {
+    //         var self = this,
+    //              isSupportedType = queryOrType instanceof DataObjectDescriptor || queryOrType instanceof ObjectDescriptor,
+    //             type = isSupportedType && queryOrType,
+    //             query = type && DataQuery.withTypeAndCriteria(type) || queryOrType;
+    //         // Set up the stream.
+    //         stream = stream || new DataStream();
+    //         stream.query = query;
+    //             // Use a child service to fetch the data.
+    //             var service;
+    //             try {
+    //                 service = self._getChildServiceForType(query.type);
+    //                 if (service && service!==self) {
+    //                     stream = service.fetchData(query, stream) || stream;
+    //                     self._dataServiceByDataStream.set(stream, service);
+    //                 } else {
+    //                     if(typeof self.fetchRawData === "function") {
+    //                         self._fetchRawData(stream);
+    //                     }
+    //                     else {
+    //                         throw new Error("Can't fetch data of unknown type - " + query.type.typeName + "/" + query.type.uuid);
+    //                     }
+    //                 }
+    //             } catch (e) {
+    //                 stream.dataError(e);
+    //             }
+    //         // Return the passed in or created stream.
+    //         return stream;
+    //     }
+    // },
 
     /**
      * Fetch the raw data of this service.
@@ -459,7 +526,9 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     isOffline: {
         get: function () {
-            return this.rootService.isOffline;
+            return this === this.rootService
+                ? this.superForGet("isOffline")()
+                : this.rootService.isOffline;
         }
     },
 
@@ -603,6 +672,17 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         }
     },
 
+    __snapshot: {
+        value: null
+    },
+
+    _snapshot: {
+        get: function() {
+            return this.__snapshot || (this.__snapshot = new Map());
+        }
+    },
+
+
     /**
      * Records the snapshot of the values of record known for a DataIdentifier
      *
@@ -612,7 +692,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     recordSnapshot: {
         value: function (dataIdentifier, rawData) {
-
+            this._snapshot.set(dataIdentifier,rawData);
         }
     },
 
@@ -624,7 +704,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
    removeSnapshot: {
         value: function (dataIdentifier) {
-
+            this._snapshot.delete(dataIdentifier);
         }
     },
 
@@ -636,9 +716,22 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
    snapshotForDataIdentifier: {
         value: function (dataIdentifier) {
-        }
+            return this._snapshot.get(dataIdentifier);
+       }
     },
 
+    /**
+     * Returns the snapshot associated with the DataIdentifier argument if available
+     *
+     * @private
+     * @argument {DataIdentifier} dataIdentifier
+     */
+   snapshotForObject: {
+        value: function (object) {
+            return this.snapshotForDataIdentifier(this.dataIdentifierForObject(object));
+
+        }
+    },
 
     /**
      * To be called once for each [fetchData()]{@link RawDataService#fetchData}

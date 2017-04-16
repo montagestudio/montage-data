@@ -1,6 +1,8 @@
 var Converter = require("montage/core/converter/converter").Converter,
     Criteria = require("montage/core/criteria").Criteria,
-    DataQuery = require("logic/model/data-query").DataQuery;
+    DataQuery = require("logic/model/data-query").DataQuery,
+    parse = require("frb/parse"),
+    compile = require("frb/compile-evaluator");
 /**
  * @class RawPropertyValueToObjectConverter
  * @classdesc Converts a property value of raw data to the referenced object.
@@ -21,8 +23,11 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
     deserializeSelf: {
         value: function (deserializer) {
             var value = deserializer.getProperty("foreignProperty");
+            if(!value) {
+                value = deserializer.getProperty("convertExpression")
+            }
             if (value) {
-                this.foreignProperty = value;
+                this.convertExpression = value;
             }
             value = deserializer.getProperty("cardinality");
             if (value) {
@@ -60,6 +65,14 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
      * The cardinality defines if this is a to one or to many relationship
      * @type {number}
      * */
+    expression: {
+        value: null
+    },
+
+    /**
+     * The cardinality defines if this is a to one or to many relationship
+     * @type {number}
+     * */
     cardinality: {
         value: null
     },
@@ -80,6 +93,30 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
      */
     foreignProperty: {
         value: null
+    },
+
+    _convertSyntax: {
+        value: undefined
+    },
+    convertSyntax: {
+        get: function() {
+            return this._convertSyntax || (this._convertSyntax = parse(this.convertExpression));
+        }
+    },
+
+    __compiledConvertExpression: {
+        value: undefined
+    },
+    _compiledConvertExpression: {
+        get: function() {
+            return this.__compiledConvertExpression || (this.__compiledConvertExpression = compile(parse(this.convertExpression)));
+        }
+    },
+
+    evaluateConvertExpression: {
+        value: function(value) {
+            return this._compiledConvertExpression(value);
+        }
     },
 
     /**
@@ -104,11 +141,24 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
         value: function (v) {
             var self = this;
             return this.foreignDescriptor.then(function (objectDescriptor) {
+                //We shouldn't have to go back to a module-id string since we have the objectDescriptor
                 var type = [objectDescriptor.module.id, objectDescriptor.name].join("/"),
-                    dataExpression = self.foreignProperty + " = $value",
-                    criteria = new Criteria().initWithExpression(dataExpression, {
-                        value: self.expression(v)
-                    });
+                    //dataExpression = self.foreignProperty,
+                    parameters,
+                    criteria;
+
+
+            //     if(self.convertExpression) {
+            //         parameters = self.evaluateParametersExpression(v);
+            //     }
+            //     else if(dataExpression.indexOf("$") === -1) {
+            //         dataExpression += "==$";
+            //         dataExpression += self.foreignProperty;
+            //         parameters = {};
+            //         parameters[self.foreignProperty] = self.expression(v);
+            //    }
+
+                criteria = new Criteria().initWithSyntax(self.convertSyntax, v);
                 return self.service.rootService.fetchData(DataQuery.withTypeAndCriteria(type, criteria));
             });
         }
@@ -122,6 +172,9 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
      */
     revert: {
         value: function (v) {
+            //The objet in the scope either has the relationship, in which case
+            //we need to get the value from there, or it doesn't and then
+            //we should leverage the object's snapshot
             console.log("V (", v, ")");
         }
     }
