@@ -460,15 +460,15 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
-   /**
-     * holds authorization promise if there's one, defaults to a resolved for backward compatibility
+    /**
+     * Returns the AuthorizationPolicyType used by this DataService.
      *
-     * @type {Object}
+     * @type {AuthorizationPolicyType}
      */
-
-    authorizationPromise: {
-        value: Promise.resolve()
+    authorizationPolicy: {
+        value: AuthorizationPolicyType.NoAuthorizationPolicy
     },
+
     /**
      * holds authorization object after a successfull authorization
      *
@@ -479,15 +479,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: undefined
     },
 
-    /**
-     * indicate wether a service can provide user-level authorization to its
-     * data. Defaults to false. Concrete services need to override this as
-     * needed.
-     *
-     * @type {boolean}
-     */
-    providesAuthorization: {
-        value: false
+    authorizationPromise: {
+        value: Promise.resolve()
     },
 
     /**
@@ -504,12 +497,49 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /**
-     * Returns the AuthorizationPolicyType used by this DataService.
      *
-     * @type {AuthorizationPolicyType}
+     * @property
+     * @type string
+     * @description Module ID of the panel component used to gather necessary authorization information
      */
-    authorizationPolicy: {
-        value: AuthorizationPolicyType.NoAuthorizationPolicy
+    authorizationPanel: {
+        value: undefined
+    },
+
+    /**
+     * indicate wether a service can provide user-level authorization to its
+     * data. Defaults to false. Concrete services need to override this as
+     * needed.
+     *
+     * @type {boolean}
+     */
+    providesAuthorization: {
+        value: false
+    },
+
+
+    /**
+     *
+     * @method
+     * @returns Promise
+     */
+    authorize: {
+        value: function () {
+            console.warn("AuthorizationService.authorize() must be overridden by the implementing service", arguments);
+            return this.nullPromise;
+        }
+    },
+
+    /**
+     *
+     * @method
+     * @returns Promise
+     */
+    logOut: {
+        value: function () {
+            console.warn("AuthorizationService.logOut() must be overridden by the implementing service");
+            return this.nullPromise;
+        }
     },
 
     /***************************************************************************
