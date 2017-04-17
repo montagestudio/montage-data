@@ -1,0 +1,20 @@
+.Tweets {
+    margin: 20px auto;
+    padding: 20px;
+    width: 300px;
+    border-radius: 10px;
+    background-color: hsl(0,0%,98%);
+    box-shadow: inset 0px 1px 2px 1px hsla(0,0%,100%,1), 0px 2px 5px hsla(0,0%,0%,.1);
+}
+
+.Tweets-loading .Tweets-result {
+    display: none;
+}
+
+.Tweets-loading .Tweets-loader {
+    display: block;
+}
+
+.Tweets-loader {
+    display: none;
+}

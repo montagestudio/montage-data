@@ -1,0 +1,18 @@
+{
+    "name": "montage-data-samples-auth0",
+    "version": "0.1.0",
+    "main": "",
+    "dependencies": {
+        "montage": "git://github.com/montagejs/montage.git#master",
+        "montage-auth0": "git://github.com/montagestudio/montage-auth0.git#master",
+        "montage-data": "*",
+        "digit": "~0.5.0"
+    },
+    "mappings": {
+        "montage-data": "../../"
+    },
+    "exclude": [
+        "test"
+    ],
+    "bundle": [ "ui/main.reel" ]
+}
