@@ -255,8 +255,9 @@ var AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.pr
                 self.hasPendingServices = false;
                 //TODO [TJ] How to concatenate authorizations from different auth-services into a single Authorization Object for the data-service
                 return authorizations;
+            }).catch(function () {
+                self.hasPendingServices = false;
             });
-
 
         }
     },
