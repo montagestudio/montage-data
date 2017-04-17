@@ -1,7 +1,7 @@
 
 var DataService = require("montage-data/logic/service/data-service").DataService,
     HttpService = require("montage-data/logic/service/http-service").HttpService,
-    DataSelector = require("montage-data/logic/service/data-selector").DataSelector
+    DataSelector = require("montage-data/logic/service/data-selector").DataSelector,
     Criteria = require("montage/core/criteria").Criteria,
     WeatherReport = require("./logic/model/weather-report").WeatherReport,
     WeatherService = require("./logic/service/weather-service").WeatherService,
