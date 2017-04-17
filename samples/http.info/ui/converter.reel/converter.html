@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <link rel="stylesheet" type="text/css" href="converter.css">
+    <script type="text/montage-serialization">
+    {
+        "owner": {
+            "properties": {
+                "element": {"#": "owner"}
+            },
+            "bindings": {
+                "classList.has('Converter-loading')": { "<-": "!@owner.weatherReport" } 
+            }
+        },
+
+        "celsiusNumberfield": {
+            "prototype": "digit/ui/number-field.reel",
+            "properties": {
+                "element": {"#": "celsius"}
+            },
+            "bindings": {
+                "value": {"<->": "(+@fahrenheitNumberfield.value - 32) / 1.8"}
+            }
+        },
+
+        "fahrenheitNumberfield": {
+            "prototype": "digit/ui/number-field.reel",
+            "properties": {
+                "element": {"#": "fahrenheit"}
+            },
+            "bindings": {
+                "value": {"<->": "@owner.weatherReport.temp"}
+            }
+        },
+
+        "thermometer": {
+            "prototype": "digit/ui/slider.reel",
+            "properties": {
+                "element": {"#": "thermometer"},
+                "axis": "vertical"
+            },
+            "bindings": {
+                "value": {"<->": "@fahrenheitNumberfield.value"}
+            }
+        }
+    }
+    </script>
+</head>
+<body>
+    <div data-montage-id="owner" class="Converter">
+        <div class="Converter-loader">
+            Loading...
+        </div>
+        <div class="Converter-result">
+            <fieldset class="Numbers">
+                <div class="Label">&deg;C
+                   <input data-montage-id="celsius">
+                </div>
+                <div class="Label">&deg;F
+                   <input data-montage-id="fahrenheit">
+                </div>
+            </fieldset>
+            <fieldset class="Slider">
+               <input data-montage-id="thermometer" class="Slider-handle" type="range" min="-13" max="122">
+            </fieldset>
+        </div>
+    </div>
+</body>
+</html>
