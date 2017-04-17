@@ -44,6 +44,45 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
         }
     },
 
+
+    /***************************************************************************
+     * Authorization
+     */
+
+    /**
+     * @type {string}
+     * @description Name of header to be passed to all requests along with authorizationHeaderValue
+     *
+     */
+    authorizationHeaderName: {
+        value: "Authorization"
+    },
+
+    /**
+     * @type {string}
+     * @description Value of header with name authorizationHeaderName to include with all requests from this service
+     *
+     */
+    authorizationHeaderValue: {
+        value: undefined
+    },
+
+    /**
+     * @type {string}
+     * @description Value of header with name authorizationHeaderName to include with all requests from this service
+     *
+     */
+    getAuthorizationHeader: {
+        value: function () {
+            var header = null;
+            if (this.authorizationHeaderName && this.authorizationHeaderValue) {
+                header = {};
+                header[this.authorizationHeaderName] = this.authorizationHeaderValue;
+            }
+            return header;
+        }
+    },
+
     /***************************************************************************
      * Getting property data
      */
@@ -184,9 +223,17 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                     request = new XMLHttpRequest();
                     request.onload = function () { resolve(request); };
                     request.open(parsed.body ? "POST" : "GET", parsed.url, true);
+
+                    headers = self.getAuthorizationHeader() || {};
+
                     for (i in parsed.headers) {
-                        request.setRequestHeader(i, parsed.headers[i]);
+                        headers[i] = parsed.headers[i];
                     }
+
+                    for (i in headers) {
+                        request.setRequestHeader(i, headers[i]);
+                    }
+
                     request.withCredentials = parsed.credentials;
                     request.send(parsed.body);
                 }
