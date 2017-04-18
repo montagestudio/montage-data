@@ -64,19 +64,8 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
 
     deserializeSelf: {
         value:function (deserializer) {
-            var value, model;
-            value = deserializer.getProperty("model") || deserializer.getProperty("binder");
-            if (value) {
-                this.model = value;
-            }
-            value = !this.model && deserializer.getProperty("types");
-            if (value) {
-                Array.prototype.push.apply(this._childServiceTypes, value);
-            }
-            value = deserializer.getProperty("mappings");
-            if (value) {
-                Array.prototype.push.apply(this._childServiceMappings, value);
-            }
+
+            this.super(deserializer);
         }
     },
 

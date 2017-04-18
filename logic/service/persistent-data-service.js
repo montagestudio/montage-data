@@ -26,6 +26,19 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
         }
     },
 
+    deserializeSelf: {
+        value:function (deserializer) {
+            this.super(deserializer);
+
+            var value;
+            value = deserializer.getProperty("persistingObjectDescriptorNames");
+            if (value) {
+                this.persistingObjectDescriptorNames = value;
+            }
+
+        }
+    },
+
    _db : {
         value: void 0
     },

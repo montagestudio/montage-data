@@ -59,6 +59,36 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /***************************************************************************
+     * Serialization
+     */
+
+    deserializeSelf: {
+        value:function (deserializer) {
+            var value;
+            value = deserializer.getProperty("childServices");
+            if (value) {
+                this.registerChildServices(value);
+            }
+
+            value = deserializer.getProperty("model") || deserializer.getProperty("binder");
+            if (value) {
+                this.model = value;
+            }
+
+            value = !this.model && deserializer.getProperty("types");
+            if (value) {
+                Array.prototype.push.apply(this._childServiceTypes, value);
+            }
+
+            value = deserializer.getProperty("mappings");
+            if (value) {
+                Array.prototype.push.apply(this._childServiceMappings, value);
+            }
+
+        }
+    },
+
+    /***************************************************************************
      * Basic Properties
      *
      * Private properties are defined where they are used, not here.
