@@ -227,7 +227,7 @@ var AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.pr
 
 
     authorizeService : {
-        value: function(dataService) {
+        value: function (dataService) {
             var self = this,
                 dataServiceInfo = Montage.getInfoForObject(dataService),
                 authorizationPromises = [],

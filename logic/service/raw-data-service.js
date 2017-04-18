@@ -400,18 +400,19 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     _fetchRawData: {
         value: function (stream) {
             var self = this,
-                childService = this._childServiceForQuery(stream.query);
-
+                childService = this._childServiceForQuery(stream.query),
+                selector = stream.selector,
+                authPromise = selector.authorization ? Promise.resolve(selector.authorization) :
+                                                       this.authorizationPromise;
 
             if (childService && childService.identifier.indexOf("offline-service") === -1) {
                 childService._fetchRawData(stream);
             } else {
 
-                this.authorizationPromise.then(function (authorization) {
-                    var streamSelector = stream.query;
-                    stream.query = self.mapSelectorToRawDataQuery(streamSelector);
+                authPromise.then(function (authorization) {
+                    stream.selector = self.mapSelectorToRawDataSelector(selector);
                     self.fetchRawData(stream);
-                    stream.query = streamSelector;
+                    stream.selector = selector;
                 })
             }
         }

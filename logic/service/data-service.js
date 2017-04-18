@@ -772,17 +772,16 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             if (this.providesAuthorization) {
                 exports.DataService.authorizationManager.registerAuthorizationService(this);
             }
+
             if (this.authorizationPolicy === AuthorizationPolicyType.UpfrontAuthorizationPolicy) {
                 var self = this;
                 this.authorizationPromise = exports.DataService.authorizationManager.authorizeService(this).then(function(authorization) {
                     self.authorization = authorization;
                     return authorization;
-                },
-                function(error) {
+                }).catch(function(error) {
                     console.log(error);
                 });
-            }
-            else {
+            } else {
                 //Service doesn't need anything upfront, so we just go through
                 this.authorizationPromise = Promise.resolve();
             }
@@ -858,7 +857,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             return this.nullPromise;
         }
     },
-
     /**
      *
      * @method
@@ -1732,6 +1730,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 criteria = optionalCriteria instanceof DataStream ? undefined : optionalCriteria,
                 query = type ? DataQuery.withTypeAndCriteria(type, criteria) : queryOrType,
                 stream = optionalCriteria instanceof DataStream ? optionalCriteria : optionalStream;
+
             // make sure type is an object descriptor or a data object descriptor.
             query.type = this._objectDescriptorForType(query.type);
             // Set up the stream.
