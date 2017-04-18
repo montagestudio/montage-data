@@ -2,6 +2,10 @@ var RawDataService = require("logic/service/raw-data-service").RawDataService,
     DataSelector = require("logic/service/data-selector").DataSelector,
     Enumeration = require("logic/model/enumeration").Enumeration,
     Map = require("collections/map"),
+    parse = require("frb/parse"),
+    compile = require("frb/compile-evaluator"),
+    evaluate = require("frb/evaluate"),
+    Scope = require("frb/scope"),
     Promise = require("montage/core/promise").Promise;
 
 /**
@@ -49,6 +53,22 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
      * Authorization
      */
 
+    makeAuthorizationHeaders: {
+        value: function (query) {
+            var header = {},
+                evaluate, scope;
+            if (query && this.authorizationHeaderName && this.authorizationHeaderValueExpression) {
+                scope = new Scope(query);
+                evaluate = compile(parse(this.authorizationHeaderValueExpression));
+                header[this.authorizationHeaderName] = evaluate(scope)
+            } else if (this.authorizationHeaderName && this.authorizationHeaderValue) {
+                header[this.authorizationHeaderName] = this.authorizationHeaderValue;
+            }
+
+            return header;
+        }
+    },
+
     /**
      * @type {string}
      * @description Name of header to be passed to all requests along with authorizationHeaderValue
@@ -69,24 +89,12 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
 
     /**
      * @type {string}
-     * @description Value of header with name authorizationHeaderName to include with all requests from this service
+     * @description FRB Expression defining the authorizationHeaderValue when evaluated against a DataQuery
+     *              passed to this service.
      *
      */
-    getAuthorizationHeader: {
-        value: function () {
-            var header = null;
-            if (this.authorizationHeaderName && this.authorizationHeaderValue) {
-                header = {};
-                header[this.authorizationHeaderName] = this.authorizationHeaderValue;
-            }
-            return header;
-        }
-    },
-
-    getHeadersForQuery: {
-        value: function (query) {
-            return {};
-        }
+    authorizationHeaderValueExpression: {
+        value: undefined
     },
 
     /***************************************************************************
@@ -210,7 +218,6 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
     fetchHttpRawData: {
         value: function (url, headers, body, types, query, sendCredentials) {
             var self = this,
-                queryHeaders,
                 parsed, error, request;
             // Parse arguments.
             parsed = this._parseFetchHttpRawDataArguments.apply(this, arguments);
@@ -231,22 +238,11 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                     request.onload = function () { resolve(request); };
                     request.open(parsed.body ? "POST" : "GET", parsed.url, true);
 
-                    headers = self.getAuthorizationHeader() || {};
-                    queryHeaders = self.getHeadersForQuery(parsed.query) || {};
-
-                    for (i in queryHeaders) {
-                        headers[i] = queryHeaders[i];
-                    }
-
-                    for (i in parsed.headers) {
-                        headers[i] = parsed.headers[i];
-                    }
-
+                    headers = self._concatenateHeaders(self.makeAuthorizationHeaders(parsed.query), parsed.headers);
 
                     for (i in headers) {
                         request.setRequestHeader(i, headers[i]);
                     }
-
 
                     request.withCredentials = parsed.credentials;
                     request.send(parsed.body);
@@ -268,6 +264,28 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                 // TODO: Support multiple alternate types.
                 return error ? null : parsed.types[0].parseResponse(request, parsed.url);
             });
+        }
+    },
+
+    _concatenateHeaders: {
+        value: function () { // Can receive any number of sources
+            var result = Object({}),
+                source,
+                i, n, key;
+
+            for (i = 0, n = arguments.length; i < n; i++) {
+                source = arguments[i];
+
+                if (source) {
+                    for (key in source) {
+                        if (Object.prototype.hasOwnProperty.call(source, key)) {
+                            result[key] = source[key];
+                        }
+                    }
+                }
+            }
+            return result;
+
         }
     },
 

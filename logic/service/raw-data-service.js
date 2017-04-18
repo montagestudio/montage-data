@@ -239,6 +239,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             })
         }
     },
+
     fetchRawData: {
         value: function (stream) {
             this.rawDataDone(stream);
