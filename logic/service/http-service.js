@@ -83,6 +83,12 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
         }
     },
 
+    getHeadersForQuery: {
+        value: function (query) {
+            return {};
+        }
+    },
+
     /***************************************************************************
      * Getting property data
      */
@@ -202,8 +208,9 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
      * error the promise will be rejected with the error.
      */
     fetchHttpRawData: {
-        value: function (url, headers, body, types, sendCredentials) {
+        value: function (url, headers, body, types, query, sendCredentials) {
             var self = this,
+                queryHeaders,
                 parsed, error, request;
             // Parse arguments.
             parsed = this._parseFetchHttpRawDataArguments.apply(this, arguments);
@@ -225,14 +232,21 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                     request.open(parsed.body ? "POST" : "GET", parsed.url, true);
 
                     headers = self.getAuthorizationHeader() || {};
+                    queryHeaders = self.getHeadersForQuery(parsed.query) || {};
+
+                    for (i in queryHeaders) {
+                        headers[i] = queryHeaders[i];
+                    }
 
                     for (i in parsed.headers) {
                         headers[i] = parsed.headers[i];
                     }
 
+
                     for (i in headers) {
                         request.setRequestHeader(i, headers[i]);
                     }
+
 
                     request.withCredentials = parsed.credentials;
                     request.send(parsed.body);
@@ -295,11 +309,12 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                     last = -1;
                 }
             }
+
             // Parse the types, which can be provided as an array or as a
             // sequence of DataType arguments.
             if (last === 4 && Array.isArray(arguments[3])) {
                 parsed.types = arguments[3];
-            } else if (last < 4) {
+            } else if (last < 4 || !(arguments[3] instanceof exports.HttpService.DataType)) {
                 parsed.types = [exports.HttpService.DataType.JSON];
             } else {
                 for (i = 3, n = last; i < n && arguments[i] instanceof exports.HttpService.DataType; i += 1) {}
@@ -308,6 +323,15 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                     console.warn(new Error("Invalid types for fetchHttpRawData()"));
                     last = -1;
                 }
+            }
+
+
+            // Parse the query, which can be provided as an array or as a
+            // sequence of DataType arguments.
+            if (last === 5 && arguments[4] instanceof DataSelector) {
+                parsed.query = arguments[4]
+            } else if (last === 4 && arguments[3] instanceof DataSelector) {
+                parsed.query = arguments[3]
             }
             // Return the parsed arguments.
             return last >= 0 ? parsed : undefined;

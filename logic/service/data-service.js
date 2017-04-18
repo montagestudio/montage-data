@@ -443,17 +443,16 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             if (this.providesAuthorization) {
                 exports.DataService.authorizationManager.registerAuthorizationService(this);
             }
+
             if (this.authorizationPolicy === AuthorizationPolicyType.UpfrontAuthorizationPolicy) {
                 var self = this;
                 this.authorizationPromise = exports.DataService.authorizationManager.authorizeService(this).then(function(authorization) {
                     self.authorization = authorization;
                     return authorization;
-                },
-                function(error) {
+                }).catch(function(error) {
                     console.log(error);
                 });
-            }
-            else {
+            } else {
                 //Service doesn't need anything upfront, so we just go through
                 this.authorizationPromise = Promise.resolve();
             }
@@ -529,7 +528,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             return this.nullPromise;
         }
     },
-
     /**
      *
      * @method
@@ -1166,10 +1164,12 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 criteria = optionalCriteria instanceof DataStream ? undefined : optionalCriteria,
                 selector = type ? DataSelector.withTypeAndCriteria(type, criteria) : selectorOrType,
                 stream = optionalCriteria instanceof DataStream ? optionalCriteria : optionalStream;
+
+
             // Set up the stream.
             stream = stream || new DataStream();
             stream.selector = selector;
-            this._dataServiceForDataStream.set(stream,this._childServiceRegistrationPromise.then(function() {
+            this._dataServiceForDataStream.set(stream, this._childServiceRegistrationPromise.then(function() {
                 // Use a child service to fetch the data.
                 var service;
                 try {
