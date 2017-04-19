@@ -52,20 +52,17 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
     /***************************************************************************
      * Authorization
      */
-
-    makeAuthorizationHeaders: {
-        value: function (query) {
-            var header = {},
-                evaluate, scope;
+    
+    setHeadersForQuery: {
+        value: function (headers, query) {
+            var evaluate, scope;
             if (query && this.authorizationHeaderName && this.authorizationHeaderValueExpression) {
                 scope = new Scope(query);
                 evaluate = compile(parse(this.authorizationHeaderValueExpression));
-                header[this.authorizationHeaderName] = evaluate(scope)
+                headers[this.authorizationHeaderName] = evaluate(scope)
             } else if (this.authorizationHeaderName && this.authorizationHeaderValue) {
-                header[this.authorizationHeaderName] = this.authorizationHeaderValue;
+                headers[this.authorizationHeaderName] = this.authorizationHeaderValue;
             }
-
-            return header;
         }
     },
 
@@ -240,10 +237,10 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                     request.onerror = request.onload;
                     request.open(parsed.body ? "POST" : "GET", parsed.url, true);
 
-                    headers = self._concatenateHeaders(self.makeAuthorizationHeaders(parsed.query), parsed.headers);
+                    self.setHeadersForQuery(parsed.headers, parsed.query);
 
-                    for (i in headers) {
-                        request.setRequestHeader(i, headers[i]);
+                    for (i in parsed.headers) {
+                        request.setRequestHeader(i, parsed.headers[i]);
                     }
 
                     request.withCredentials = parsed.credentials;
