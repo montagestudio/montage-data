@@ -52,11 +52,17 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
     /***************************************************************************
      * Authorization
      */
-    
+
     setHeadersForQuery: {
         value: function (headers, query) {
-            var evaluate, scope;
-            if (query && this.authorizationHeaderName && this.authorizationHeaderValueExpression) {
+            var authorization = query && query.authorization && query.authorization[0],
+                evaluate, scope;
+
+            if (authorization && authorization.headerValueExpression && this.authorizationHeaderName) {
+                scope = new Scope(authorization);
+                evaluate = compile(parse(authorization.headerValueExpression));
+                headers[this.authorizationHeaderName] = evaluate(scope)
+            } else if (query && this.authorizationHeaderName && this.authorizationHeaderValueExpression) {
                 scope = new Scope(query);
                 evaluate = compile(parse(this.authorizationHeaderValueExpression));
                 headers[this.authorizationHeaderName] = evaluate(scope)
