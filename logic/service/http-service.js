@@ -270,28 +270,6 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
         }
     },
 
-    _concatenateHeaders: {
-        value: function () { // Can receive any number of sources
-            var result = Object({}),
-                source,
-                i, n, key;
-
-            for (i = 0, n = arguments.length; i < n; i++) {
-                source = arguments[i];
-
-                if (source) {
-                    for (key in source) {
-                        if (Object.prototype.hasOwnProperty.call(source, key)) {
-                            result[key] = source[key];
-                        }
-                    }
-                }
-            }
-            return result;
-
-        }
-    },
-
     /**
      * @private
      * @method

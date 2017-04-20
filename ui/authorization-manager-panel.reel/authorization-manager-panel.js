@@ -34,7 +34,7 @@ exports.AuthorizationManagerPanel = Component.specialize({
             }
             this._panels.get(authorizationPanel).resolve(authorization);
 
-            if (!this.authorizationPanels.length) {
+            if (!this.authorizationPanels.length && this._authorizationResolve) {
                 this._authorizationResolve(authorization);
             }
         }
@@ -79,7 +79,9 @@ exports.AuthorizationManagerPanel = Component.specialize({
             if (application.applicationModal) {
                 application.applicationModal.hide(this);
             }
-            this._authorizationReject("CANCEL");
+            if (this._authorizationResolve) {
+                this._authorizationReject("CANCEL");
+            }
         }
     },
 
