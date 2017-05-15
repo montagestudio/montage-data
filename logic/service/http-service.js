@@ -241,7 +241,7 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                     request.onload = function () { resolve(request); };
                     request.open(parsed.body ? "POST" : "GET", parsed.url, true);
 
-                    self.setHeadersForQuery(parsed.headers, parsed.query);
+                    self.setHeadersForQuery(parsed.headers, parsed.query, parsed.url);
 
                     for (i in parsed.headers) {
                         request.setRequestHeader(i, parsed.headers[i]);
