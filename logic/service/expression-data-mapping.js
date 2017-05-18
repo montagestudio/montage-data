@@ -504,11 +504,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         value: function (object, propertyName) {
             var rule = this._compiledObjectMappingRules[propertyName],
                 prerequisites = rule.prerequisitePropertyNames || null;
-            if (prerequisites) {
-                console.log(prerequisites);
-            }
-
-
+            
             return prerequisites ? this.service.rootService.getObjectProperties(object, prerequisites) : Promise.resolve(null);
         }
     },
