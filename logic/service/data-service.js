@@ -1151,9 +1151,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                     //Otherwise we're going to use model, property descriptor, mappings
                     //to make it happen.
                     else {
-                        var propertyDescriptor = this._propertyDescriptorForObjectAndName(object, propertyName),
-                            destinationReference = propertyDescriptor && propertyDescriptor.valueDescriptor;
-                        return destinationReference ?   this._fetchObjectPropertyWithPropertyDescriptor(object, propertyName, propertyDescriptor) :
+                        var propertyDescriptor = this._propertyDescriptorForObjectAndName(object, propertyName);
+                        return propertyDescriptor ?   this._fetchObjectPropertyWithPropertyDescriptor(object, propertyName, propertyDescriptor) :
                                                         this.nullPromise;
 
                     }
@@ -1167,21 +1166,23 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
     _fetchObjectPropertyWithPropertyDescriptor: {
         value: function (object, propertyName, propertyDescriptor) {
-            var self = this, service = this.rootService,
+            var self = this,
                 objectDescriptor = propertyDescriptor.owner,
                 mapping = objectDescriptor && this.mappingWithType(objectDescriptor),
-                data = this.snapshotForObject(object);
+                data = {};
 
-            if (!mapping) {
-                mapping = BlueprintDataMapping.withBlueprint(objectDescriptor);
-                this._objectDescriptorMappings.set(objectDescriptor, mapping);
+            if (mapping) {
+                Object.assign(data, this.snapshotForObject(object));
+                return mapping.resolvePrerequisitesForProperty(object, propertyName).then(function () {
+                    return mapping.mapObjectToRawData(object, data)
+                }).then(function() {
+                    return mapping.mapRawDataToObjectProperty(data, object, propertyName);
+                });
+            } else {
+                return this.nullPromise;
             }
-            data = {}
-            Object.assign(data,this.snapshotForObject(object));
-            return mapping.mapObjectToRawData(object,data, propertyName)
-            .then(function() {
-                return mapping.mapRawDataToObjectProperty(data,object, propertyName);
-            })
+
+
             //return mapping.mapObjectToRawDataProperty(object,{}, propertyName);
 
         }
@@ -1259,7 +1260,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             if(this.isRootService) {
                 var dataObject;
                 // TODO [Charles]: Object uniquing.
-                if(this.isUniqueing && dataIdentifier) {
+                if(this.isUniquing && dataIdentifier) {
                     dataObject = this.objectForDataIdentifier(dataIdentifier);
                 }
                 if(!dataObject) {

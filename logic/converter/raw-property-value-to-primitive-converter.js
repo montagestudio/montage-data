@@ -4,11 +4,11 @@ var Converter = require("montage/core/converter/converter").Converter,
     parse = require("frb/parse"),
     compile = require("frb/compile-evaluator");
 /**
- * @class RawPropertyValueToObjectConverter
+ * @class RawPropertyValueToPrimitiveConverter
  * @classdesc Converts a property value of raw data to the referenced object.
  * @extends Converter
  */
-exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends RawPropertyValueToObjectConverter# */ {
+exports.RawPropertyValueToPrimitiveConverter = Converter.specialize( /** @lends RawPropertyValueToPrimitiveConverter# */ {
 
     /*********************************************************************
      * Serialization
@@ -139,28 +139,11 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
      */
     convert: {
         value: function (v) {
-            var self = this;
-            return this.foreignDescriptor.then(function (objectDescriptor) {
-                //We shouldn't have to go back to a module-id string since we have the objectDescriptor
-                var type = [objectDescriptor.module.id, objectDescriptor.name].join("/"),
-                    //dataExpression = self.foreignProperty,
-                    parameters,
-                    criteria;
-
-
-            //     if(self.convertExpression) {
-            //         parameters = self.evaluateParametersExpression(v);
-            //     }
-            //     else if(dataExpression.indexOf("$") === -1) {
-            //         dataExpression += "==$";
-            //         dataExpression += self.foreignProperty;
-            //         parameters = {};
-            //         parameters[self.foreignProperty] = self.expression(v);
-            //    }
-
+            var self = this,
                 criteria = new Criteria().initWithSyntax(self.convertSyntax, v);
-                return self.service.rootService.fetchData(DataQuery.withTypeAndCriteria(type, criteria));
-            });
+            criteria.parameters.propertyName = this.propertyName;
+
+            return this.service.rootService.fetchData(DataQuery.withTypeAndCriteria(this.objectDescriptor, criteria));
         }
     },
 

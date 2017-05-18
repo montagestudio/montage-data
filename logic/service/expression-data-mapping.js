@@ -1,11 +1,11 @@
 var DataMapping = require("./data-mapping").DataMapping,
+    DataStream = require("logic/service/data-stream").DataStream,
     assign = require("frb/assign"),
     compile = require("frb/compile-evaluator"),
     ObjectDescriptorReference = require("montage/core/meta/object-descriptor-reference").ObjectDescriptorReference,
     parse = require("frb/parse"),
     Promise = require("montage/core/promise").Promise,
     Scope = require("frb/scope"),
-    Promise = require("montage/core/promise").Promise,
     Set = require("collections/set");
 
 
@@ -294,10 +294,9 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
      */
     mapObjectToRawData: {
         value: function (object, data) {
-            var self = this,
-                rules = this._compiledRawDataMappingRules,
-                scope = new Scope(object),
-                promises = [], propertyDescriptor, rule, key;
+            var rules = this._compiledRawDataMappingRules,
+                promises = [], key;
+
             for (key in rules) {
                 promises.push(this.mapObjectToRawDataProperty(object, data, key));
             }
@@ -326,6 +325,8 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 }) || Promise.resolve(null);
         }
     },
+
+
 
     _compiledObjectMappingRules: {
         get: function () {
@@ -374,6 +375,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                     rule = this._makeRule(sourcePath);
                     rule.converter = rawRule.converter || this._defaultConverter(sourcePath, targetPath, true);
                     rule.isReverter = rawRule.converter && !addOneWayBindings;
+                    rule.prerequisitePropertyNames = rawRule.prerequisitePropertyNames || null;
                     rules[targetPath] = rule;
                 }
             }
@@ -481,8 +483,12 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                     }
                 );
             } else if (propertyDescriptor) {
-                object[propertyName] = this._parse(rule, scope);
-                return Promise.resolve();
+                if (rule.converter) {
+                    rule.converter.propertyName = propertyName;
+                    rule.converter.service = this.service;
+                    rule.converter.objectDescriptor = this.objectDescriptor;
+                }
+                return self._resolvePrimitive(object, propertyDescriptor, rule, scope);
             } else {
                 console.warn("---------------------------------------------------");
                 console.warn("Did not map property with name (", propertyName, ")");
@@ -494,10 +500,60 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         }
     },
 
+    resolvePrerequisitesForProperty: {
+        value: function (object, propertyName) {
+            var rule = this._compiledObjectMappingRules[propertyName],
+                prerequisites = rule.prerequisitePropertyNames || null;
+            if (prerequisites) {
+                console.log(prerequisites);
+            }
+
+
+            return prerequisites ? this.service.rootService.getObjectProperties(object, prerequisites) : Promise.resolve(null);
+        }
+    },
+
+    _resolvePrimitive: {
+        value: function (object, propertyDescriptor, rule, scope) {
+            var value = this._parse(rule, scope),
+                self = this,
+                result;
+            if (value instanceof DataStream) {
+                value.then(function (data) {
+                    self._assignDataToObjectProperty(object, propertyDescriptor, data);
+                    return null;
+                });
+            } else {
+                object[propertyDescriptor.name] = value;
+                result = Promise.resolve(null);
+            }
+
+            return result;
+        }
+    },
+
+    _assignDataToObjectProperty: {
+        value: function (object, propertyDescriptor, data) {
+            var hasData = data && data.length,
+                isToMany = propertyDescriptor.cardinality !== 1,
+                propertyName = propertyDescriptor.name;
+
+            if (isToMany && Array.isArray(object[propertyName])) {
+                object[propertyName].splice.apply(object[propertyName], [0, Infinity].concat(data));
+            } else if (isToMany) {
+                object[propertyName] = data;
+            } else if (hasData) {
+                object[propertyName] = data[0];
+            }
+        }
+
+    },
+
     _resolveRelationship: {
         value: function (object, propertyDescriptor, rule, scope) {
+            var self = this;
             return rule.converter.convert(rule.expression(scope)).then(function (data) {
-                object[propertyDescriptor.name] = propertyDescriptor.cardinality === 1 ? data[0] : data;
+                self._assignDataToObjectProperty(object, propertyDescriptor, data);
                 return null;
             });
         }

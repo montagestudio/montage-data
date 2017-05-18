@@ -493,7 +493,7 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */ {
         value: function (service, objectDescriptor, prototype, name) {
             var descriptor = objectDescriptor.propertyDescriptorForName(name),
                 trigger;
-            if (descriptor && descriptor.valueDescriptor) {
+            if (descriptor) {
                 trigger = Object.create(this._getTriggerPrototype(service));
                 trigger._objectPrototype = prototype;
                 trigger._propertyName = name;

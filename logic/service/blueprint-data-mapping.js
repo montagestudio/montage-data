@@ -80,7 +80,7 @@ exports.BlueprintDataMapping = DataMapping.specialize(/** @lends BlueprintDataMa
         value: function (object, data) {
             // TO DO: Provide a default mapping based on object.TYPE.
             // For now, subclasses must override this.
-            var propertyBlueprints = this._blueprint.propertyBlueprints,
+            var propertyBlueprints = this._blueprint.propertyDescriptors,
                 attributes = data.attributes,
                 // relationships = data.relationships,
                 i, length, property, propertyKey;
