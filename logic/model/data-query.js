@@ -125,7 +125,7 @@ exports.DataQuery = Montage.specialize(/** @lends DataQuery.prototype */ {
     /**
      * An object defining a list of expressions to resolve at the same time as the query.
      * expressions are based on the content of results described by criteria. A common
-     * use is to preftch relationships off fetched objects.
+     * use is to prefetch relationships off fetched objects.
      * @type {Array}
      */
 

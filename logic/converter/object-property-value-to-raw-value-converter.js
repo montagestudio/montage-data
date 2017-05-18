@@ -4,11 +4,11 @@ var Converter = require("montage/core/converter/converter").Converter,
     parse = require("frb/parse"),
     compile = require("frb/compile-evaluator");
 /**
- * @class RawPropertyValueToPrimitiveConverter
+ * @class RawPropertyValueToObjectConverter
  * @classdesc Converts a property value of raw data to the referenced object.
  * @extends Converter
  */
-exports.RawPropertyValueToPrimitiveConverter = Converter.specialize( /** @lends RawPropertyValueToPrimitiveConverter# */ {
+exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends RawPropertyValueToObjectConverter# */ {
 
     /*********************************************************************
      * Serialization
@@ -36,16 +36,6 @@ exports.RawPropertyValueToPrimitiveConverter = Converter.specialize( /** @lends 
             value = deserializer.getProperty("foreignDescriptor");
             if (value) {
                 this.foreignDescriptor = value;
-            }
-
-            value = deserializer.getProperty("service");
-            if (value) {
-                this.service = value;
-            }
-
-            value = deserializer.getProperty("serviceIdentifier");
-            if (value) {
-                this.serviceIdentifier = value;
             }
         }
     },
@@ -149,15 +139,28 @@ exports.RawPropertyValueToPrimitiveConverter = Converter.specialize( /** @lends 
      */
     convert: {
         value: function (v) {
-            var self = this,
+            var self = this;
+            return this.foreignDescriptor.then(function (objectDescriptor) {
+                //We shouldn't have to go back to a module-id string since we have the objectDescriptor
+                var type = [objectDescriptor.module.id, objectDescriptor.name].join("/"),
+                    //dataExpression = self.foreignProperty,
+                    parameters,
+                    criteria;
+
+
+            //     if(self.convertExpression) {
+            //         parameters = self.evaluateParametersExpression(v);
+            //     }
+            //     else if(dataExpression.indexOf("$") === -1) {
+            //         dataExpression += "==$";
+            //         dataExpression += self.foreignProperty;
+            //         parameters = {};
+            //         parameters[self.foreignProperty] = self.expression(v);
+            //    }
+
                 criteria = new Criteria().initWithSyntax(self.convertSyntax, v);
-            criteria.parameters.propertyName = this.propertyName;
-
-            if (self.serviceIdentifier) {
-                criteria.parameters.serviceIdentifier = self.serviceIdentifier
-            }
-
-            return this.service.fetchData(DataQuery.withTypeAndCriteria(this.objectDescriptor, criteria));
+                return self.service.rootService.fetchData(DataQuery.withTypeAndCriteria(type, criteria));
+            });
         }
     },
 

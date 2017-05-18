@@ -8,6 +8,7 @@ var DataMapping = require("./data-mapping").DataMapping,
     Scope = require("frb/scope"),
     Set = require("collections/set");
 
+var Montage = require("montage").Montage;
 
 var ONE_WAY_BINDING = "<-";
 var TWO_WAY_BINDING = "<->";
@@ -295,12 +296,80 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     mapObjectToRawData: {
         value: function (object, data) {
             var rules = this._compiledRawDataMappingRules,
-                promises = [], key;
+                promises = [],
+                key;
 
             for (key in rules) {
                 promises.push(this.mapObjectToRawDataProperty(object, data, key));
             }
             return promises && promises.length && Promise.all(promises) || Promise.resolve(null);
+        }
+    },
+
+    mapObjectToCriteriaSourceForProperty: {
+        value: function (object, data, propertyName) {
+            var rules = this._compiledRawDataMappingRules,
+                rule = this._compiledObjectMappingRules[propertyName],
+                requiredRawProperties = rule.requirements,
+                requiredObjectProperties = [],
+                promises = [];
+
+            requiredRawProperties.forEach(function (propertyName) {
+                var rawRule = rules[propertyName];
+                if (rawRule) {
+                    requiredObjectProperties.push.apply(requiredObjectProperties, rawRule.requirements);
+                }
+            });
+
+
+
+
+            if (!rule) {
+                console.log("No Rule For:", propertyName);
+            }
+
+            var rawRequirementsToMap = new Set(requiredRawProperties);
+            for (var key in rules) {
+                if (rules.hasOwnProperty(key) && rawRequirementsToMap.has(key)) {
+
+                    // if (this.objectDescriptor.name === "Layer" && propertyName === "allFeatures") {
+                    //     console.log("MapRawProperty", key);
+                    // }
+                    promises.push(this._getAndMapObjectProperty(object, data, key, propertyName));
+                }
+            }
+            return promises && promises.length && Promise.all(promises) || Promise.resolve(null);
+        }
+    },
+
+    _propertiesRequestedForLayer: {
+        get: function () {
+            if (!this.__propertiesRequestedForLayer) {
+                this.__propertiesRequestedForLayer = new Map();
+            }
+            return this.__propertiesRequestedForLayer;
+        }
+    },
+
+    _getAndMapObjectProperty: {
+        value: function (object, data, propertyName, trigger) {
+            var self = this,
+                rules = this._compiledRawDataMappingRules,
+                rule = rules[propertyName],
+                requiredObjectProperties = rule ? rule.requirements : [],
+                result;
+
+
+            result = this.service.rootService.getObjectPropertyExpressions(object, requiredObjectProperties);
+
+
+            if (result && typeof result.then === "function") {
+                return result.then(function () {
+                    return self.mapObjectToRawDataProperty(object, data, propertyName);
+                });
+            } else {
+                return this.mapObjectToRawDataProperty(object, data, propertyName);
+            }
         }
     },
 
@@ -312,17 +381,25 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 propertyDescriptor = rule && rule.propertyDescriptor,
                 promise;
 
-                if (propertyDescriptor && propertyDescriptor.valueDescriptor && rule.converter) {
-                    rule.converter.expression = rule.converter.expression || rule.expression;
-                    rule.converter.foreignDescriptor = rule.converter.foreignDescriptor || propertyDescriptor.valueDescriptor;
-                    rule.converter.service = rule.converter.service || this.service;
-                    promise = this._convertRelationshipToRawData(object, propertyDescriptor, rule, scope);
-                } else /*if (propertyDescriptor)*/ { //relaxing this for now
-                    promise = Promise.resolve(this._parse(rule, scope));
-                }
-                return promise && promise.then(function(value){
-                    data[property] = value;
-                }) || Promise.resolve(null);
+
+            if (propertyDescriptor && propertyDescriptor.valueDescriptor && rule.converter) {
+                rule.converter.expression = rule.converter.expression || rule.expression;
+                rule.converter.foreignDescriptor = rule.converter.foreignDescriptor || propertyDescriptor.valueDescriptor;
+                rule.converter.service = rule.converter.service || this.service.rootService;
+                promise = this._convertRelationshipToRawData(object, propertyDescriptor, rule, scope);
+            } else /*if (propertyDescriptor)*/ { //relaxing this for now
+                promise = Promise.resolve(this._parse(rule, scope));
+            }
+            return promise && promise.then(function(value){
+                data[property] = value;
+            }) || Promise.resolve(null);
+        }
+    },
+
+    serviceIdentifierForProperty: {
+        value: function (propertyName) {
+            var rule = this._compiledObjectMappingRules[propertyName];
+            return rule && rule.serviceIdentifier;
         }
     },
 
@@ -335,6 +412,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 this._mapObjectMappingRules(this._rawDataMappingRules);
                 this._mapObjectMappingRules(this._objectMappingRules, true);
             }
+
             return this.__compiledObjectMappingRules;
         }
     },
@@ -373,9 +451,10 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                     targetPath = addOneWayBindings && propertyName || rawRule[TWO_WAY_BINDING];
                     sourcePath = addOneWayBindings ? rawRule[ONE_WAY_BINDING] || rawRule[TWO_WAY_BINDING] : propertyName;
                     rule = this._makeRule(sourcePath);
+                    rule.requirements = this._parseRequirementsFromParsedExpression(rule.parsed);
+                    rule.serviceIdentifier = rawRule.serviceIdentifier;
                     rule.converter = rawRule.converter || this._defaultConverter(sourcePath, targetPath, true);
                     rule.isReverter = rawRule.converter && !addOneWayBindings;
-                    rule.prerequisitePropertyNames = rawRule.prerequisitePropertyNames || null;
                     rules[targetPath] = rule;
                 }
             }
@@ -396,6 +475,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                     targetPath = addOneWayBindings && propertyName || rawRule[TWO_WAY_BINDING];
                     sourcePath = addOneWayBindings ? rawRule[ONE_WAY_BINDING] || rawRule[TWO_WAY_BINDING] : propertyName;
                     rule = this._makeRule(sourcePath);
+                    rule.requirements = this._parseRequirementsFromParsedExpression(rule.parsed);
                     rule.converter = rawRule.converter || this._defaultConverter(sourcePath, targetPath);
                     rule.isReverter = rawRule.converter && !addOneWayBindings;
                     rule.propertyDescriptor = propertyDescriptor;
@@ -407,8 +487,10 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
 
     _makeRule: {
         value: function (sourcePath) {
+            var compiled = this._compileRuleExpression(sourcePath);
             return {
-                expression: this._compileRuleExpression(sourcePath)
+                expression: compiled.expression,
+                parsed: compiled.parsed
             }
         }
     },
@@ -442,6 +524,9 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     // },
     _convertRelationshipToRawData: {
         value: function (object, propertyDescriptor, rule, scope) {
+            if (!rule.converter.revert) {
+                debugger;
+            }
             return rule.converter.revert(rule.expression(scope));
         }
     },
@@ -477,7 +562,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                         if(rule.converter) {
                             rule.converter.expression = rule.converter.expression || rule.expression;
                             rule.converter.foreignDescriptor = rule.converter.foreignDescriptor || propertyDescriptor.valueDescriptor;
-                            rule.converter.service = rule.converter.service || self.service;
+                            rule.converter.service = rule.converter.service || self.service.rootService;
                         }
                         return self._resolveRelationship(object, propertyDescriptor, rule, scope);
                     }
@@ -485,7 +570,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
             } else if (propertyDescriptor) {
                 if (rule.converter) {
                     rule.converter.propertyName = propertyName;
-                    rule.converter.service = this.service;
+                    rule.converter.service = rule.converter.service || this.service.rootService;
                     rule.converter.objectDescriptor = this.objectDescriptor;
                 }
                 return self._resolvePrimitive(object, propertyDescriptor, rule, scope);
@@ -503,8 +588,11 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     resolvePrerequisitesForProperty: {
         value: function (object, propertyName) {
             var rule = this._compiledObjectMappingRules[propertyName],
-                prerequisites = rule.prerequisitePropertyNames || null;
-            
+                prerequisites = rule && rule.prerequisitePropertyNames || null;
+            if (!rule) {
+                console.log("No Rule For:", propertyName);
+            }
+
             return prerequisites ? this.service.rootService.getObjectProperties(object, prerequisites) : Promise.resolve(null);
         }
     },
@@ -512,19 +600,19 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     _resolvePrimitive: {
         value: function (object, propertyDescriptor, rule, scope) {
             var value = this._parse(rule, scope),
-                self = this,
-                result;
-            if (value instanceof DataStream) {
-                value.then(function (data) {
-                    self._assignDataToObjectProperty(object, propertyDescriptor, data);
-                    return null;
-                });
-            } else {
-                object[propertyDescriptor.name] = value;
-                result = Promise.resolve(null);
-            }
+                self = this;
 
-            return result;
+            return new Promise(function (resolve, reject) {
+                if (value instanceof DataStream) {
+                    value.then(function (data) {
+                        self._assignDataToObjectProperty(object, propertyDescriptor, data);
+                        resolve(null)
+                    });
+                } else {
+                    object[propertyDescriptor.name] = value;
+                    resolve(null);
+                }
+            });
         }
     },
 
@@ -566,7 +654,48 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
 
     _compileRuleExpression: {
         value: function (rule) {
-            return compile(parse(rule));
+            var parsed = parse(rule),
+                expression = compile(parsed);
+
+
+            return {
+                parsed: parsed,
+                expression: expression
+            }
+        }
+    },
+
+    _parseRequirementsFromParsedExpression: {
+        value: function (parsedExpression, requirements) {
+            var args = parsedExpression.args,
+                type = parsedExpression.type;
+
+            requirements = requirements || [];
+
+            if (type === "property" && args[0].type === "value") {
+                requirements.push(args[1].value);
+            } else if (type === "property" && args[0].type === "property") {
+                var subProperty = [args[1].value];
+                this._parseRequirementsFromParsedExpression(args[0], subProperty);
+                requirements.push(subProperty.reverse().join("."));
+            } else if (type === "record") {
+                this._parseRequirementsFromParsedRecord(parsedExpression, requirements);
+            }
+
+            return requirements;
+        }
+    },
+
+
+    _parseRequirementsFromParsedRecord: {
+        value: function (parsedExpression, requirements) {
+            var self = this,
+                args = parsedExpression.args,
+                keys = Object.keys(args);
+
+            keys.forEach(function (key) {
+                self._parseRequirementsFromParsedExpression(args[key], requirements);
+            });
         }
     },
 

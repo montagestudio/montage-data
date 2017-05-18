@@ -383,15 +383,34 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     // practical nor safe, we either need to keep it separately or store it on the stream under
     // rawDataQuery
 
+    // _fetchRawData: {
+    //     value: function (stream) {
+    //         var self = this;
+    //         this.authorizationPromise.then(function (authorization) {
+    //             var streamSelector = stream.query;
+    //             stream.query = self.mapSelectorToRawDataQuery(streamSelector);
+    //             self.fetchRawData(stream);
+    //             stream.query = streamSelector;
+    //         })
+    //     }
+    // },
+
     _fetchRawData: {
         value: function (stream) {
-            var self = this;
-            this.authorizationPromise.then(function (authorization) {
-                var streamSelector = stream.query;
-                stream.query = self.mapSelectorToRawDataQuery(streamSelector);
-                self.fetchRawData(stream);
-                stream.query = streamSelector;
-            });
+            var self = this,
+                childService = this._getChildServiceForQuery(stream.query);
+
+            if (childService && childService.identifier.indexOf("offline-service") === -1) {
+                console.log("RawDataService.fetchDataWithChildService", stream.query.type.name, childService.identifier);
+                childService._fetchRawData(stream);
+            } else {
+                this.authorizationPromise.then(function (authorization) {
+                    var streamSelector = stream.query;
+                    stream.query = self.mapSelectorToRawDataQuery(streamSelector);
+                    self.fetchRawData(stream);
+                    stream.query = streamSelector;
+                })
+            }
         }
     },
 

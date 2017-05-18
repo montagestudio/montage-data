@@ -1,6 +1,7 @@
 var Converter = require("montage/core/converter/converter").Converter,
     Criteria = require("montage/core/criteria").Criteria,
     DataQuery = require("logic/model/data-query").DataQuery,
+    Montage = require("montage").Montage,
     parse = require("frb/parse"),
     compile = require("frb/compile-evaluator");
 /**
@@ -36,6 +37,16 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
             value = deserializer.getProperty("foreignDescriptor");
             if (value) {
                 this.foreignDescriptor = value;
+            }
+
+            value = deserializer.getProperty("service");
+            if (value) {
+                this.service = value;
+            }
+
+            value = deserializer.getProperty("serviceIdentifier");
+            if (value) {
+                this.serviceIdentifier = value;
             }
         }
     },
@@ -123,7 +134,12 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
      * The service to use to make requests.
      */
     service: {
-        value: undefined
+        get: function () {
+            return this._service;
+        },
+        set: function (value) {
+            this._service = value;
+        }
     },
 
     /*********************************************************************
@@ -147,19 +163,11 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
                     parameters,
                     criteria;
 
-
-            //     if(self.convertExpression) {
-            //         parameters = self.evaluateParametersExpression(v);
-            //     }
-            //     else if(dataExpression.indexOf("$") === -1) {
-            //         dataExpression += "==$";
-            //         dataExpression += self.foreignProperty;
-            //         parameters = {};
-            //         parameters[self.foreignProperty] = self.expression(v);
-            //    }
-
                 criteria = new Criteria().initWithSyntax(self.convertSyntax, v);
-                return self.service.rootService.fetchData(DataQuery.withTypeAndCriteria(type, criteria));
+                if (self.serviceIdentifier) {
+                    criteria.parameters.serviceIdentifier = self.serviceIdentifier
+                }
+                return self.service.fetchData(DataQuery.withTypeAndCriteria(type, criteria));
             });
         }
     },

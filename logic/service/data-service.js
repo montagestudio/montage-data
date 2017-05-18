@@ -267,8 +267,10 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             if (child._parentService) {
                 child._parentService.removeChildService(child);
             }
+
             // Add the new child to this service's children set.
             this.childServices.add(child);
+            this._childServicesByIdentifier.set(child.identifier, child);
             // Add the new child service to the services array of each of its
             // types or to the "all types" service array identified by the
             // `null` type, and add each of the new child's types to the array
@@ -333,19 +335,23 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     registerChildService: {
         value: function (child, types) {
+            var self = this,
             // possible types
             // -- types is passed in as an array or a single type.
             // -- a model is set on the child.
             // -- types is set on the child.
             // any type can be asychronous or synchronous.
-            var types = types && Array.isArray(types) && types ||
+                types = types && Array.isArray(types) && types ||
                         types && [types] ||
                         child.model && child.model.objectDescriptors ||
                         child.types && Array.isArray(child.types) && child.types ||
                         child.types && [child.types] ||
                         [],
                 mappings = child.mappings || [];
-            return this._registerChildServiceTypesAndMappings(child, types, mappings);
+
+            return child._childServiceRegistrationPromise.then(function () {
+                return self._registerChildServiceTypesAndMappings(child, types, mappings);
+            })
         }
     },
 
@@ -597,6 +603,19 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: undefined
     },
 
+    _childServicesByIdentifier: {
+        get: function () {
+            if (!this.__childServicesByIdentifier) {
+                this.__childServicesByIdentifier = new Map();
+            }
+            return this.__childServicesByIdentifier;
+        }
+    },
+
+    __childServicesByIdentifier: {
+        value: undefined
+    },
+
     /**
      * An array of the data types handled by all child services of this service.
      *
@@ -652,6 +671,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             return services && services[0] || null;
         }
     },
+
 
     /***************************************************************************
      * Mappings
@@ -1048,7 +1068,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     getObjectProperties: {
         value: function (object, propertyNames) {
-             if(this.isRootService) {
+             if (this.isRootService) {
                 // Get the data, accepting property names as an array or as a list
                 // of string arguments while avoiding the creation of any new array.
                 var names = Array.isArray(propertyNames) ? propertyNames : arguments,
@@ -1060,6 +1080,58 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             }
         }
     },
+
+    getObjectPropertyExpressions: {
+        value: function (object, propertyValueExpressions) {
+            if (this.isRootService) {
+                // Get the data, accepting property names as an array or as a list
+                // of string arguments while avoiding the creation of any new array.
+                var expressions = Array.isArray(propertyValueExpressions) ? propertyValueExpressions : arguments,
+                    start = expressions === propertyValueExpressions ? 0 : 1,
+                    promises = [],
+                    self = this;
+
+
+                expressions.forEach(function (expression) {
+                    var split = expression.split(".");
+                    // if (split.length == 1) {
+                    //     promises.push(self.getObjectProperties(object, split[0]));
+                    // } else {
+                        promises.push(self._getPropertiesOnPath(object, split));
+                    // }
+
+                });
+
+
+                return Promise.all(promises);
+
+
+            } else {
+                return this.rootService.getObjectPropertyExpressions(object, propertyValueExpressions);
+            }
+        }
+    },
+
+    _getPropertiesOnPath: {
+        value: function (object, propertiesToRequest) {
+            var self = this,
+                propertyName = propertiesToRequest.shift(),
+                promise = this.getObjectProperties(object, propertyName);
+
+            if (promise) {
+                return promise.then(function () {
+                    var result = null;
+                    if (propertiesToRequest.length && object[propertyName]) {
+                        result = self._getPropertiesOnPath(object[propertyName], propertiesToRequest);
+                    }
+                    return result;
+                });
+            } else {
+                return this.nullPromise;
+            }
+        }
+    },
+
 
     /**
      * Request possibly asynchronous values of a data object's properties,
@@ -1151,6 +1223,9 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                     //Otherwise we're going to use model, property descriptor, mappings
                     //to make it happen.
                     else {
+                        if (Montage.getInfoForObject(object).moduleId.endsWith("hazard") && propertyName === "timeZone") {
+                            console.log("PropertyName", propertyName);
+                        }
                         var propertyDescriptor = this._propertyDescriptorForObjectAndName(object, propertyName);
                         return propertyDescriptor ?   this._fetchObjectPropertyWithPropertyDescriptor(object, propertyName, propertyDescriptor) :
                                                         this.nullPromise;
@@ -1173,9 +1248,9 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
 
             if (mapping) {
                 Object.assign(data, this.snapshotForObject(object));
-                return mapping.resolvePrerequisitesForProperty(object, propertyName).then(function () {
-                    return mapping.mapObjectToRawData(object, data)
-                }).then(function() {
+
+
+                return mapping.mapObjectToCriteriaSourceForProperty(object, data, propertyName).then(function() {
                     return mapping.mapRawDataToObjectProperty(data, object, propertyName);
                 });
             } else {
@@ -1183,7 +1258,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             }
 
 
-            //return mapping.mapObjectToRawDataProperty(object,{}, propertyName);
+            //return mapping.
+            // (object,{}, propertyName);
 
         }
     },
@@ -1218,6 +1294,9 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                     }
                 }
             }
+            // if (names.indexOf("geometryType")) {
+            //
+            // }
             // Return a promise that will be fulfilled only when all of the
             // requested data has been set on the object. If possible do this
             // without creating any additional promises.
@@ -1572,17 +1651,22 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             // Set up the stream.
             stream = stream || new DataStream();
             stream.query = query;
+
+
             this._dataServiceByDataStream.set(stream, this._childServiceRegistrationPromise.then(function() {
                 var service;
                 //This is a workaround, we should clean that up so we don't
                 //have to go up to answer that question. The difference between
                 //.TYPE and Objectdescriptor still creeps-in when it comes to
                 //the service to answer that to itself
-                if(self.parentService && self.parentService._getChildServiceForType(query.type) === self && typeof self.fetchRawData === "function") {
+                // if (query.type.name === "GeometryType") {
+                //     debugger;
+                // }
+
+                if (self.parentService && self.parentService._getChildServiceForType(query.type) === self && typeof self.fetchRawData === "function") {
                     service = self;
                     service._fetchRawData(stream);
-                }
-                else {
+                } else {
 
                     // Use a child service to fetch the data.
                     try {
@@ -1607,16 +1691,45 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
 
     _fetchRawData: {
         value: function (stream) {
-            var self = this;
-            this.authorizationPromise.then(function (authorization) {
-                var streamSelector = stream.query;
-                stream.query = self.mapSelectorToRawDataQuery(streamSelector);
-                self.fetchRawData(stream);
-                stream.query = streamSelector;
-            })
+            var self = this,
+                childService = this._getChildServiceForQuery(stream.query);
+
+            if (childService) {
+
+                childService._fetchRawData(stream);
+            } else {
+                this.authorizationPromise.then(function (authorization) {
+                    var streamSelector = stream.query;
+                    stream.query = self.mapSelectorToRawDataQuery(streamSelector);
+                    self.fetchRawData(stream);
+                    stream.query = streamSelector;
+                })
+            }
         }
     },
 
+    _getChildServiceForQuery: {
+        value: function (query) {
+            var propertyName = this._propertyNameForQuery(query),
+                service = this._getChildServiceForType(query.type),
+                mapping, serviceModuleID;
+
+            if (!service && propertyName) {
+                mapping = this.mappingWithType(query.type);
+                serviceModuleID = mapping && mapping.serviceIdentifierForProperty(propertyName);
+                service = serviceModuleID && this._childServicesByIdentifier.get(serviceModuleID);
+            }
+
+            return service || null;
+        }
+    },
+
+    _propertyNameForQuery: {
+        value: function (query) {
+            var parameters = query.criteria.parameters;
+            return parameters && parameters.propertyName;
+        }
+    },
 
     __dataServiceByDataStream: {
         value: null
