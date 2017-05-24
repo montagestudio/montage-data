@@ -32,10 +32,11 @@ launchctl load ~/Library/LaunchAgents/com.kaazing.montagedata.watch.plist
 launchctl start ~/Library/LaunchAgents/com.kaazing.montagedata.watch.plist
 ```
 
-## Testing
+## Maintenance
 
-All non-disabled tests should always pass.
+Tests are in the `test` directory. Use `npm test` to run the tests in
+NodeJS or open `test/run.html` in a browser. 
 
-Tests can be run by executing `npm install` in the `test` subdirectory and then
-loading `test/index.html` through a web server. Tests can be created by editing
-`test/index.reel/index.js`.
+To run the tests in your browser, simply use `npm run test:jasmine`.
+
+To run the tests using Karma use `npm run test:karma` and for continious tests run with file changes detection `npm run test:karma-dev`.
