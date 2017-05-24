@@ -401,6 +401,7 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
         }
     },
 
+
    /**
      * This is the opportunity for a PersistentDataService to lazily create the storage needed
      * to execute this query. Traversing the query's criteria's syntactic tree and looking up
@@ -411,18 +412,30 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
      * @returns {Promise}
      */
    definePersistenceStorageForQuery: {
-        value: function(stream) {
+        value: function(query) {
             //Walk stream's criteria's syntax,
             //  call definePersistenceStorageForObjectDescriptor() for type of query
             //  plus criteria's properties' valueDescriptor
             //  if such property should persist (see persistentPropertyDescriptors)
-            return Promise.reject();
+            var message = "PersistentDataService.definePersistenceStorageForQuery is not implemented",
+                type = query && query.type;
+
+            if (type && typeof type === "string") {
+                message = message + " (" + type + ")";
+            } else if (type) {
+                message = message + " (" + (type.name || type.exportName) + ")";
+            }
+            return Promise.reject(new Error(message));
         }
     },
 
    definePersistenceStorageForObjectDescriptor: {
         value: function(objectDescriptor) {
-            return Promise.reject();
+            var message = "PersistentDataService.definePersistenceStorageForObjectDescriptor is not implemented";
+            if (objectDescriptor) {
+                message += " (" + (objectDescriptor.name || objectDescriptor.exportName) + ")";
+            }
+            return Promise.reject(new Error(message));
         }
     },
 
@@ -435,12 +448,13 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
                 //This is the opportunity to lazily create the storage needed
                 //to execute this query. Traversing the criteria's syntactic tree and looking up
                 //property descriptors' valueDescriptors to navigate the set of persistentStorage needed.
-                this.definePersistenceStorageForQuery(stream.query)
-                .then(function() {
+                this.definePersistenceStorageForQuery(stream.query).then(function() {
                     this.fetchRawData(stream).then(function(data) {
                         this._persistFetchedDataStream(stream);
                     })
-                })
+                }).catch(function (e) {
+                    console.warn(e.message);
+                });
             }
 
             return stream;

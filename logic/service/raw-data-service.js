@@ -401,7 +401,6 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
                 childService = this._getChildServiceForQuery(stream.query);
 
             if (childService && childService.identifier.indexOf("offline-service") === -1) {
-                console.log("RawDataService.fetchDataWithChildService", stream.query.type.name, childService.identifier);
                 childService._fetchRawData(stream);
             } else {
                 this.authorizationPromise.then(function (authorization) {
