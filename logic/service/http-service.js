@@ -183,6 +183,7 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                 } else {
                     request = new XMLHttpRequest();
                     request.onload = function () { resolve(request); };
+                    request.onerror = request.onload;
                     request.open(parsed.body ? "POST" : "GET", parsed.url, true);
                     for (i in parsed.headers) {
                         request.setRequestHeader(i, parsed.headers[i]);
@@ -198,7 +199,7 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
             }).then(function () {
                 // Log a warning for error status responses.
                 // TODO: Reject the promise for error statuses.
-                if (!error && request.status >= 300) {
+                if (!error && (request.status >= 300 || request.status === 0)) {
                     error = new Error("Status " + request.status + " received for REST URL " + parsed.url);
                     console.warn(error);
                 }
