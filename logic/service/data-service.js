@@ -9,7 +9,7 @@ var Montage = require("montage/core/core").Montage,
     DataTrigger = require("logic/service/data-trigger").DataTrigger,
     Map = require("collections/map"),
     Promise = require("montage/core/promise").Promise,
-    ObjectDescriptor = require("montage/core/meta/ObjectDescriptor").ObjectDescriptor,
+    ObjectDescriptor = require("montage/core/meta/object-descriptor").ObjectDescriptor,
     Set = require("collections/set"),
     WeakMap = require("collections/weak-map");
 
