@@ -85,7 +85,16 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 Array.prototype.push.apply(this._childServiceMappings, value);
             }
 
+            value = deserializer.getProperty("delegate");
+            if (value) {
+                this.delegate = value;
+            }
+
         }
+    },
+
+    delegate: {
+        value: null
     },
 
     /***************************************************************************
@@ -650,7 +659,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     _getChildServiceForObject: {
         value: function (object) {
-            return this._getChildServiceForType(this.rootService._getObjectType(object));
+            return this.childServiceForType(this.rootService._getObjectType(object));
         }
     },
 
@@ -663,7 +672,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * @argument {DataObjectDescriptor} type
      * @returns {Set.<DataService,number>}
      */
-    _getChildServiceForType: {
+    childServiceForType: {
         value: function (type) {
             var services;
             type = this._objectDescriptorForType(type);
@@ -1659,18 +1668,14 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 //have to go up to answer that question. The difference between
                 //.TYPE and Objectdescriptor still creeps-in when it comes to
                 //the service to answer that to itself
-                // if (query.type.name === "GeometryType") {
-                //     debugger;
-                // }
-
-                if (self.parentService && self.parentService._getChildServiceForType(query.type) === self && typeof self.fetchRawData === "function") {
+                if (self.parentService && self.parentService.childServiceForType(query.type) === self && typeof self.fetchRawData === "function") {
                     service = self;
                     service._fetchRawData(stream);
                 } else {
 
                     // Use a child service to fetch the data.
                     try {
-                        service = self._getChildServiceForType(query.type);
+                        service = self.childServiceForType(query.type);
                         if (service) {
                             stream = service.fetchData(query, stream) || stream;
                             self._dataServiceByDataStream.set(stream, service);
@@ -1711,7 +1716,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     _getChildServiceForQuery: {
         value: function (query) {
             var propertyName = this._propertyNameForQuery(query),
-                service = this._getChildServiceForType(query.type),
+                service = this.childServiceForType(query.type),
                 mapping, serviceModuleID;
 
             if (!service && propertyName) {
