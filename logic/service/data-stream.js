@@ -1,4 +1,4 @@
-// Note: Bluebird promises are used even if ECMAScript 6 promises are available.
+// Note: Montage's promises are used even if ECMAScript 6 promises are available.
 var DataProvider = require("logic/service/data-provider").DataProvider,
     DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
     DataQuery = require("logic/model/data-query").DataQuery,
@@ -122,7 +122,7 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */ 
             // to a function that will create the appropriate promise when it
             // is needed. This way if the promise is not needed it won't be
             // created. This avoids the "unhandled rejection" error that
-            // Bluebird logs for promises that are rejected but whose rejection
+            // Montage's Promises logs for promises that are rejected but whose rejection
             // is not handled.
             if (!this.__promise) {
                 this.__promise = function () {return Promise.reject(reason);};
