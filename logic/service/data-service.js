@@ -269,7 +269,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
 
     _addChildService: {
         value: function (child, types) {
-            var children, type, i, n;
+            var children, type, i, n, nIfEmpty;
             types = types || child.model && child.model.objectDescriptors || child.types;
             // If the new child service already has a parent, remove it from
             // that parent.
@@ -284,7 +284,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             // types or to the "all types" service array identified by the
             // `null` type, and add each of the new child's types to the array
             // of child types if they're not already there.
-            for (i = 0, n = types && types.length || 1; i < n; i += 1) {
+
+            for (i = 0, n = types && types.length || nIfEmpty; i < n; i += 1) {
                 type = types && types.length && types[i] || null;
                 children = this._childServicesByType.get(type) || [];
                 children.push(child);
@@ -1716,13 +1717,16 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     _getChildServiceForQuery: {
         value: function (query) {
             var propertyName = this._propertyNameForQuery(query),
-                service = this.childServiceForType(query.type),
-                mapping, serviceModuleID;
+                mapping, service, serviceModuleID;
 
-            if (!service && propertyName) {
+            if (propertyName) {
                 mapping = this.mappingWithType(query.type);
                 serviceModuleID = mapping && mapping.serviceIdentifierForProperty(propertyName);
                 service = serviceModuleID && this._childServicesByIdentifier.get(serviceModuleID);
+            }
+
+            if (!service) {
+                service = this.childServiceForType(query.type);
             }
 
             return service || null;
@@ -1825,6 +1829,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             var self = this,
                 service = action && this._getChildServiceForObject(object),
                 promise = this.nullPromise;
+
             if (!action) {
                 self.createdDataObjects.delete(object);
             } else if (service) {

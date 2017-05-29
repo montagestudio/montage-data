@@ -8,7 +8,9 @@ var DataMapping = require("./data-mapping").DataMapping,
     Scope = require("frb/scope"),
     Set = require("collections/set");
 
+
 var Montage = require("montage").Montage;
+
 
 var ONE_WAY_BINDING = "<-";
 var TWO_WAY_BINDING = "<->";
@@ -310,7 +312,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         value: function (object, data, propertyName) {
             var rules = this._compiledRawDataMappingRules,
                 rule = this._compiledObjectMappingRules[propertyName],
-                requiredRawProperties = rule.requirements,
+                requiredRawProperties = rule ? rule.requirements : [],
                 requiredObjectProperties = [],
                 promises = [];
 
@@ -321,9 +323,6 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 }
             });
 
-
-
-
             if (!rule) {
                 console.log("No Rule For:", propertyName);
             }
@@ -332,9 +331,6 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
             for (var key in rules) {
                 if (rules.hasOwnProperty(key) && rawRequirementsToMap.has(key)) {
 
-                    // if (this.objectDescriptor.name === "Layer" && propertyName === "allFeatures") {
-                    //     console.log("MapRawProperty", key);
-                    // }
                     promises.push(this._getAndMapObjectProperty(object, data, key, propertyName));
                 }
             }
@@ -551,8 +547,16 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 self = this;
 
                 scope.value = data;
-
-            if (propertyDescriptor && propertyDescriptor.valueDescriptor) {
+                if (!propertyDescriptor) {
+                    console.warn("---------------------------------------------------");
+                    console.warn("Did not map property with name (", propertyName, ")");
+                    console.warn("Property not defined on this object descriptor (", this.objectDescriptor, ")");
+                    console.warn("---------------------------------------------------");
+                    //Shall we return Promise.fail() instead?
+                    return Promise.resolve();
+                } else if (propertyDescriptor.isDerived) {
+                    return Promise.resolve();
+                } else if (propertyDescriptor.valueDescriptor) {
                 //We may need to test for
                 //rule.converter.foreignDescriptor || propertyDescriptor.valueDescriptor
                 //before resolving the promise to make sure we have the
@@ -567,21 +571,14 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                         return self._resolveRelationship(object, propertyDescriptor, rule, scope);
                     }
                 );
-            } else if (propertyDescriptor) {
+            } else {
                 if (rule.converter) {
                     rule.converter.propertyName = propertyName;
                     rule.converter.service = rule.converter.service || this.service.rootService;
                     rule.converter.objectDescriptor = this.objectDescriptor;
                 }
                 return self._resolvePrimitive(object, propertyDescriptor, rule, scope);
-            } else {
-                console.warn("---------------------------------------------------");
-                console.warn("Did not map property with name (", propertyName, ")");
-                console.warn("Property not defined on this object descriptor (", this.objectDescriptor, ")");
-                console.warn("---------------------------------------------------");
-                //Shall we return Promise.fail() instead?
-                return Promise.resolve();
-          }
+            }
         }
     },
 
@@ -620,12 +617,15 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         value: function (object, propertyDescriptor, data) {
             var hasData = data && data.length,
                 isToMany = propertyDescriptor.cardinality !== 1,
-                propertyName = propertyDescriptor.name;
+                propertyName = propertyDescriptor.name,
+                i, n;
 
             if (isToMany && Array.isArray(object[propertyName])) {
                 object[propertyName].splice.apply(object[propertyName], [0, Infinity].concat(data));
-            } else if (isToMany) {
-                object[propertyName] = data;
+            }  else if (isToMany && object[propertyName] instanceof Set) {
+                for (i = 0, n = data.length; i < n; ++i) {
+                    object[propertyName].add(data[i]);
+                }
             } else if (hasData) {
                 object[propertyName] = data[0];
             }
