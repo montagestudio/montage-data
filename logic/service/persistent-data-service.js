@@ -39,9 +39,34 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
         }
     },
 
-   _db : {
-        value: void 0
+    serializeSelf: {
+        value:function (serializer) {
+            this.super(serializer);
+
+            if (this.persistingObjectDescriptorNames) {
+                serializer.setProperty("persistingObjectDescriptorNames", this.persistingObjectDescriptorNames);
+            }
+
+        }
     },
+
+    /**
+     * returns a Promise that resolves to the object used by the service to
+     * store data
+     *
+     * @returns {Promise}
+     */
+
+    _storage : {
+        value: undefined
+    },
+    storage : {
+        get: function() {
+            return this._storage || (this._storage = Promise.reject(new Error('Needs to be implemented by sub classes')));
+        }
+    },
+
+
    schema : {
         value: void 0
     },
@@ -73,8 +98,8 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
     initWithName: {
         value: function(name, version, schema) {
             var localVersion = version || 1;
-            if (!this._db) {
-                var db = this._db = new Dexie(name),
+            if (!this._storage) {
+                var storage = this._storage = new Dexie(name),
                     table, tableSchema, dbTable, dbSchema, dbIndexes,
                     shouldUpgradeToNewVersion = false, newDbSchema,
                     schemaDefinition, tableIndexes, tablePrimaryKey;
@@ -82,7 +107,7 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
                 this.name = name;
                 this.schema = schema;
 
-                //db.open().then(function (db) {
+                //storage.open().then(function (storage) {
                 newDbSchema = {};
 
                 //We automatically create an extra table that will track offline operations the record was last updated
@@ -109,7 +134,7 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
                         tableSchema = schema[table];
                         tableIndexes = tableSchema.indexes;
                         tablePrimaryKey = tableSchema.primaryKey;
-                        dbTable = db[table];
+                        dbTable = storage[table];
                         if (dbTable) {
                             //That table is defined, now let's compare primaryKey and indexes
                             dbSchema = dbTable.schema;
@@ -143,11 +168,11 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
                     }
 
                     if (shouldUpgradeToNewVersion) {
-                        //db.close();
+                        //storage.close();
                         //Add upgrade here
                         //console.log("newDbSchema:",newDbSchema);
-                        db.version(db.verno+1).stores(newDbSchema);
-                        //db.open();
+                        storage.version(storage.verno+1).stores(newDbSchema);
+                        //storage.open();
                     }
 
                     PersistentDataService.registerPersistentDataService(this);
@@ -164,10 +189,10 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
     //         if(!sampleData) return;
 
     //         var sampleDataKeys = Object.keys(sampleData),
-    //             db = this._db,
+    //             storage = this._storage,
     //             currentSchema = {};
 
-    //         db.tables.forEach(function (table) {
+    //         storage.tables.forEach(function (table) {
     //             currentSchema[table.name] = JSON.stringify(table.schema);
     //         });
 
@@ -179,7 +204,7 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
     //             }
     //         }
     //         currentSchema[objectStoreName] = schemaDefinition;
-    //         db.version(db.verno+1).stores(currentSchema);
+    //         storage.version(storage.verno+1).stores(currentSchema);
 
     //     }
     // },
@@ -329,9 +354,9 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
             }
             table = this._tableByName.get(tableName);
             if(!table) {
-                table = this._db[tableName];
+                table = this._storage[tableName];
                 if(!table) {
-                    var tables = this._db.tables;
+                    var tables = this._storage.tables;
                     for(var i=0, iTable; (iTable = tables[i]); i++) {
                         if(iTable.name === tableName) {
                             this._tableByName.set(tableName,(table = iTable));
@@ -383,9 +408,16 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
      */
     persistsObjectDescriptor: {
         value: function(objectDescriptor) {
-            return this._persistingObjectDescriptorNames && this._persistingObjectDescriptorNames.has(objectDescriptor.name);
+            return objectDescriptor && this._persistingObjectDescriptorNames && this._persistingObjectDescriptorNames.has(objectDescriptor.name);
         }
     },
+
+    persistsObject: {
+        value: function(object) {
+            return this.persistsObjectDescriptor(this.objectDescriptorForObject(object));
+        }
+    },
+
 
   /**
      * returns the list of all property descriptors that should persist for the
@@ -411,13 +443,13 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
      * @argument {DataStream} stream
      * @returns {Promise}
      */
-   definePersistenceStorageForQuery: {
+   storageForQuery: {
         value: function(query) {
             //Walk stream's criteria's syntax,
-            //  call definePersistenceStorageForObjectDescriptor() for type of query
+            //  call storageForObjectDescriptor() for type of query
             //  plus criteria's properties' valueDescriptor
             //  if such property should persist (see persistentPropertyDescriptors)
-            var message = "PersistentDataService.definePersistenceStorageForQuery is not implemented",
+            var message = "PersistentDataService.storageForQuery is not implemented",
                 type = query && query.type;
 
             if (type && typeof type === "string") {
@@ -429,45 +461,213 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
         }
     },
 
-   definePersistenceStorageForObjectDescriptor: {
-        value: function(objectDescriptor) {
-            var message = "PersistentDataService.definePersistenceStorageForObjectDescriptor is not implemented";
-            if (objectDescriptor) {
-                message += " (" + (objectDescriptor.name || objectDescriptor.exportName) + ")";
+    _databaseByModel: {
+        value: undefined
+    },
+    /**
+     * Returns the WeakMap keeping track of the storage objects
+     * used for objectDescriptors
+     *
+     * @returns {WeakMap}
+     */
+
+    databaseByModel: {
+        get: function() {
+            return this._databaseByModel || (this._databaseByModel = new WeakMap);
+        }
+    },
+    registerDatabaseForModel: {
+        value: function(database,model) {
+            this._databaseByModel.set(model,database);
+        }
+    },
+    unregisterDatabaseForModel: {
+        value: function(model) {
+            this._databaseByModel.delete(model);
+        }
+    },
+
+    /**
+     * Returns a Promise for the persistence storage used to store objects
+     * described by the objectDescriptor passed as an argument.
+     *
+     * may need to introduce an _method used internally to minimize
+     * use of super()
+     *
+     * @argument {ObjectDescriptor} stream
+     * @returns {Promise}
+     */
+    databaseForModel: {
+        value: function(model) {
+            if(this.persistsModel(model)) {
+                var database = this._databaseByModel.get(model);
+                if(!database) {
+                    database = this.provideDatabaseForModel(model) || Promise.reject(null);
+                    this.registerDatabaseForModel(database,model);
+                };
+                return database;
             }
-            return Promise.reject(new Error(message));
+            return Promise.reject(null);
+        }
+    },
+
+    databaseForObjectDescriptor: {
+        value: function(objectDescriptor) {
+            return this.databaseForModel(objectDescriptor.model);
+        }
+    },
+
+    _storageByObjectDescriptor: {
+        value: undefined
+    },
+    /**
+     * Returns the WeakMap keeping track of the storage objects
+     * used for objectDescriptors
+     *
+     * @returns {WeakMap}
+     */
+
+    storageByObjectDescriptor: {
+        get: function() {
+            return this._storageByObjectDescriptor || (this._storageByObjectDescriptor = new WeakMap);
+        }
+    },
+    registerStorageForObjectDescriptor: {
+        value: function(storage,objectDescriptor) {
+            this._storageByObjectDescriptor.set(objectDescriptor,storage);
+        }
+    },
+    unregisterStorageForObjectDescriptor: {
+        value: function(objectDescriptor) {
+            this._storageByObjectDescriptor.delete(objectDescriptor);
+        }
+    },
+
+    /**
+     * Returns a Promise for the persistence storage used to store objects
+     * described by the objectDescriptor passed as an argument.
+     *
+     * may need to introduce an _method used internally to minimize
+     * use of super()
+     *
+     * @argument {ObjectDescriptor} stream
+     * @returns {Promise}
+     */
+    storageForObjectDescriptor: {
+        value: function(objectDescriptor) {
+            return this.databaseForObjectDescriptor(objectDescriptor)
+                .then(function(database) {
+                    if(this.persistsObjectDescriptor(objectDescriptor)) {
+                        var storage = this._storageByObjectDescriptor.get(objectDescriptor);
+                        if(!storage) {
+                            storage = this.provideStorageForObjectDescriptor(objectDescriptor) || Promise.reject(null);
+                            this.registerStorageForObjectDescriptor(storage,objectDescriptor);
+                        };
+                        return storage;
+                    }
+                    return Promise.reject(null);
+                })
+        }
+    },
+
+
+     /**
+     * Returns a Promise for the storage used to store objects
+     * described by all objectDescriptors in the service's model.
+     *
+     * @argument {Model} stream
+     * @returns {Promise}
+     */
+   storage: {
+        value: function(model) {
+            return Promise.reject();
+        }
+    },
+
+    /**
+     * Get the first child service that can handle data of the specified type,
+     * or `null` if no such child service exists.
+     *
+     * Overrides super to set itself as the delegate
+     *
+     * @private
+     * @method
+     * @argument {DataObjectDescriptor} type
+     * @returns {Set.<DataService,number>}
+     */
+    childServiceForType: {
+        value: function (type) {
+            var service = this.super(type);
+            if(service && this.persistsObjectDescriptor(type)) {
+                service.delegate = this;
+            }
+            return service;
         }
     },
 
    fetchData: {
         value: function (queryOrType, optionalCriteria, optionalStream) {
             //We let the super logic apply, which will attempt to obtain data through any existing child service
-            var stream = this.super(queryOrType, optionalCriteria, optionalStream);
+            var dataStream = this.super(queryOrType, optionalCriteria, optionalStream),
+                rawDataStream,
+                promise = dataStream,
+                rawPromise,
+                self = this;
 
-            if(this.persistsObjectDescriptor(stream.query.type)) {
-                //This is the opportunity to lazily create the storage needed
-                //to execute this query. Traversing the criteria's syntactic tree and looking up
-                //property descriptors' valueDescriptors to navigate the set of persistentStorage needed.
-                this.definePersistenceStorageForQuery(stream.query).then(function() {
-                    this.fetchRawData(stream).then(function(data) {
-                        this._persistFetchedDataStream(stream);
-                    })
-                }).catch(function (e) {
-                    console.warn(e.message);
+            if(this.persistsObjectDescriptor(dataStream.query.type)) {
+
+                promise = promise.then(function(data) {
+                    var rawDataStream = new DataStream();
+                    rawDataStream.type = dataStream.type;
+                    rawDataStream.query = dataStream.query;
+                    self._registerDataStreamForRawDataStream(dataStream,rawDataStream);
+                    self.fetchRawData(rawDataStream);
+
+                    return rawDataStream;
                 });
             }
 
-            return stream;
+            return promise;
         }
+   },
+
+   _dataStreamObjectsByPrimaryKey: {
+        value: new WeakMap()
+   },
+   objectsByPrimaryKeyForDataStream: {
+        value: function(dataStream) {
+            var value = this._dataStreamObjectsByPrimaryKey.get(dataStream);
+            if(!value) {
+                value = new Map();
+                this._dataStreamObjectsByPrimaryKey.set(dataStream,value);
+            }
+            return value;
+        }
+   },
+    __dataStreamForRawDataStream: {
+        value: new WeakMap()
+    },
+
+   _dataStreamForRawDataStream: {
+       value: function(rawDataStream) {
+        return this.__dataStreamForRawDataStream.get(rawDataStream);
+       }
+   },
+   _registerDataStreamForRawDataStream: {
+       value: function(dataStream,rawDataStream) {
+        return this.__dataStreamForRawDataStream.set(rawDataStream,dataStream);
+       }
    },
 
     fetchRawData: {
         value: function (stream) {
-            var db = this._db,
-                selector = stream.query,
-                criteria = selector.criteria,
+            var query = stream.query,
+                queryObjectDescriptor = query.type,
+                storage = this.storageForObjectDescriptor(queryObjectDescriptor),
+                criteria = query.criteria,
                 whereProperties = Object.keys(criteria),
-                orderings = selector.orderings,
+                orderings = query.orderings,
+
                 self = this;
 
               /*
@@ -477,120 +677,197 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
                     results in the then is an Array... This first pass fetches offline Hazards with status === "A",
                     which seems to be the only fetch for Hazards on load when offline.
                 */
-                db.open().then(function (db) {
-                    var table = self.tableNamed(selector.type);
+                storage.then(function (storage) {
 
-                    if(whereProperties.length) {
-                        var wherePromise,
-                            resultPromise,
-                            whereProperty = whereProperties.shift(),
-                            whereValue = criteria[whereProperty];
+                    var resultPromise = self.tableNamed(query.type);
+                    resultPromise.toArray(function(results) {
+                        //Creates an infinite loop, we don't need what's there
+                        //self.addRawData(stream, results);
+                        //self.rawDataDone(stream);
+                        if(orderings) {
+                            var expression = "";
+                            //Build combined expression
+                            for(var i=0,iDataOrdering,iExpression;(iDataOrdering = orderings[i]);i++) {
+                                iExpression = iDataOrdering.expression;
 
-                        if(whereProperties.length > 0) {
-                                //db.table1.where("key1").between(8,12).and(function (x) { return x.key2 >= 3 && x.key2 < 18; }).toArray();
+                                if(expression.length)
+                                    expression += ".";
 
-
-                            if(Array.isArray(whereValue)) {
-                                wherePromise = table
-                                                .where(whereProperty)
-                                                .anyOf(whereValue);
-                            }
-                            else {
-                                wherePromise = table
-                                                .where(whereProperty)
-                                                .equals(whereValue);
-                            }
-
-                            resultPromise = wherePromise
-                                            .and(function (aRecord) {
-                                                var result = true;
-                                                for(var i=0, iKey, iValue, iKeyMatchValue, iOrValue;(iKey = whereProperties[i]);i++) {
-                                                    iValue = criteria[iKey];
-                                                    iKeyMatchValue = false;
-                                                    if(Array.isArray(iValue)) {
-                                                        iOrValue = false;
-                                                        for(var j=0, jValue;(jValue = iValue[j]);j++) {
-                                                            if(aRecord[iKey] === jValue) {
-                                                                if(!iKeyMatchValue) iKeyMatchValue = true;
-                                                            }
-                                                        }
-                                                    }
-                                                    else {
-                                                        if(aRecord[iKey] !== iValue) {
-                                                            iKeyMatchValue = false;
-                                                        }
-                                                        else {
-                                                            iKeyMatchValue = true;
-                                                        }
-                                                    }
-
-                                                    if(!(result = result && iKeyMatchValue)) {
-                                                        break;
-                                                    }
-                                                }
-                                                return result;
-                                            });
-                        }
-                        else {
-                            if(Array.isArray(whereValue)) {
-                                resultPromise = table
-                                                .where(whereProperty)
-                                                .anyOf(whereValue);
-                            }
-                            else {
-                                resultPromise = table
-                                                .where(whereProperty)
-                                                .equals(whereValue);
-                            }
-                        }
-                        resultPromise.toArray(function(results) {
-                            //Creates an infinite loop, we don't need what's there
-                            //self.addRawData(stream, results);
-                            //self.rawDataDone(stream);
-                            if(orderings) {
-                                var expression = "";
-                                //Build combined expression
-                                for(var i=0,iDataOrdering,iExpression;(iDataOrdering = orderings[i]);i++) {
-                                    iExpression = iDataOrdering.expression;
-
-                                    if(expression.length)
-                                        expression += ".";
-
-                                    expression += "sorted{";
-                                    expression += iExpression;
-                                    expression += "}";
-                                    if(iDataOrdering.order === DESCENDING) {
-                                        expression += ".reversed()";
-                                    }
+                                expression += "sorted{";
+                                expression += iExpression;
+                                expression += "}";
+                                if(iDataOrdering.order === DESCENDING) {
+                                    expression += ".reversed()";
                                 }
-                                results = evaluate(expression, results);
                             }
+                            results = evaluate(expression, results);
+                        }
 
-                            stream.addData(results);
-                            stream.dataDone();
+                        stream.addRawData(results);
+                        stream.rawDataDone();
 
-                        });
+                    });
 
-                    }
-                    else {
-                        table.toArray()
-                        .then(function(results) {
-                            stream.addData(results);
-                            stream.dataDone();
-                        });
-                    }
+                //}
+                // else {
+                //     table.toArray()
+                //     .then(function(results) {
+                //         stream.addData(results);
+                //         stream.dataDone();
+                //     });
+                // }
 
-                }).catch('NoSuchDatabaseError', function(e) {
-                    // Database with that name did not exist
-                    stream.dataError(e);
-                }).catch(function (e) {
-                    stream.dataError(e);
-                });
+            }).catch('NoSuchDatabaseError', function(e) {
+                // Database with that name did not exist
+                stream.dataError(e);
+            }).catch(function (e) {
+                stream.dataError(e);
+            });
 
             // Return the passed in or created stream.
             return stream;
         }
     },
+
+    openTransaction: {
+        value: function() {
+            return Promise.resolve();
+        }
+    },
+
+    closeTransaction: {
+        value: function() {
+            return Promise.resolve();
+        }
+    },
+
+    _updateOperationsByDataStream: {
+        value: new Map()
+    },
+
+    //ToDo:
+    //The dataStream will need to be removed from this structure when the cycle is completed.
+    updateOperationsForDataStream: {
+        value: function(dataStream) {
+            var operations = this._updateOperationsByDataStream.get(dataStream);
+            if(!operations) {
+                this._updateOperationsByDataStream.set(dataStream,(operations = []));
+            }
+            return operations;
+        }
+    },
+    _objectsToUpdatesForDataStream: {
+        value: new Map()
+    },
+
+    objectsToUpdatesForDataStream: {
+        value: function(dataStream) {
+            var objects = this._objectsToUpdatesForDataStream.get(dataStream);
+            if(!objects) {
+                this._objectsToUpdatesForDataStream.set(dataStream,(objects = []));
+            }
+            return objects;
+        }
+    },
+    /**
+     * Delegate method allowing the persistent service to do the ground work
+     * as objects are created, avoiding to loop again later
+     *
+     * @method
+     * @argument {DataService} dataService
+     * @argument {DataStream} dataStream
+     * @argument {Object} rawData
+     * @argument {Object} object
+     * @returns {void}
+     */
+    rawDataServiceDidAddOneRawData: {
+        value: function(dataService,dataStream,rawData,object) {
+            if(this.persistsObject(object)) {
+                var dataIdentifier = this.dataIdentifierForObject(object),
+                    dataStreamPrimaryKeyMap = this.objectsByPrimaryKeyForDataStream(dataStream),
+                    dataOperation;
+
+                //Register the object by primarykey, which we'll need later
+                dataStreamPrimaryKeyMap.set(dataIdentifier.primaryKey,object);
+
+                //The operation should be created atomically in the method that
+                //will actually save the data itself.
+                //Create the record to track the online Last Updated date
+                dataOperation = {};
+                dataOperation.dataID = dataIdentifier.primaryKey;
+                //We previously had the exact same time cached for all objects
+                //Need to keep an eye out for possible consequences due to that change
+                dataOperation[this.lastFetchedPropertyName] = Date.now();
+                dataOperation[this.typePropertyName] = dataStream.query.type;
+
+                this.updateOperationsForDataStream(dataStream).push(dataOperation);
+                //Pseudo code.
+                this.objectsToUpdatesForDataStream(dataStream).push(object);
+            }
+
+        }
+    },
+
+    // addRawData: {
+    //     value: function (stream, records, context) {
+    //         this.super(stream, records, context);
+    //     }
+    // },
+
+    addOneRawData: {
+        value: function(stream, rawData, context, _type) {
+            var dataIdentifier = this.dataIdentifierForTypeRawData(stream.query.type,rawData);
+                primaryKey = dataIdentifier.primaryKey,
+                dataStream = this._dataStreamForRawDataStream(stream),
+                dataStreamPrimaryKeyMap = this.objectsByPrimaryKeyForDataStream(dataStream),
+                object = null,
+                dataOperation;
+
+            //Register the object by primarykey, which we'll need later
+            dataStreamValue = dataStreamPrimaryKeyMap.get(primaryKey);
+            //If results were returned by childServices but that primaryKey isn't found
+            //it means that this obect doesn't match stream's query criteria as it used to.
+            //We were removing it from storage in general, which could cause that object to disapear for other queries that it still matches. It should be done eventually
+            //for a per query cache
+            if(dataStream.data && dataStream.length > 0 && !dataStreamValue) {
+                this.deletesForDataStream(dataStream).push(primaryKey);
+            }
+
+            //If no data was returned, we go on and create the object
+            if(!dataStream.data || dataStream.length === 0) {
+                object = this.super(stream, rawData, context, _type);
+            }
+
+
+            //Do we have
+
+
+
+            return object;
+        }
+    },
+
+    rawDataDone: {
+        value: function (stream, context) {
+            var self = this;
+            this.super(stream, context)
+            .then(function() {
+                self.openTransaction()
+                .then(function() {
+                    var dataStream = self._dataStreamForRawDataStream(stream);
+                        updateOperations = self.objectsToUpdatesForDataStream(dataStream),
+                        deleteOperations = self.deletesForDataStream(dataStream),
+                        updates = stream.data;
+
+                    //Need to structure the API to
+                    return this.closeTransaction();
+
+                })
+
+            })
+        }
+    },
+
 
      /**
      * Called every time [addRawData()]{@link RawDataService#addRawData} is
@@ -617,12 +894,12 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
     //writeOfflineData/readOfflineOperation
 
     _persistFetchedDataStream: {
-        value: function (dataStream) {
+        value: function (dataStream, rawData) {
 
              var self = this,
                 dataArray = dataStream.data,
-                selector = dataStream.query,
-                tableName = selector.type,
+                query = dataStream.query,
+                tableName = query.type,
                 table = this.tableNamed(tableName),
                 clonedArray = [],
                 i,countI,iRawData, iLastUpdated,
@@ -637,7 +914,7 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
                 rawDataStream = new DataStream();
 
                 rawDataStream.type = dataStream.type;
-                rawDataStream.query = selector;
+                rawDataStream.query = query;
 
             //Make a clone of the array and create the record to track the online Last Updated date
             for(i=0, countI = dataArray.length; i<countI; i++) {
@@ -653,7 +930,7 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
                 }
             }
 
-            // 1) First we need to execute the equivalent of stream's selector to find what we have matching locally
+            // 1) First we need to execute the equivalent of stream's query to find what we have matching locally
             return this.fetchRawData(rawDataStream).then(function (fetchedRawRecords) {
                 // 2) Loop on offline results and if we can't find it in the recent dataArray:
                 //    2.0) Remove the non-matching record so it doesn't show up in results
@@ -677,11 +954,11 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
                 //We need to be able to build a transaction and pass
 
                 // 3) Put new objects
-                return self.performOfflineSelectorChanges(selector, clonedArray, updateOperationArray, offlineObjectsToClear);
+                return self.performOfflineSelectorChanges(query, clonedArray, updateOperationArray, offlineObjectsToClear);
 
             })
             .catch(function(e) {
-                console.log(selector.type + ": performOfflineSelectorChanges failed",e);
+                console.log(query.type + ": performOfflineSelectorChanges failed",e);
                 console.error(e);
             });
 
@@ -692,12 +969,12 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
         value: function (/* operationMapToService */) {
             var self = this;
             return new Promise(function (resolve, reject) {
-                var myDB = self._db;
-                myDB.open().then(function (/* db */) {
+                var myDB = self._storage;
+                myDB.open().then(function (/* storage */) {
                     self.operationTable.where("operation").anyOf("create", "update", "delete").toArray(function (offlineOperations) {
                         resolve(offlineOperations);
                     }).catch(function (e) {
-                        console.log(selector.type + ": performOfflineSelectorChanges failed", e);
+                        console.log(query.type + ": performOfflineSelectorChanges failed", e);
                         console.error(e);
                         reject(e);
                     });
@@ -707,8 +984,8 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
     },
 
     performOfflineSelectorChanges: {
-        value: function (selector, rawDataArray, updateOperationArray, offlineObjectsToClear) {
-            var myDB = this._db,
+        value: function (query, rawDataArray, updateOperationArray, offlineObjectsToClear) {
+            var myDB = this._storage,
                 self = this,
                 clonedRawDataArray = rawDataArray.slice(0), // why clone twice?
                 clonedUpdateOperationArray = updateOperationArray.slice(0),
@@ -716,9 +993,9 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
 
             return myDB
             .open()
-            .then(function (db) {
+            .then(function (storage) {
 
-                var table = db[selector.type],
+                var table = storage[query.type],
                     operationTable = self.operationTable;
 
             //Transaction:
@@ -728,7 +1005,7 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
                 //Objects to delete:
                 //      offlineObjectsToClear in table and operationTable
 
-                db.transaction('rw', table, operationTable, function () {
+                storage.transaction('rw', table, operationTable, function () {
 
                         return Dexie.Promise.all(
                             [table.bulkPut(clonedRawDataArray),
@@ -737,9 +1014,9 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
                             operationTable.bulkDelete(clonedOfflineObjectsToClear)]);
 
                 }).then(function(value) {
-                    //console.log(selector.type + ": performOfflineSelectorChanges succesful: "+rawDataArray.length+" rawDataArray, "+clonedUpdateOperationArray.length+" updateOperationArray");
+                    //console.log(query.type + ": performOfflineSelectorChanges succesful: "+rawDataArray.length+" rawDataArray, "+clonedUpdateOperationArray.length+" updateOperationArray");
                 }).catch(function(e) {
-                        console.log(selector.type + ": performOfflineSelectorChanges failed", e);
+                        console.log(query.type + ": performOfflineSelectorChanges failed", e);
                         console.error(e);
                 });
             });
@@ -784,7 +1061,7 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
             var self = this;
 
             return new Promise(function (resolve, reject) {
-                var myDB = self._db,
+                var myDB = self._storage,
                 table = self.tableNamed(type),
                 operationTable = self.operationTable,
                 clonedObjects = [],
@@ -800,8 +1077,8 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
                 primaryKeys = [];
 
 
-                myDB.open().then(function (db) {
-                    db.transaction('rw', table, operationTable,
+                myDB.open().then(function (storage) {
+                    storage.transaction('rw', table, operationTable,
                         function () {
 
                             //Assign primary keys and build operations
@@ -871,7 +1148,7 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
     updatePrimaryKey: {
         value: function (currentPrimaryKey, newPrimaryKey, type) {
 
-            var myDB = this._db,
+            var myDB = this._storage,
             table = this.tableNamed(type),
             primaryKeyProperty = table.schema.primKey.name,
             record,
@@ -912,7 +1189,7 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
             if(!objects || objects.length === 0) return Dexie.Promise.resolve();
 
             return new Promise(function (resolve, reject) {
-                var myDB = self._db,
+                var myDB = self._storage,
                 table = self.tableNamed(type),
                 operationTable = self.operationTable,
                 clonedObjects = objects.slice(0),
@@ -927,8 +1204,8 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
                 operationPropertyName = self.operationPropertyName,
                 operationUpdateName = self.operationUpdateName;
 
-                myDB.open().then(function (db) {
-                    db.transaction('rw', table, operationTable,
+                myDB.open().then(function (storage) {
+                    storage.transaction('rw', table, operationTable,
                         function () {
                             //Make a clone of the array and create the record to track the online Last Updated date
                             for(var i=0, countI = objects.length, iRawData,iPrimaryKey;i<countI;i++) {
@@ -987,7 +1264,7 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
             if(!objects || objects.length === 0) return Dexie.Promise.resolve();
 
             return new Promise(function (resolve, reject) {
-                var myDB = self._db,
+                var myDB = self._storage,
                 table = self.tableNamed(type),
                 operationTable = self.operationTable,
                 clonedObjects = objects.slice(0),
@@ -1001,8 +1278,8 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
                 operationDeleteName = self.operationDeleteName,
                 updateDataPromises = [];
 
-                myDB.open().then(function (db) {
-                    db.transaction('rw', table, operationTable,
+                myDB.open().then(function (storage) {
+                    storage.transaction('rw', table, operationTable,
                         function () {
                             //Make a clone of the array and create the record to track the online Last Updated date
                             for (var i=0, countI = objects.length, iRawData, iOperation, iPrimaryKey; i<countI; i++) {
@@ -1050,13 +1327,13 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
             if(!operations || operations.length === 0) return Promise.resolve();
 
             return new Promise(function (resolve, reject) {
-                var myDB = self._db,
+                var myDB = self._storage,
                 operationTable = self.operationTable,
                 primaryKey = operationTable.schema.primKey.name,
                 deleteOperationPromises = [];
 
-                myDB.open().then(function (db) {
-                    db.transaction('rw', operationTable,
+                myDB.open().then(function (storage) {
+                    storage.transaction('rw', operationTable,
                         function () {
                             //Make a clone of the array and create the record to track the online Last Updated date
                             for(var i=0, countI = operations.length, iOperation;i<countI;i++) {
@@ -1110,8 +1387,8 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
         _offlinePrimaryKeyDB: {
             get: function() {
                 if(!this.__offlinePrimaryKeyDB) {
-                    var db = this.__offlinePrimaryKeyDB = new Dexie("OfflinePrimaryKeys"),
-                        primaryKeysTable = db["PrimaryKeys"];
+                    var storage = this.__offlinePrimaryKeyDB = new Dexie("OfflinePrimaryKeys"),
+                        primaryKeysTable = storage["PrimaryKeys"];
 
                     if(!primaryKeysTable) {
                         /*   PrimaryKeys has offlinePrimaryKey and a property "dependencies" that contains an array of
@@ -1132,7 +1409,7 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
                         var newDbSchema = {
                             PrimaryKeys: "offlinePrimaryKey,dependencies.serviceName, dependencies.tableName, dependencies.primaryKey, dependencies.foreignKeyName"
                         };
-                        db.version(db.verno+1).stores(newDbSchema);
+                        storage.version(storage.verno+1).stores(newDbSchema);
                     }
 
                 }
@@ -1157,7 +1434,7 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
 
         writeOfflinePrimaryKeys: {
             value: function(primaryKeys) {
-                var db = this._offlinePrimaryKeyDB,
+                var storage = this._offlinePrimaryKeyDB,
                     table = this.primaryKeysTable,
                     primaryKeysRecords = [],
                     self = this;
