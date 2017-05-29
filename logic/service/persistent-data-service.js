@@ -1,7 +1,7 @@
 var RawDataService = require("logic/service/raw-data-service").RawDataService,
     DataStream = require("logic/service/data-stream").DataStream,
     DataOperation= require("logic/service/data-operation").DataOperation,
-    Promise = require("bluebird"),
+    Promise = require("montage/core/promise").Promise,
     uuid = require("montage/core/uuid"),
     DataOrdering = require("logic/model/data-ordering").DataOrdering,
     DESCENDING = DataOrdering.DESCENDING,
