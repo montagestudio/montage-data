@@ -2,6 +2,7 @@ var Converter = require("montage/core/converter/converter").Converter,
     Criteria = require("montage/core/criteria").Criteria,
     DataQuery = require("logic/model/data-query").DataQuery,
     Montage = require("montage").Montage,
+    ObjectDescriptorReference = require("montage/core/meta/object-descriptor-reference").ObjectDescriptorReference,
     parse = require("frb/parse"),
     compile = require("frb/compile-evaluator");
 /**
@@ -36,7 +37,7 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
             }
             value = deserializer.getProperty("foreignDescriptor");
             if (value) {
-                this.foreignDescriptor = value;
+                this._foreignDescriptorReference = value;
             }
 
             value = deserializer.getProperty("service");
@@ -95,7 +96,13 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
      * @type {?ObjectDescriptorReference}
      * */
     foreignDescriptor: {
-        value: null
+        serializable: false,
+        get: function () {
+            return this._foreignDescriptorReference && this._foreignDescriptorReference.promise(this.require);
+        },
+        set: function (descriptor) {
+            this._foreignDescriptorReference = new ObjectDescriptorReference().initWithValue(descriptor);
+        }
     },
 
     /**

@@ -440,10 +440,12 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     _mapObjectMappingRules: {
         value: function (rawRules, addOneWayBindings) {
             var rules = this._compiledObjectMappingRules,
-                propertyName, rawRule, rule, sourcePath, targetPath, converter;
+                propertyName, propertyDescriptor,
+                rawRule, rule, sourcePath, targetPath;
             for (propertyName in rawRules) {
                 rawRule = rawRules[propertyName];
                 if (this._shouldMapRule(rawRule, addOneWayBindings)) {
+                    propertyDescriptor = this.objectDescriptor.propertyDescriptorForName(propertyName);
                     targetPath = addOneWayBindings && propertyName || rawRule[TWO_WAY_BINDING];
                     sourcePath = addOneWayBindings ? rawRule[ONE_WAY_BINDING] || rawRule[TWO_WAY_BINDING] : propertyName;
                     rule = this._makeRule(sourcePath);
@@ -561,9 +563,8 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 //rule.converter.foreignDescriptor || propertyDescriptor.valueDescriptor
                 //before resolving the promise to make sure we have the
                 //right one. Need to add testing for this ASAP
-                return propertyDescriptor.valueDescriptor.then(
-                    function (valueDescriptor) {
-                        if(rule.converter) {
+                return propertyDescriptor.valueDescriptor.then(function (valueDescriptor) {
+                        if (rule.converter) {
                             rule.converter.expression = rule.converter.expression || rule.expression;
                             rule.converter.foreignDescriptor = rule.converter.foreignDescriptor || propertyDescriptor.valueDescriptor;
                             rule.converter.service = rule.converter.service || self.service.rootService;
@@ -617,17 +618,18 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         value: function (object, propertyDescriptor, data) {
             var hasData = data && data.length,
                 isToMany = propertyDescriptor.cardinality !== 1,
-                propertyName = propertyDescriptor.name,
-                i, n;
-
-            if (isToMany && Array.isArray(object[propertyName])) {
-                object[propertyName].splice.apply(object[propertyName], [0, Infinity].concat(data));
-            }  else if (isToMany && object[propertyName] instanceof Set) {
-                for (i = 0, n = data.length; i < n; ++i) {
-                    object[propertyName].add(data[i]);
+                propertyName = propertyDescriptor.name;
+            if (propertyName)
+            if (Array.isArray(data)) {
+                if (isToMany && Array.isArray(object[propertyName])) {
+                    object[propertyName].splice.apply(object[propertyName], [0, Infinity].concat(data));
+                } else if (isToMany) {
+                    object[propertyName] = data;
+                } else if (hasData) {
+                    object[propertyName] = data[0];
                 }
-            } else if (hasData) {
-                object[propertyName] = data[0];
+            } else {
+                object[propertyName] = data;
             }
         }
 
