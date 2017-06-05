@@ -3,6 +3,7 @@ var Converter = require("montage/core/converter/converter").Converter,
     DataQuery = require("logic/model/data-query").DataQuery,
     Montage = require("montage").Montage,
     ObjectDescriptorReference = require("montage/core/meta/object-descriptor-reference").ObjectDescriptorReference,
+    Promise = require("montage/core/promise").Promise,
     parse = require("frb/parse"),
     compile = require("frb/compile-evaluator");
 /**
@@ -25,16 +26,16 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
     deserializeSelf: {
         value: function (deserializer) {
             var value = deserializer.getProperty("foreignProperty");
-            if(!value) {
-                value = deserializer.getProperty("convertExpression")
+            if (value) {
+                this.foreignProperty = value;
+            } else {
+                value = deserializer.getProperty("convertExpression");
             }
+
             if (value) {
                 this.convertExpression = value;
             }
-            value = deserializer.getProperty("cardinality");
-            if (value) {
-                this.cardinality = value;
-            }
+
             value = deserializer.getProperty("foreignDescriptor");
             if (value) {
                 this._foreignDescriptorReference = value;
@@ -45,10 +46,17 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
                 this.service = value;
             }
 
+            value = deserializer.getObjectByLabel("root");
+            if (value) {
+                this.owner = value;
+            }
+
             value = deserializer.getProperty("serviceIdentifier");
             if (value) {
                 this.serviceIdentifier = value;
             }
+
+            deserializer.deserializeUnit("bindings");
         }
     },
 
@@ -81,13 +89,6 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
         value: null
     },
 
-    /**
-     * The cardinality defines if this is a to one or to many relationship
-     * @type {number}
-     * */
-    cardinality: {
-        value: null
-    },
 
     /**
      * The descriptor of the destination object.  If one is not provided
@@ -142,7 +143,9 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
      */
     service: {
         get: function () {
-            return this._service;
+            return  this._service                    ? this._service :
+                    this.owner && this.owner.service ? this.owner.service.rootService :
+                    undefined;
         },
         set: function (value) {
             this._service = value;
@@ -167,14 +170,16 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
                 //We shouldn't have to go back to a module-id string since we have the objectDescriptor
                 var type = [objectDescriptor.module.id, objectDescriptor.name].join("/"),
                     //dataExpression = self.foreignProperty,
-                    parameters,
                     criteria;
 
                 criteria = new Criteria().initWithSyntax(self.convertSyntax, v);
                 if (self.serviceIdentifier) {
                     criteria.parameters.serviceIdentifier = self.serviceIdentifier
                 }
-                return self.service.fetchData(DataQuery.withTypeAndCriteria(type, criteria));
+
+
+                return self.service ? self.service.fetchData(DataQuery.withTypeAndCriteria(type, criteria)) :
+                                      Promise.resolve(null);
             });
         }
     },

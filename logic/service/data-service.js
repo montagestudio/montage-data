@@ -1233,9 +1233,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                     //Otherwise we're going to use model, property descriptor, mappings
                     //to make it happen.
                     else {
-                        if (Montage.getInfoForObject(object).moduleId.endsWith("hazard") && propertyName === "timeZone") {
-                            console.log("PropertyName", propertyName);
-                        }
                         var propertyDescriptor = this._propertyDescriptorForObjectAndName(object, propertyName);
                         return propertyDescriptor ?   this._fetchObjectPropertyWithPropertyDescriptor(object, propertyName, propertyDescriptor) :
                                                         this.nullPromise;

@@ -4,16 +4,51 @@ var DataMapping = require("./data-mapping").DataMapping,
     compile = require("frb/compile-evaluator"),
     ObjectDescriptorReference = require("montage/core/meta/object-descriptor-reference").ObjectDescriptorReference,
     parse = require("frb/parse"),
+    Montage = require("montage").Montage,
     Promise = require("montage/core/promise").Promise,
     Scope = require("frb/scope"),
     Set = require("collections/set");
 
 
-var Montage = require("montage").Montage;
-
 
 var ONE_WAY_BINDING = "<-";
 var TWO_WAY_BINDING = "<->";
+
+var MappingRule = Montage.specialize({
+
+    converter: {
+        value: undefined
+    },
+
+    expression: {
+        value: undefined
+    },
+
+    inversePropertyName: {
+        value: undefined
+    },
+
+    isReverter: {
+        value: undefined
+    },
+
+    propertyDescriptor: {
+        value: undefined
+    },
+
+    requirements: {
+        value: undefined
+    },
+
+    serviceIdentifier: {
+        value: undefined
+    },
+
+    targetPath: {
+        value: undefined
+    }
+});
+
 
 /**
  * Maps raw data to data objects, using FRB expressions, of a specific type.
@@ -62,6 +97,9 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
             }
         }
     },
+
+
+
 
     /**
      * @param   {ObjectDescriptor}
@@ -280,13 +318,11 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         value: function (data, object) {
             var requisitePropertyNames = this.requisitePropertyNames,
                 iterator = requisitePropertyNames.values(),
-                rules = requisitePropertyNames.length && this._compiledObjectMappingRules || [],
-                iPromise,
-                promises, rule, propertyName, propertyDescriptor;
+                promise, promises, propertyName;
 
             while (propertyName = iterator.next().value) {
-                iPromise = this.mapRawDataToObjectProperty(data, object, propertyName);
-                (promises || []).push(iPromise);
+                promise = this.mapRawDataToObjectProperty(data, object, propertyName);
+                (promises || []).push(promise);
             }
             return promises && promises.length && Promise.all(promises) || Promise.resolve(null);
         }
@@ -313,24 +349,14 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
             var rules = this._compiledRawDataMappingRules,
                 rule = this._compiledObjectMappingRules[propertyName],
                 requiredRawProperties = rule ? rule.requirements : [],
-                requiredObjectProperties = [],
-                promises = [];
+                rawRequirementsToMap = new Set(requiredRawProperties),
+                promises = [], key;
 
-            requiredRawProperties.forEach(function (propertyName) {
-                var rawRule = rules[propertyName];
-                if (rawRule) {
-                    requiredObjectProperties.push.apply(requiredObjectProperties, rawRule.requirements);
-                }
-            });
 
-            if (!rule) {
-                console.log("No Rule For:", propertyName);
-            }
 
-            var rawRequirementsToMap = new Set(requiredRawProperties);
-            for (var key in rules) {
+
+            for (key in rules) {
                 if (rules.hasOwnProperty(key) && rawRequirementsToMap.has(key)) {
-
                     promises.push(this._getAndMapObjectProperty(object, data, key, propertyName));
                 }
             }
@@ -381,7 +407,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
             if (propertyDescriptor && propertyDescriptor.valueDescriptor && rule.converter) {
                 rule.converter.expression = rule.converter.expression || rule.expression;
                 rule.converter.foreignDescriptor = rule.converter.foreignDescriptor || propertyDescriptor.valueDescriptor;
-                rule.converter.service = rule.converter.service || this.service.rootService;
+                // rule.converter.service = rule.converter.service || this.service.rootService;
                 promise = this._convertRelationshipToRawData(object, propertyDescriptor, rule, scope);
             } else /*if (propertyDescriptor)*/ { //relaxing this for now
                 promise = Promise.resolve(this._parse(rule, scope));
@@ -440,20 +466,13 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     _mapObjectMappingRules: {
         value: function (rawRules, addOneWayBindings) {
             var rules = this._compiledObjectMappingRules,
-                propertyName, propertyDescriptor,
-                rawRule, rule, sourcePath, targetPath;
+                propertyName, rawRule, rule;
+
             for (propertyName in rawRules) {
                 rawRule = rawRules[propertyName];
                 if (this._shouldMapRule(rawRule, addOneWayBindings)) {
-                    propertyDescriptor = this.objectDescriptor.propertyDescriptorForName(propertyName);
-                    targetPath = addOneWayBindings && propertyName || rawRule[TWO_WAY_BINDING];
-                    sourcePath = addOneWayBindings ? rawRule[ONE_WAY_BINDING] || rawRule[TWO_WAY_BINDING] : propertyName;
-                    rule = this._makeRule(sourcePath);
-                    rule.requirements = this._parseRequirementsFromParsedExpression(rule.parsed);
-                    rule.serviceIdentifier = rawRule.serviceIdentifier;
-                    rule.converter = rawRule.converter || this._defaultConverter(sourcePath, targetPath, true);
-                    rule.isReverter = rawRule.converter && !addOneWayBindings;
-                    rules[targetPath] = rule;
+                    rule = this._makeRuleFromRawRule(rawRule, propertyName, addOneWayBindings);
+                    rules[rule.targetPath] = rule;
                 }
             }
         }
@@ -462,64 +481,39 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     _mapRawDataMappingRules: {
         value: function (rawRules, addOneWayBindings) {
             var rules = this._compiledRawDataMappingRules,
-                propertyName, propertyDescriptorName, propertyDescriptor,
-                rawRule, rule, targetPath, sourcePath;
+                propertyName, rawRule, rule;
             for (propertyName in rawRules) {
                 rawRule = rawRules[propertyName];
                 if (this._shouldMapRule(rawRule, addOneWayBindings)) {
-                    propertyDescriptorName = addOneWayBindings ? rawRule[ONE_WAY_BINDING] || rawRule[TWO_WAY_BINDING] :
-                        propertyName;
-                    propertyDescriptor = this.objectDescriptor.propertyDescriptorForName(propertyDescriptorName);
-                    targetPath = addOneWayBindings && propertyName || rawRule[TWO_WAY_BINDING];
-                    sourcePath = addOneWayBindings ? rawRule[ONE_WAY_BINDING] || rawRule[TWO_WAY_BINDING] : propertyName;
-                    rule = this._makeRule(sourcePath);
-                    rule.requirements = this._parseRequirementsFromParsedExpression(rule.parsed);
-                    rule.converter = rawRule.converter || this._defaultConverter(sourcePath, targetPath);
-                    rule.isReverter = rawRule.converter && !addOneWayBindings;
-                    rule.propertyDescriptor = propertyDescriptor;
-                    rules[targetPath] = rule;
+                    rule = this._makeRuleFromRawRule(rawRule, propertyName, addOneWayBindings);
+                    rules[rule.targetPath] = rule;
                 }
             }
         }
     },
 
-    _makeRule: {
-        value: function (sourcePath) {
-            var compiled = this._compileRuleExpression(sourcePath);
-            return {
-                expression: compiled.expression,
-                parsed: compiled.parsed
-            }
+    _makeRuleFromRawRule: {
+        value: function (rawRule, propertyName, addOneWayBindings) {
+            var propertyDescriptorName = addOneWayBindings ? rawRule[ONE_WAY_BINDING] || rawRule[TWO_WAY_BINDING] : propertyName,
+                propertyDescriptor = this.objectDescriptor.propertyDescriptorForName(propertyDescriptorName),
+                sourcePath = addOneWayBindings ? rawRule[ONE_WAY_BINDING] || rawRule[TWO_WAY_BINDING] : propertyName,
+                targetPath = addOneWayBindings && propertyName || rawRule[TWO_WAY_BINDING],
+                compiled = this._compileRuleExpression(sourcePath),
+                rule = new MappingRule();
+
+            rule.converter = rawRule.converter || this._defaultConverter(sourcePath, targetPath);
+            rule.expression = compiled.expression;
+            rule.inversePropertyName = rawRule.inversePropertyName;
+            rule.isReverter = rawRule.converter && !addOneWayBindings;
+            rule.propertyDescriptor = propertyDescriptor;
+            rule.requirements = this._parseRequirementsFromParsedExpression(compiled.parsed);
+            rule.serviceIdentifier = rawRule.serviceIdentifier;
+            rule.targetPath = targetPath;
+
+            return rule;
         }
     },
 
-    // _mapRule: {
-    //     value: function (rawRule) {
-    //         var sourcePath = rawRule[ONE_WAY_BINDING] || rawRule[TWO_WAY_BINDING];
-    //         return {
-    //             converter: rawRule.converter,
-    //             expression: this._compileRuleExpression(sourcePath)
-    //         };
-    //     }
-    // },
-    //
-    // _mapReverseRule: {
-    //     value: function (rawRule) {
-    //         var sourcePath = rawRule[TWO_WAY_BINDING];
-    //         return {
-    //             converter: rawRule.converter,
-    //             expression: this._compileRuleExpression(sourcePath)
-    //         };
-    //     }
-    // },
-
-    // _convertRelationshipToRawData: {
-    //     value: function (object, propertyDescriptor, rule) {
-    //         return this._resolveRelationshipIfNecessary(object, propertyDescriptor).then(function (destination) {
-    //             return rule.converter.revert(new Scope(destination));
-    //         });
-    //     }
-    // },
     _convertRelationshipToRawData: {
         value: function (object, propertyDescriptor, rule, scope) {
             if (!rule.converter.revert) {
@@ -533,6 +527,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     __scope: {
         value: null
     },
+
     _scope: {
         get: function() {
             return this.__scope || new Scope();
@@ -540,45 +535,36 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     },
 
     mapRawDataToObjectProperty: {
-        value: function(data, object, propertyName) {
+        value: function (data, object, propertyName) {
             //We should probably shift rules to be a Map rather than an anonymous object.
             var rules = this._compiledObjectMappingRules,
                 rule = rules.hasOwnProperty(propertyName) && rules[propertyName],
                 propertyDescriptor = rule && this.objectDescriptor.propertyDescriptorForName(propertyName),
+                isRelationship = !!(propertyDescriptor && propertyDescriptor.valueDescriptor),
                 scope = this._scope,
-                self = this;
+                self = this,
+                result;
 
-                scope.value = data;
-                if (!propertyDescriptor) {
-                    console.warn("---------------------------------------------------");
-                    console.warn("Did not map property with name (", propertyName, ")");
-                    console.warn("Property not defined on this object descriptor (", this.objectDescriptor, ")");
-                    console.warn("---------------------------------------------------");
-                    //Shall we return Promise.fail() instead?
-                    return Promise.resolve();
-                } else if (propertyDescriptor.isDerived) {
-                    return Promise.resolve();
-                } else if (propertyDescriptor.valueDescriptor) {
-                //We may need to test for
-                //rule.converter.foreignDescriptor || propertyDescriptor.valueDescriptor
-                //before resolving the promise to make sure we have the
-                //right one. Need to add testing for this ASAP
-                return propertyDescriptor.valueDescriptor.then(function (valueDescriptor) {
-                        if (rule.converter) {
-                            rule.converter.expression = rule.converter.expression || rule.expression;
-                            rule.converter.foreignDescriptor = rule.converter.foreignDescriptor || propertyDescriptor.valueDescriptor;
-                            rule.converter.service = rule.converter.service || self.service.rootService;
-                        }
-                        return self._resolveRelationship(object, propertyDescriptor, rule, scope);
-                    }
-                );
+            scope.value = data;
+            if (!propertyDescriptor || propertyDescriptor.isDerived) {
+                result = Promise.resolve();
             } else {
-                if (rule.converter) {
-                    rule.converter.propertyName = propertyName;
-                    rule.converter.service = rule.converter.service || this.service.rootService;
-                    rule.converter.objectDescriptor = this.objectDescriptor;
-                }
-                return self._resolvePrimitive(object, propertyDescriptor, rule, scope);
+                self._prepareConverterForRule(rule.converter, rule, propertyDescriptor);
+                result = isRelationship ? self._resolveRelationship(object, propertyDescriptor, rule, scope) :
+                                          self._resolvePrimitive(object, propertyDescriptor, rule, scope);
+            }
+            return result;
+        }
+    },
+
+
+    _prepareConverterForRule: {
+        value: function (converter, rule, propertyDescriptor) {
+            if (converter) {
+                converter.expression = converter.expression || rule.expression;
+                converter.propertyName = propertyDescriptor.name;
+                converter.foreignDescriptor = converter.foreignDescriptor || propertyDescriptor.valueDescriptor;
+                converter.objectDescriptor = this.objectDescriptor;
             }
         }
     },
@@ -619,7 +605,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
             var hasData = data && data.length,
                 isToMany = propertyDescriptor.cardinality !== 1,
                 propertyName = propertyDescriptor.name;
-            if (propertyName)
+
             if (Array.isArray(data)) {
                 if (isToMany && Array.isArray(object[propertyName])) {
                     object[propertyName].splice.apply(object[propertyName], [0, Infinity].concat(data));
@@ -632,7 +618,21 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 object[propertyName] = data;
             }
         }
+    },
 
+    _assignObjectToDataInverseProperty: {
+        value: function (object, propertyDescriptor, data, inversePropertyName) {
+            var self = this;
+            return propertyDescriptor.valueDescriptor.then(function (valueDescriptor) {
+                var inversePropertyDescriptor = valueDescriptor.propertyDescriptorForName(inversePropertyName);
+                if (inversePropertyDescriptor.cardinality === 1) {
+                    data.forEach(function (item) {
+                        item[inversePropertyName] = object;
+                    });
+                }
+                return null;
+            });
+        }
     },
 
     _resolveRelationship: {
@@ -640,17 +640,10 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
             var self = this;
             return rule.converter.convert(rule.expression(scope)).then(function (data) {
                 self._assignDataToObjectProperty(object, propertyDescriptor, data);
-                return null;
-            });
-        }
-    },
+                return rule.inversePropertyName ? self._assignObjectToDataInverseProperty(object, propertyDescriptor, data, rule.inversePropertyName) :
+                                                  null;
 
-    _resolveRelationshipIfNecessary: {
-        value: function (object, propertyDescriptor) {
-            var wasPropertyFetched = this._requisitePropertyNames.has(propertyDescriptor.name);
-            return wasPropertyFetched
-                ? Promise.resolve(object[propertyDescriptor.name])
-                : object[propertyDescriptor.name]; // should be data trigger.
+            });
         }
     },
 

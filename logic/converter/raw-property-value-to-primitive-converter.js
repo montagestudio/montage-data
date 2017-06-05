@@ -2,6 +2,7 @@ var Converter = require("montage/core/converter/converter").Converter,
     Criteria = require("montage/core/criteria").Criteria,
     DataQuery = require("logic/model/data-query").DataQuery,
     parse = require("frb/parse"),
+    Promise = require("montage/core/promise").Promise,
     compile = require("frb/compile-evaluator");
 /**
  * @class RawPropertyValueToPrimitiveConverter
@@ -41,6 +42,11 @@ exports.RawPropertyValueToPrimitiveConverter = Converter.specialize( /** @lends 
             value = deserializer.getProperty("service");
             if (value) {
                 this.service = value;
+            }
+
+            value = deserializer.getObjectByLabel("root");
+            if (value) {
+                this.owner = value;
             }
 
             value = deserializer.getProperty("serviceIdentifier");
@@ -105,6 +111,20 @@ exports.RawPropertyValueToPrimitiveConverter = Converter.specialize( /** @lends 
         value: null
     },
 
+    /**
+     * The service to use to make requests.
+     */
+    objectDescriptor: {
+        get: function () {
+            return  this._objectDescriptor                    ? this._objectDescriptor :
+                    this.owner && this.owner.objectDescriptor ? this.owner.objectDescriptor  :
+                                                                undefined;
+        },
+        set: function (value) {
+            this._objectDescriptor = value;
+        }
+    },
+
     _convertSyntax: {
         value: undefined
     },
@@ -133,7 +153,14 @@ exports.RawPropertyValueToPrimitiveConverter = Converter.specialize( /** @lends 
      * The service to use to make requests.
      */
     service: {
-        value: undefined
+        get: function () {
+            return  this._service                   ? this._service :
+                    this.owner && this.owner.service ? this.owner.service.rootService :
+                                                        undefined;
+        },
+        set: function (value) {
+            this._service = value;
+        }
     },
 
     /*********************************************************************
@@ -157,7 +184,9 @@ exports.RawPropertyValueToPrimitiveConverter = Converter.specialize( /** @lends 
                 criteria.parameters.serviceIdentifier = self.serviceIdentifier
             }
 
-            return this.service.fetchData(DataQuery.withTypeAndCriteria(this.objectDescriptor, criteria));
+
+            return self.service ? self.service.fetchData(DataQuery.withTypeAndCriteria(self.objectDescriptor, criteria)) :
+                                  Promise.resolve(null);
         }
     },
 
