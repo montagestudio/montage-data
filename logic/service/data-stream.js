@@ -3,7 +3,10 @@ var DataProvider = require("logic/service/data-provider").DataProvider,
     DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
     DataQuery = require("logic/model/data-query").DataQuery,
     Promise = require("montage/core/promise").Promise,
-    deprecate = require("montage/core/deprecate");
+    deprecate = require("montage/core/deprecate"),
+    parse = require("frb/parse"),
+    Scope = require("frb/scope"),
+    compile = require("frb/compile-evaluator");
 
 /**
  * A [DataProvider]{@link DataProvider} whose data is received sequentially.
@@ -232,16 +235,17 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */ 
      */
     addData: {
         value: function (objects) {
-            if(objects) {
-                if(Array.isArray(objects)) {
-                    if (objects.length) {
-                        this.data.push.apply(this.data, objects);
-                    }
-                }
-                else {
-                    this.data.push(objects);
-                }
-           }
+            var data = objects;
+
+            if (this.dataExpression && objects) {
+                data = this._compiledDataExpression(new Scope(objects));
+            }
+
+            if (data && Array.isArray(data)) {
+                this.data.push.apply(this.data, data);
+            } else if (data) {
+                this.data.push(data);
+            }
         }
     },
 
@@ -282,6 +286,28 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */ 
             this._reject(reason);
             delete this._reject;
             delete this._resolve;
+        }
+    },
+
+    _compiledDataExpression: {
+        get: function () {
+            return this.__compiledDataExpression || (this.__compiledDataExpression = compile(this._dataExpressionSyntax));
+        }
+    },
+
+    _dataExpressionSyntax: {
+        get: function () {
+            return this.__dataExpressionSyntax || (this.__dataExpressionSyntax = parse(this.dataExpression));
+        }
+    },
+
+    dataExpression: {
+        value: undefined
+    },
+
+    evaluateDataExpression: {
+        value: function(value) {
+            return this._compiledDataExpression(value);
         }
     },
 
@@ -331,6 +357,6 @@ exports.DataStream = DataProvider.specialize(/** @lends DataStream.prototype */ 
             stream.query = selector;
             return stream;
         }
-    },
+    }
 
 });

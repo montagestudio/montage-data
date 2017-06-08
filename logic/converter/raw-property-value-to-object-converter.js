@@ -1,24 +1,18 @@
 var Converter = require("montage/core/converter/converter").Converter,
     Criteria = require("montage/core/criteria").Criteria,
     DataQuery = require("logic/model/data-query").DataQuery,
-    DataService = require("logic/service/data-service").DataService,
-    Montage = require("montage").Montage,
     ObjectDescriptorReference = require("montage/core/meta/object-descriptor-reference").ObjectDescriptorReference,
     Promise = require("montage/core/promise").Promise,
     parse = require("frb/parse"),
-    compile = require("frb/compile-evaluator"),
-    RawPropertyValueConverter = require("logic/converter/raw-property-value-converter").RawPropertyValueConverter;
-;
+    compile = require("frb/compile-evaluator");
+
 /**
  * @class RawPropertyValueToObjectConverter
  * @classdesc Converts a property value of raw data to the referenced object.
  * @extends Converter
  */
-exports.RawPropertyValueToObjectConverter = RawPropertyValueConverter.specialize( /** @lends RawPropertyValueToObjectConverter# */ {
+exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends RawPropertyValueToObjectConverter# */ {
 
-    _revertExpression: {
-        value: "service.dataIdentifierForObject($).primaryKey"
-    },
 
     /*********************************************************************
      * Serialization
@@ -26,29 +20,64 @@ exports.RawPropertyValueToObjectConverter = RawPropertyValueConverter.specialize
 
     serializeSelf: {
         value: function (serializer) {
-            this.super(serializer);
-           // TODO: Implement
+
+            serializer.setProperty("convertDataExpression", this.convertDataExpression);
+            serializer.setProperty("convertExpression", this.convertExpression);
+
+            serializer.setProperty("foreignDescriptor", this._foreignDescriptorReference);
+
+            serializer.setProperty("revertDataExpression", this.revertDataExpression);
+            serializer.setProperty("revertExpression", this.revertExpression);
+
+            serializer.setProperty("root", this.owner);
+
+            serializer.setProperty("serviceIdentifier", this.serviceIdentifier);
+            serializer.setProperty("service", this.service);
+
         }
     },
 
     deserializeSelf: {
         value: function (deserializer) {
-            this.super(deserializer);
-
-            var value = deserializer.getProperty("foreignProperty");
-            if (value) {
-                this.foreignProperty = value;
-            } else {
-                value = deserializer.getProperty("convertExpression");
-            }
-
+            var value = deserializer.getProperty("convertExpression");
             if (value) {
                 this.convertExpression = value;
+            }
+
+            value = deserializer.getProperty("convertDataExpression");
+            if (value) {
+                this.convertDataExpression = value;
+            }
+
+
+            value = deserializer.getProperty("revertExpression");
+            if (value) {
+                this.revertExpression = value;
+            }
+
+            value = deserializer.getProperty("revertDataExpression");
+            if (value) {
+                this.revertDataExpression = value;
             }
 
             value = deserializer.getProperty("foreignDescriptor");
             if (value) {
                 this._foreignDescriptorReference = value;
+            }
+
+            value = deserializer.getProperty("service");
+            if (value) {
+                this.service = value;
+            }
+
+            value = deserializer.getObjectByLabel("root");
+            if (value) {
+                this.owner = value;
+            }
+
+            value = deserializer.getProperty("serviceIdentifier");
+            if (value) {
+                this.serviceIdentifier = value;
             }
 
             deserializer.deserializeUnit("bindings");
@@ -77,6 +106,92 @@ exports.RawPropertyValueToObjectConverter = RawPropertyValueConverter.specialize
      */
 
     /**
+     * The expression used to convert a raw value into a modeled one, for example a foreign property value into the objet it represents.
+     * @type {string}
+     * */
+    _convertExpression: {
+        value: null
+    },
+    convertExpression: {
+        get: function() {
+            return this._convertExpression;
+        },
+        set: function(value) {
+            if(value !== this._convertExpression) {
+                this._convertExpression = value;
+                //Reset parsed & compiled version:
+                this._convertSyntax = undefined;
+                this.__compiledConvertExpression = undefined;
+            }
+        }
+    },
+
+    _convertSyntax: {
+        value: undefined
+    },
+
+    convertSyntax: {
+        get: function() {
+            return this._convertSyntax || (this._convertSyntax = parse(this.convertExpression));
+        }
+    },
+
+
+    __compiledConvertExpression: {
+        value: undefined
+    },
+    _compiledConvertExpression: {
+        get: function() {
+            return this.__compiledConvertExpression || (this.__compiledConvertExpression = compile(this.convertSyntax));
+        }
+    },
+
+    /**
+     * The expression used to convert a modeled value, like a modeled object, back into the raw value used to represent it into another object, like for example a foreign property value.
+     * @type {string}
+     * */
+    _revertExpression: {
+        value: "service.dataIdentifierForObject($).primaryKey"
+    },
+    revertExpression: {
+        get: function() {
+            return this._revertExpression;
+        },
+        set: function(value) {
+            if(value !== this._revertExpression) {
+                this._revertExpression = value;
+                //Reset parswd & compiled version:
+                this._revertSyntax = undefined;
+                this.__compiledRevertExpression = undefined;
+            }
+        }
+    },
+
+    _revertSyntax: {
+        value: undefined
+    },
+    revertSyntax: {
+        get: function() {
+            return this._revertSyntax || (this._revertSyntax = parse(this.revertExpression));
+        }
+    },
+
+    __compiledRevertExpression: {
+        value: undefined
+    },
+    _compiledRevertExpression: {
+        get: function() {
+            return this.__compiledRevertExpression || (this.__compiledRevertExpression = compile(this.revertSyntax));
+        }
+    },
+
+    evaluateRevertExpression: {
+        value: function(value) {
+            return this._compiledRevertExpression(value);
+        }
+    },
+
+    /**
      * The descriptor of the destination object.  If one is not provided
      * the value descriptor of the property descriptor that defines the
      * relationship will be used.
@@ -92,12 +207,38 @@ exports.RawPropertyValueToObjectConverter = RawPropertyValueConverter.specialize
         }
     },
 
+
+    objectDescriptor: {
+        get: function () {
+            return  this._objectDescriptor                    ? this._objectDescriptor :
+                    this.owner && this.owner.objectDescriptor ? this.owner.objectDescriptor  :
+                    undefined;
+        },
+        set: function (value) {
+            this._objectDescriptor = value;
+        }
+    },
+
+
     /**
-     * The property name on the destination object.
-     * @type {string}
+     * The service to use to make requests.
      */
-    foreignProperty: {
-        value: null
+    service: {
+        get: function () {
+            return  this._service                    ? this._service :
+                    this.owner && this.owner.service ? this.owner.service.rootService :
+                    undefined;
+        },
+        set: function (value) {
+            this._service = value;
+        }
+    },
+
+    /**
+     * Identifier of the child of service to route the request to
+     */
+    serviceIdentifier: {
+        value: undefined
     },
 
     /*********************************************************************
@@ -113,21 +254,29 @@ exports.RawPropertyValueToObjectConverter = RawPropertyValueConverter.specialize
      */
     convert: {
         value: function (v) {
-            var self = this;
-            return this.foreignDescriptor.then(function (objectDescriptor) {
-                //We shouldn't have to go back to a module-id string since we have the objectDescriptor
-                var type = [objectDescriptor.module.id, objectDescriptor.name].join("/"),
-                    //dataExpression = self.foreignProperty,
-                    criteria;
+            var self = this,
+                criteria = new Criteria().initWithSyntax(self.convertSyntax, v),
+                descriptorPromise = this.foreignDescriptor || Promise.resolve(this.objectDescriptor),
+                query;
 
-                criteria = new Criteria().initWithSyntax(self.convertSyntax, v);
+
+            return descriptorPromise.then(function (typeToFetch) {
+                var type = [typeToFetch.module.id, typeToFetch.name].join("/");
+
                 if (self.serviceIdentifier) {
                     criteria.parameters.serviceIdentifier = self.serviceIdentifier
                 }
 
+                query = DataQuery.withTypeAndCriteria(type, criteria);
 
-                return self.service ? self.service.fetchData(DataQuery.withTypeAndCriteria(type, criteria)) :
-                                      Promise.resolve(null);
+                if (self.convertDataExpression) {
+                    query.selectExpression = self.convertDataExpression;
+                } else if (self.propertyName) {
+                    criteria.parameters.propertyName = self.propertyName;
+                }
+
+                return self.service ? self.service.fetchData(query) :
+                                      null;
             });
         }
     },

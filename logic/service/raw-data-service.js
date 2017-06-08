@@ -400,11 +400,13 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     _fetchRawData: {
         value: function (stream) {
             var self = this,
-                childService = this._getChildServiceForQuery(stream.query);
+                childService = this._childServiceForQuery(stream.query);
+
 
             if (childService && childService.identifier.indexOf("offline-service") === -1) {
                 childService._fetchRawData(stream);
             } else {
+
                 this.authorizationPromise.then(function (authorization) {
                     var streamSelector = stream.query;
                     stream.query = self.mapSelectorToRawDataQuery(streamSelector);
@@ -688,7 +690,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         value:function(type, rawData, context) {
                 var dataIdentifier = this.dataIdentifierForTypeRawData(type,rawData);
                 //Record snapshot before we may create an object
-                this.recordSnapshot(dataIdentifier,rawData);
+                this.recordSnapshot(dataIdentifier, rawData);
                //iDataIdentifier argument should be all we need later on
                 return this.getDataObject(type, rawData, context, dataIdentifier);
         }

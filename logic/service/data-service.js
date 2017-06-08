@@ -1706,6 +1706,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             // Set up the stream.
             stream = stream || new DataStream();
             stream.query = query;
+            stream.dataExpression = query.selectExpression;
+
 
 
             this._dataServiceByDataStream.set(stream, this._childServiceRegistrationPromise.then(function() {
@@ -1726,7 +1728,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                             stream = service.fetchData(query, stream) || stream;
                             self._dataServiceByDataStream.set(stream, service);
                         } else {
-                            throw new Error("Can't fetch data of unknown type - " + query.type.typeName + "/" + query.type.uuid);
+                            debugger;
+                            throw new Error("Can't fetch data of unknown type - " + (query.type.typeName || query.type.name) + "/" + query.type.uuid);
                         }
                     } catch (e) {
                         stream.dataError(e);
@@ -1743,7 +1746,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     _fetchRawData: {
         value: function (stream) {
             var self = this,
-                childService = this._getChildServiceForQuery(stream.query);
+                childService = this._childServiceForQuery(stream.query);
 
             if (childService) {
 
@@ -1759,16 +1762,10 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
-    _getChildServiceForQuery: {
+    _childServiceForQuery: {
         value: function (query) {
-            var propertyName = this._propertyNameForQuery(query),
-                mapping, service, serviceModuleID;
-
-            if (propertyName) {
-                mapping = this.mappingWithType(query.type);
-                serviceModuleID = mapping && mapping.serviceIdentifierForProperty(propertyName);
+            var serviceModuleID = this._serviceIdentifierForQuery(query),
                 service = serviceModuleID && this._childServicesByIdentifier.get(serviceModuleID);
-            }
 
             if (!service) {
                 service = this.childServiceForType(query.type);
@@ -1778,10 +1775,19 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         }
     },
 
-    _propertyNameForQuery: {
+    _serviceIdentifierForQuery: {
         value: function (query) {
-            var parameters = query.criteria.parameters;
-            return parameters && parameters.propertyName;
+            var parameters = query.criteria.parameters,
+                serviceModuleID = parameters && parameters.serviceIdentifier,
+                mapping, propertyName;
+
+            if (!serviceModuleID) {
+                mapping = this.mappingWithType(query.type);
+                propertyName = mapping && parameters && parameters.propertyName;
+                serviceModuleID = propertyName && mapping.serviceIdentifierForProperty(propertyName);
+            }
+
+            return serviceModuleID;
         }
     },
 

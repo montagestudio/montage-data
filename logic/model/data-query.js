@@ -121,6 +121,10 @@ exports.DataQuery = Montage.specialize(/** @lends DataQuery.prototype */ {
         value: undefined
     },
 
+    selectExpression: {
+        value: undefined
+    },
+
 
     /**
      * An object defining a list of expressions to resolve at the same time as the query.
@@ -140,7 +144,7 @@ exports.DataQuery = Montage.specialize(/** @lends DataQuery.prototype */ {
      */
     withTypeAndCriteria: {
         value: function (type, criteria) {
-            var query, key;
+            var query;
             query = new this();
             query.type = type;
             query.criteria = criteria;

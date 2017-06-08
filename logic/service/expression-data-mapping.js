@@ -1,5 +1,4 @@
 var DataMapping = require("./data-mapping").DataMapping,
-    DataStream = require("logic/service/data-stream").DataStream,
     assign = require("frb/assign"),
     compile = require("frb/compile-evaluator"),
     ObjectDescriptorReference = require("montage/core/meta/object-descriptor-reference").ObjectDescriptorReference,
@@ -380,7 +379,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     },
 
     _getAndMapObjectProperty: {
-        value: function (object, data, propertyName, trigger) {
+        value: function (object, data, propertyName) {
             var self = this,
                 rules = this._compiledRawDataMappingRules,
                 rule = rules[propertyName],
@@ -430,8 +429,6 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
             return rule && rule.serviceIdentifier;
         }
     },
-
-
 
     _compiledObjectMappingRules: {
         get: function () {
@@ -556,7 +553,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 result;
 
             scope.value = data;
-            if (!propertyDescriptor || propertyDescriptor.isDerived) {
+            if (!propertyDescriptor || propertyDescriptor.definition) {
                 result = Promise.resolve();
             } else {
                 self._prepareConverterForRule(rule.converter, rule, propertyDescriptor);
@@ -572,9 +569,13 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         value: function (converter, rule, propertyDescriptor) {
             if (converter) {
                 converter.expression = converter.expression || rule.expression;
-                converter.propertyName = propertyDescriptor.name;
-                converter.foreignDescriptor = converter.foreignDescriptor || propertyDescriptor.valueDescriptor;
+                if (!propertyDescriptor.valueDescriptor) {
+                    converter.propertyName = propertyDescriptor.name;
+                } else if (!converter.foreignDescriptor) {
+                    converter.foreignDescriptor = propertyDescriptor.valueDescriptor;
+                }
                 converter.objectDescriptor = this.objectDescriptor;
+                converter.serviceIdentifier = rule.serviceIdentifier;
             }
         }
     },
@@ -597,7 +598,7 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 self = this;
 
             return new Promise(function (resolve, reject) {
-                if (value instanceof DataStream) {
+                if (self._isThenable(value)) {
                     value.then(function (data) {
                         self._assignDataToObjectProperty(object, propertyDescriptor, data);
                         resolve(null)
@@ -607,6 +608,12 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                     resolve(null);
                 }
             });
+        }
+    },
+
+    _isThenable: {
+        value: function (object) {
+            return object && object.then && typeof object.then === "function";
         }
     },
 
@@ -632,7 +639,6 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
 
     _assignObjectToDataInverseProperty: {
         value: function (object, propertyDescriptor, data, inversePropertyName) {
-            var self = this;
             return propertyDescriptor.valueDescriptor.then(function (valueDescriptor) {
                 var inversePropertyDescriptor = valueDescriptor.propertyDescriptorForName(inversePropertyName);
                 if (inversePropertyDescriptor.cardinality === 1) {
