@@ -23,7 +23,7 @@
         "montage-data": "../"
     },
     "dependencies": {
-        "montage": "~16.0.x"
+        "montage": "~16.0.x",
         "moment-timezone": "~0.5.x"
     },
     "private": true
