@@ -1,30 +1,40 @@
 var Converter = require("montage/core/converter/converter").Converter,
     Criteria = require("montage/core/criteria").Criteria,
     DataQuery = require("logic/model/data-query").DataQuery,
+    DataService = require("logic/service/data-service").DataService,
     Montage = require("montage").Montage,
     ObjectDescriptorReference = require("montage/core/meta/object-descriptor-reference").ObjectDescriptorReference,
     Promise = require("montage/core/promise").Promise,
     parse = require("frb/parse"),
-    compile = require("frb/compile-evaluator");
+    compile = require("frb/compile-evaluator"),
+    RawPropertyValueConverter = require("logic/converter/raw-property-value-converter").RawPropertyValueConverter;
+;
 /**
  * @class RawPropertyValueToObjectConverter
  * @classdesc Converts a property value of raw data to the referenced object.
  * @extends Converter
  */
-exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends RawPropertyValueToObjectConverter# */ {
+exports.RawPropertyValueToObjectConverter = RawPropertyValueConverter.specialize( /** @lends RawPropertyValueToObjectConverter# */ {
+
+    _revertExpression: {
+        value: "service.dataIdentifierForObject($).primaryKey"
+    },
 
     /*********************************************************************
      * Serialization
      */
 
     serializeSelf: {
-        value: function () {
-            // TODO: Implement
+        value: function (serializer) {
+            this.super(serializer);
+           // TODO: Implement
         }
     },
 
     deserializeSelf: {
         value: function (deserializer) {
+            this.super(deserializer);
+
             var value = deserializer.getProperty("foreignProperty");
             if (value) {
                 this.foreignProperty = value;
@@ -39,21 +49,6 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
             value = deserializer.getProperty("foreignDescriptor");
             if (value) {
                 this._foreignDescriptorReference = value;
-            }
-
-            value = deserializer.getProperty("service");
-            if (value) {
-                this.service = value;
-            }
-
-            value = deserializer.getObjectByLabel("root");
-            if (value) {
-                this.owner = value;
-            }
-
-            value = deserializer.getProperty("serviceIdentifier");
-            if (value) {
-                this.serviceIdentifier = value;
             }
 
             deserializer.deserializeUnit("bindings");
@@ -82,15 +77,6 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
      */
 
     /**
-     * The cardinality defines if this is a to one or to many relationship
-     * @type {number}
-     * */
-    expression: {
-        value: null
-    },
-
-
-    /**
      * The descriptor of the destination object.  If one is not provided
      * the value descriptor of the property descriptor that defines the
      * relationship will be used.
@@ -114,50 +100,12 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
         value: null
     },
 
-    _convertSyntax: {
-        value: undefined
-    },
-    convertSyntax: {
-        get: function() {
-            return this._convertSyntax || (this._convertSyntax = parse(this.convertExpression));
-        }
-    },
-
-    __compiledConvertExpression: {
-        value: undefined
-    },
-    _compiledConvertExpression: {
-        get: function() {
-            return this.__compiledConvertExpression || (this.__compiledConvertExpression = compile(parse(this.convertExpression)));
-        }
-    },
-
-    evaluateConvertExpression: {
-        value: function(value) {
-            return this._compiledConvertExpression(value);
-        }
-    },
-
-    /**
-     * The service to use to make requests.
-     */
-    service: {
-        get: function () {
-            return  this._service                    ? this._service :
-                    this.owner && this.owner.service ? this.owner.service.rootService :
-                    undefined;
-        },
-        set: function (value) {
-            this._service = value;
-        }
-    },
-
     /*********************************************************************
      * Public API
      */
 
     /**
-     * Converts the fault for the relationship to an actual object.
+     * Converts the fault for the relationship to an actual object that has an ObjectDescriptor.
      * @function
      * @param {Property} v The value to format.
      * @returns {Promise} A promise for the referenced object.  The promise is
@@ -192,10 +140,13 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
      */
     revert: {
         value: function (v) {
-            //The objet in the scope either has the relationship, in which case
-            //we need to get the value from there, or it doesn't and then
-            //we should leverage the object's snapshot
-            // console.log("V (", v, ")");
+            if(v) {
+                var scope = this.scope;
+                //Parameter is what is accessed as $ in expressions
+                scope.parameters = v;
+                return Promise.resolve(this.evaluateRevertExpression(scope));
+            }
+            return Promise.resolve(undefined);
         }
     }
 

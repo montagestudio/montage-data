@@ -3,26 +3,30 @@ var Converter = require("montage/core/converter/converter").Converter,
     DataQuery = require("logic/model/data-query").DataQuery,
     parse = require("frb/parse"),
     Promise = require("montage/core/promise").Promise,
-    compile = require("frb/compile-evaluator");
+    compile = require("frb/compile-evaluator"),
+    RawPropertyValueConverter = require("logic/converter/raw-property-value-converter").RawPropertyValueConverter;
 /**
  * @class RawPropertyValueToPrimitiveConverter
- * @classdesc Converts a property value of raw data to the referenced object.
+ * @classdesc raw-property-to-primitive-converter is used to load asynchronous properties that are not model objects.
  * @extends Converter
  */
-exports.RawPropertyValueToPrimitiveConverter = Converter.specialize( /** @lends RawPropertyValueToPrimitiveConverter# */ {
+exports.RawPropertyValueToPrimitiveConverter = RawPropertyValueConverter.specialize( /** @lends RawPropertyValueToPrimitiveConverter# */ {
 
     /*********************************************************************
      * Serialization
      */
 
     serializeSelf: {
-        value: function () {
+        value: function (serializer) {
+            this.super(serializer);
             // TODO: Implement
         }
     },
 
     deserializeSelf: {
         value: function (deserializer) {
+            this.super(deserializer);
+
             var value = deserializer.getProperty("foreignProperty");
             if(!value) {
                 value = deserializer.getProperty("convertExpression")
@@ -37,21 +41,6 @@ exports.RawPropertyValueToPrimitiveConverter = Converter.specialize( /** @lends 
             value = deserializer.getProperty("foreignDescriptor");
             if (value) {
                 this.foreignDescriptor = value;
-            }
-
-            value = deserializer.getProperty("service");
-            if (value) {
-                this.service = value;
-            }
-
-            value = deserializer.getObjectByLabel("root");
-            if (value) {
-                this.owner = value;
-            }
-
-            value = deserializer.getProperty("serviceIdentifier");
-            if (value) {
-                this.serviceIdentifier = value;
             }
         }
     },
@@ -76,14 +65,6 @@ exports.RawPropertyValueToPrimitiveConverter = Converter.specialize( /** @lends 
     /*********************************************************************
      * Properties
      */
-
-    /**
-     * The cardinality defines if this is a to one or to many relationship
-     * @type {number}
-     * */
-    expression: {
-        value: null
-    },
 
     /**
      * The cardinality defines if this is a to one or to many relationship
@@ -122,44 +103,6 @@ exports.RawPropertyValueToPrimitiveConverter = Converter.specialize( /** @lends 
         },
         set: function (value) {
             this._objectDescriptor = value;
-        }
-    },
-
-    _convertSyntax: {
-        value: undefined
-    },
-    convertSyntax: {
-        get: function() {
-            return this._convertSyntax || (this._convertSyntax = parse(this.convertExpression));
-        }
-    },
-
-    __compiledConvertExpression: {
-        value: undefined
-    },
-    _compiledConvertExpression: {
-        get: function() {
-            return this.__compiledConvertExpression || (this.__compiledConvertExpression = compile(parse(this.convertExpression)));
-        }
-    },
-
-    evaluateConvertExpression: {
-        value: function(value) {
-            return this._compiledConvertExpression(value);
-        }
-    },
-
-    /**
-     * The service to use to make requests.
-     */
-    service: {
-        get: function () {
-            return  this._service                   ? this._service :
-                    this.owner && this.owner.service ? this.owner.service.rootService :
-                                                        undefined;
-        },
-        set: function (value) {
-            this._service = value;
         }
     },
 
