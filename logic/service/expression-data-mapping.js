@@ -95,6 +95,12 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
             if (value) {
                 this.addRequisitePropertyName.apply(this, value);
             }
+
+            value = deserializer.getProperty("rawDataPrimaryKeys");
+            if (value) {
+                this.rawDataPrimaryKeys = value;
+            }
+
         }
     },
 
@@ -451,6 +457,10 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
     },
 
     _rawDataMappingRules: {
+        value: undefined
+    },
+
+    rawDataPrimaryKeys: {
         value: undefined
     },
 
