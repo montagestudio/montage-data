@@ -25,7 +25,7 @@ describe("A DataMapping", function() {
             random = Math.random(),
             data = new ClassA(1, 2, object, random),
             mapped = new ClassB();
-        new DataMapping().mapFromRawData(mapped, data);
+        new DataMapping().mapRawDataToObject(mapped, data);
         expect(mapped).toEqual(new ClassB(1, 2, object, random));
     });
 
