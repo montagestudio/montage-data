@@ -954,10 +954,39 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 prototype = Object.create(type.objectPrototype || Montage.prototype);
                 this._dataObjectPrototypes.set(type, prototype);
                 this._dataObjectTriggers.set(type, DataTrigger.addTriggers(this, type, prototype));
+
+                //We add a property that returns an object's snapshot
+                //We add a property that returns an object's primaryKey
+                //Let's postponed this for now and revisit when we need
+                //add more properties/logic to automatically track changes
+                //on objects
+
+                // Object.defineProperties(prototype, {
+                //      "montageDataSnapshot": {
+                //          get: this.__object__snapshotMethodImplementation
+                //      },
+                //      "montageDataPrimaryKey": {
+                //          get: this.__object_primaryKeyMethodImplementation
+                //      }
+                //  });
+
             }
             return prototype;
         }
     },
+
+    // __object__snapshotMethodImplementation: {
+    //     value: function() {
+    //         debugger;
+    //         return exports.DataService.mainService._getChildServiceForObject(this).snapshotForObject(this);
+    //     }
+    // },
+    // __object_primaryKeyMethodImplementation: {
+    //     value: function() {
+    //         debugger;
+    //         return exports.DataService.mainService.dataIdentifierForObject(this).primaryKey;
+    //     }
+    // },
 
     /**
      * Returns the [data triggers]{@link DataTrigger} set up for objects of the
@@ -1518,10 +1547,11 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 //anyting inside its constructor, like creating a binding on a relationships
                 //causing a trigger to fire, not knowing about the match between identifier
                 //and object... If that's feels like a real situation, it is.
-                if(dataIdentifier && this.isUniquing) {
-                    this.recordDataIdentifierForObject(dataIdentifier, object);
-                    this.recordObjectForDataIdentifier(object, dataIdentifier);
-                }
+                this.registerUniqueObjectWithDataIdentifier(object, dataIdentifier);
+                // if(dataIdentifier && this.isUniquing) {
+                //     this.recordDataIdentifierForObject(dataIdentifier, object);
+                //     this.recordObjectForDataIdentifier(object, dataIdentifier);
+                // }
 
                 object = object.constructor.call(object) || object;
                 if (object) {
@@ -1529,6 +1559,24 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 }
             }
             return object;
+        }
+    },
+
+     /**
+     * Register an object with its dataIdentifier for uniquing reasons
+     *
+     * @private
+     * @method
+     * @argument {Object} object - object to register.
+     * @argument {DataIdentifier} dataIdentifier - dataIdentifier of object to register.
+     * @returns {void}
+     */
+   registerUniqueObjectWithDataIdentifier: {
+        value: function(object, dataIdentifier) {
+            if(object && dataIdentifier && this.isRootService && this.isUniquing) {
+                this.recordDataIdentifierForObject(dataIdentifier, object);
+                this.recordObjectForDataIdentifier(object, dataIdentifier);
+            }
         }
     },
 
@@ -1817,15 +1865,55 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     saveDataObject: {
         value: function (object) {
-            return this._updateDataObject(object, "saveDataObject");
+            //return this._updateDataObject(object, "saveDataObject");
+
+            var self = this,
+                service,
+                promise = this.nullPromise,
+                mappingPromise;
+
+            if (this.parentService && this.parentService._getChildServiceForObject(object) === this) {
+                var record = {};
+                mappingPromise =  this._mapObjectToRawData(object, record);
+                if(!mappingPromise) {
+                    mappingPromise = this.nullPromise;
+                }
+                return mappingPromise.then(function () {
+                        return self.saveRawData(record, object)
+                            .then(function () {
+                                self.rootService.createdDataObjects.delete(object);
+                                return null;
+                            });
+                 });
+            }
+            else {
+                service = this._getChildServiceForObject(object);
+                if(service) {
+                    return service.saveDataObject(object);
+                }
+                else {
+                    return promise;
+                }
+            }
         }
     },
+
 
     _updateDataObject: {
         value: function (object, action) {
             var self = this,
-                service = action && this._getChildServiceForObject(object),
+                service,
                 promise = this.nullPromise;
+
+            if (this.parentService && this.parentService._getChildServiceForObject(object) === this) {
+                service = action && this;
+            }
+            else {
+                service = action && this._getChildServiceForObject(object);
+                if(service) {
+                    return service._updateDataObject(object, action);
+                }
+            }
 
             if (!action) {
                 self.createdDataObjects.delete(object);
@@ -1838,6 +1926,31 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             return promise;
         }
     },
+
+    _saveDataObject: {
+        value: function (object) {
+            var record = {};
+            this._mapObjectToRawData(object, record);
+            return this.saveRawData(record, object);
+        }
+    },
+    // _updateDataObject: {
+    //     value: function (object, action) {
+    //         var self = this,
+    //             service = action && this._getChildServiceForObject(object),
+    //             promise = this.nullPromise;
+
+    //         if (!action) {
+    //             self.createdDataObjects.delete(object);
+    //         } else if (service) {
+    //             promise = service[action](object).then(function () {
+    //                 self.createdDataObjects.delete(object);
+    //                 return null;
+    //             });
+    //         }
+    //         return promise;
+    //     }
+    // },
 
     /***************************************************************************
      * Offline

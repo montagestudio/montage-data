@@ -1,6 +1,7 @@
 var DataService = require("logic/service/data-service").DataService,
     BlueprintDataMapping = require("logic/service/blueprint-data-mapping").BlueprintDataMapping,
     DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
+    DataIdentifier = require("logic/model/data-identifier").DataIdentifier,
     DataQuery = require("logic/model/data-query").DataQuery,
     DataStream = require("logic/service/data-stream").DataStream,
     Deserializer = require("montage/core/serialization/deserializer/montage-deserializer").MontageDeserializer,
@@ -39,6 +40,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     constructor: {
         value: function RawDataService() {
             DataService.call(this);
+            this._typeIdentifierMap = new Map();
         }
     },
 
@@ -453,7 +455,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     deleteDataObject: {
         value: function (object) {
             var record = {};
-            this.mapObjectToRawData(object, record);
+            this._mapObjectToRawData(object, record);
             return this.deleteRawData(record, object);
         }
     },
@@ -493,13 +495,13 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      * the changed object has been saved. The promise's fulfillment value is not
      * significant and will usually be `null`.
      */
-    saveDataObject: {
-        value: function (object) {
-            var record = {};
-            this.mapObjectToRawData(object, record);
-            return this.saveRawData(record, object);
-        }
-    },
+    // saveDataObject: {
+    //     value: function (object) {
+    //         var record = {};
+    //         this._mapObjectToRawData(object, record);
+    //         return this.saveRawData(record, object);
+    //     }
+    // },
 
     /**
      * Subclasses should override this method to save a data object when that
@@ -655,7 +657,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             //     this.recordSnapshot(iDataIdentifier,iRecord);
             //    //iDataIdentifier argument should be all we need later on
             //     object = this.getDataObject(streamSelectorType, iRecord, context, iDataIdentifier);
-            result = this.mapRawDataToObject(rawData, object, context);
+            result = this._mapRawDataToObject(rawData, object, context);
             if (result && result instanceof Promise) {
                 this._addMapDataPromiseForStream(result, stream);
             }
@@ -692,10 +694,52 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         }
     },
 
+    _typeIdentifierMap: {
+        value: undefined
+    },
+
     //This should belong on the
     //Gives us an indirection layer to deal with backward compatibility.
     dataIdentifierForTypeRawData: {
         value: function (type, rawData) {
+
+            var mapping = this.mappingWithType(type),
+                rawDataPrimaryKeys = mapping ? mapping.rawDataPrimaryKeys : null,
+                rawDataPrimaryKeysValues,
+                dataIdentifier, dataIdentifierMap, primaryKey;
+            if(rawDataPrimaryKeys && rawDataPrimaryKeys.length) {
+
+                dataIdentifierMap = this._typeIdentifierMap.get(type);
+
+                if(!dataIdentifierMap) {
+                    this._typeIdentifierMap.set(type,(dataIdentifierMap = new Map()));
+                }
+
+                for(var i=0, iKey;(iKey = rawDataPrimaryKeys[i]);i++) {
+                    rawDataPrimaryKeysValues = rawDataPrimaryKeysValues || [];
+                    rawDataPrimaryKeysValues[i] = rawData[iKey];
+                }
+                if(rawDataPrimaryKeysValues) {
+                    primaryKey = rawDataPrimaryKeysValues.join("/");
+                    dataIdentifier = dataIdentifierMap.get(primaryKey);
+                }
+
+                if(!dataIdentifier) {
+                    var typeName = type.typeName/*DataDescriptor*/||type.name,
+                        //This should be done by ObjectDescriptor/blueprint using primaryProperties
+                        //and extract the corresponsing values from rawData
+                        //For now we know here that MileZero objects have an "id" attribute.
+                        dataIdentifier = new DataIdentifier()
+                        dataIdentifier.objectDescriptor = type;
+                        dataIdentifier.dataService = this;
+                        dataIdentifier.typeName = type.name;
+                        dataIdentifier._identifier = dataIdentifier.primaryKey = primaryKey;
+
+                        dataIdentifierMap.set(primaryKey,dataIdentifier);
+                }
+                return dataIdentifier;
+            }
+            return undefined;
         }
     },
 
@@ -865,6 +909,60 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
     /**
      * Convert raw data to data objects of an appropriate type.
      *
+     *
+     * @todo Make this method overridable by type name with methods like
+     * `mapRawDataToHazard()` and `mapRawDataToProduct()`.
+     *
+     * @method
+     * @argument {Object} record - An object whose properties' values hold
+     *                             the raw data.
+     * @argument {Object} object - An object whose properties must be set or
+     *                             modified to represent the raw data.
+     * @argument {?} context     - The value that was passed in to the
+     *                             [addRawData()]{@link RawDataService#addRawData}
+     *                             call that invoked this method.
+     */
+    mappingForObject: {
+        value: function (object) {
+            var objectDescriptor = this.objectDescriptorForObject(object),
+                mapping = objectDescriptor && this.mappingWithType(objectDescriptor);
+
+            if (!mapping && objectDescriptor) {
+                mapping = this._objectDescriptorMappings.get(objectDescriptor);
+                if (!mapping) {
+                    mapping = BlueprintDataMapping.withBlueprint(objectDescriptor);
+                    this._objectDescriptorMappings.set(objectDescriptor, mapping);
+                }
+            }
+
+            return mapping;
+        }
+    },
+
+    /**
+     * Convert raw data to data objects of an appropriate type.
+     *
+     * Subclasses should override this method to map properties of the raw data
+     * to data objects:
+     * @method
+     * @argument {Object} record - An object whose properties' values hold
+     *                             the raw data.
+     * @argument {Object} object - An object whose properties must be set or
+     *                             modified to represent the raw data.
+     * @argument {?} context     - The value that was passed in to the
+     *                             [addRawData()]{@link RawDataService#addRawData}
+     *                             call that invoked this method.
+     */
+
+
+    mapRawDataToObject: {
+        value: function (rawData, object, context) {
+            // return this.mapFromRawData(object, record, context);
+        }
+    },
+    /**
+     * Convert raw data to data objects of an appropriate type.
+     *
      * Subclasses should override this method to map properties of the raw data
      * to data objects, as in the following:
      *
@@ -895,41 +993,53 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *                             [addRawData()]{@link RawDataService#addRawData}
      *                             call that invoked this method.
      */
-    mapRawDataToObject: {
+    _mapRawDataToObject: {
         value: function (record, object, context) {
-            var objectDescriptor = this.objectDescriptorForObject(object),
-                mapping = objectDescriptor && this.mappingWithType(objectDescriptor),
+            var mapping = this.mappingForObject(object),
                 result;
 
             if (mapping) {
-                result = mapping.mapFromRawData(object, record, context);
-            } else if (objectDescriptor) {
-                mapping = this._objectDescriptorMappings.get(objectDescriptor);
-                if (!mapping) {
-                    mapping = BlueprintDataMapping.withBlueprint(objectDescriptor);
-                    this._objectDescriptorMappings.set(objectDescriptor, mapping);
-                }
                 result = mapping.mapRawDataToObject(record, object, context);
-            } else if (record) {
-                // this.mapFromRawData(object, record, context);
             }
 
             // TODO: Remove -- should be part of if/else block above.
             if (record) {
                 if (result) {
-                    var otherResult = this.mapFromRawData(object, record, context);
+                    var otherResult = this.mapRawDataToObject(record, object, context);
                     if (result instanceof Promise && otherResult instanceof Promise) {
                         result = Promise.all([result, otherResult]);
                     } else if (otherResult instanceof Promise) {
                         result = otherResult;
                     }
                 } else {
-                    result = this.mapFromRawData(object, record, context);
+                    result = this.mapRawDataToObject(record, object, context);
                 }
             }
 
             return result;
 
+        }
+    },
+
+    /**
+     * Public method invoked by the framework during the conversion from
+     * an object to a raw data.
+     * Designed to be overriden by concrete RawDataServices to allow fine-graine control
+     * when needed, beyond transformations offered by an ObjectDescriptorDataMapping or
+     * an ExpressionDataMapping
+     *
+     * @method
+     * @argument {Object} object - An object whose properties must be set or
+     *                             modified to represent the raw data.
+     * @argument {Object} record - An object whose properties' values hold
+     *                             the raw data.
+     * @argument {?} context     - The value that was passed in to the
+     *                             [addRawData()]{@link RawDataService#addRawData}
+     *                             call that invoked this method.
+     */
+    mapObjectToRawData: {
+        value: function (object, record, context) {
+            // this.mapToRawData(object, record, context);
         }
     },
 
@@ -940,19 +1050,29 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      *
      * @method
      */
-    mapObjectToRawData: {
+    _mapObjectToRawData: {
         value: function (object, record, context) {
-            var blueprint = this.objectDescriptorForObject(object);
-            if (this.mapping) {
-                this.mapping.mapObjectToRawData(record, object, context);
-            } else if (blueprint) {
-                this.mapping = BlueprintDataMapping.withBlueprint(blueprint);
-                this.mapping.mapObjectToRawData(record, object, context);
-            } else if (record) {
-                this.mapFromRawData(object, record, context);
+            var mapping = this.mappingForObject(object),
+                result;
+
+            if (mapping) {
+                result = mapping.mapObjectToRawData(object, record, context);
             }
 
-            this.mapToRawData(object, record);
+            if (record) {
+                if (result) {
+                    var otherResult = this.mapObjectToRawData(object, record, context);
+                    if (result instanceof Promise && otherResult instanceof Promise) {
+                        result = Promise.all([result, otherResult]);
+                    } else if (otherResult instanceof Promise) {
+                        result = otherResult;
+                    }
+                } else {
+                    result = this.mapObjectToRawData(object, record, context);
+                }
+            }
+
+            return result;
         }
     },
 
