@@ -765,7 +765,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
      */
     recordSnapshot: {
         value: function (dataIdentifier, rawData) {
-            this._snapshot.set(dataIdentifier,rawData);
+            this._snapshot.set(dataIdentifier, rawData);
         }
     },
 
@@ -802,7 +802,6 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
    snapshotForObject: {
         value: function (object) {
             return this.snapshotForDataIdentifier(this.dataIdentifierForObject(object));
-
         }
     },
 

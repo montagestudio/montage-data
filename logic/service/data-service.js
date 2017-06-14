@@ -1253,7 +1253,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     fetchObjectProperty: {
         value: function (object, propertyName) {
-            if(this.parentService && this.parentService._getChildServiceForObject(object) === this) {
+            if (this.parentService && this.parentService._getChildServiceForObject(object) === this) {
                     //If service decides to implemment fetchRawObjectProperty
                     //it takes matter in its own hands
                     if(typeof this.fetchRawObjectProperty === "function") {
@@ -1283,10 +1283,12 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 data = {};
 
             if (mapping) {
+
                 Object.assign(data, this.snapshotForObject(object));
 
 
                 return mapping.mapObjectToCriteriaSourceForProperty(object, data, propertyName).then(function() {
+                    Object.assign(data, self.snapshotForObject(object));
                     return mapping.mapRawDataToObjectProperty(data, object, propertyName);
                 });
             } else {
