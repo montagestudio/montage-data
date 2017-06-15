@@ -3,6 +3,7 @@ var Converter = require("montage/core/converter/converter").Converter,
     DataQuery = require("logic/model/data-query").DataQuery,
     ObjectDescriptorReference = require("montage/core/meta/object-descriptor-reference").ObjectDescriptorReference,
     Promise = require("montage/core/promise").Promise,
+    Scope = require("frb/scope"),
     parse = require("frb/parse"),
     compile = require("frb/compile-evaluator");
 
@@ -219,6 +220,22 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
         }
     },
 
+    __scope: {
+        value: null
+    },
+
+    /**
+     * Scope with which convert and revert expressions are evaluated.
+     * @type {Scope} Scope which value is this.
+     */
+
+    scope: {
+        get: function() {
+            return this.__scope || (this.__scope = new Scope(this));
+        }
+    },
+
+
 
     /**
      * The service to use to make requests.
@@ -226,8 +243,8 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
     service: {
         get: function () {
             return  this._service                    ? this._service :
-                    this.owner && this.owner.service ? this.owner.service.rootService :
-                    undefined;
+                    this.owner && this.owner.service ? this.owner.service :
+                                                       undefined;
         },
         set: function (value) {
             this._service = value;
@@ -275,7 +292,7 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
                     criteria.parameters.propertyName = self.propertyName;
                 }
 
-                return self.service ? self.service.fetchData(query) :
+                return self.service ? self.service.rootService.fetchData(query) :
                                       null;
             });
         }
