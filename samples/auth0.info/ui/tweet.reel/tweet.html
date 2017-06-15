@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <link rel="stylesheet" type="text/css" href="tweet.css">
+    <script type="text/montage-serialization">
+    {
+        "owner": {
+            "properties": {
+                "element": {"#": "owner"}
+            }
+        },
+        "tweetText": {
+            "prototype": "montage/ui/text.reel",
+            "properties": {
+                "element": {"#": "tweetText"}
+            },
+            "bindings": {
+                "value": {"<-": "@owner.value.text"}
+            }
+        },
+        "tweetUser": {
+            "prototype": "montage/ui/text.reel",
+            "properties": {
+                "element": {"#": "tweetUser"}
+            },
+            "bindings": {
+                "value": {"<-": "@owner.value.user.name"}
+            }
+        }
+
+    }
+    </script>
+</head>
+<body>
+    <div data-montage-id="owner" class="Tweet">
+        <p data-montage-id="tweetText"></p>
+        <a href="https://twitter.com" data-montage-id="tweetUser"></a>
+    </div>
+</body>
+</html>

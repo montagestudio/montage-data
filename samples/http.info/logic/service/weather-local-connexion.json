@@ -1,0 +1,5 @@
+{
+    "name": "Weather Local Development",
+    "endpoint": "http://api.openweathermap.org/data/2.5/",
+    "appid": "7593a575795cbd73f54c69a321ed86fe"
+}

@@ -1,0 +1,17 @@
+{
+    "name": "montage-data-samples-simple",
+    "version": "0.1.0",
+    "main": "",
+    "dependencies": {
+        "montage": "git://github.com/montagejs/montage.git#master",
+        "montage-data": "*",
+        "digit": "~0.5.0"
+    },
+    "mappings": {
+        "montage-data": "../../"
+    },
+    "exclude": [
+        "test"
+    ],
+    "bundle": [ "ui/main.reel" ]
+}

@@ -42,6 +42,8 @@
     "test": "node test/run-node.js",
     "test:karma": "karma start --no-auto-watch --single-run",
     "test:karma-dev": "karma start --auto-watch --no-single-run",
-    "test:jasmine": "concurrently \"http-server -a localhost -p 8084\" \"open http://localhost:8084/test/run.html\""
+    "test:jasmine": "concurrently \"http-server -a localhost -p 8084\" \"open http://localhost:8084/test/run.html\"",
+    "sample:auth0": "concurrently \"http-server -a localhost -p 8080\" \"open http://localhost:8080/samples/auth0.info\"",
+    "sample:http": "concurrently \"http-server -a localhost -p 8080\" \"open http://localhost:8080/samples/http.info/\""
   }
 }

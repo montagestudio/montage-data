@@ -1,0 +1,13 @@
+{
+    "name": "Auth0 Pros Development",
+    "domain": "hthetiot.auth0.com",
+    "clientId": "Gd-TImevBrSr1jNl-Dvx7eBZO3lmRgxc",
+    "options": {
+        "auth": {
+            "redirectUrl": "http://localhost:8080/",
+            "responseType": "token",
+            "redirect": true,
+            "sso": true
+        }
+    }
+}

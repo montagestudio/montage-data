@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <title>Tweets</title>
+    <link rel="stylesheet" type="text/css" href="tweets.css">
+    <script type="text/montage-serialization">
+        {
+            "owner": {
+                "properties": {
+                    "element": {"#": "owner"}
+                },
+                "bindings": {
+                    "classList.has('Tweets-loading')": { "<-": "!@owner.tweets" } 
+                }
+            },
+            "tweets": {
+                "prototype": "montage/ui/repetition.reel",
+                "properties": {
+                    "element": { "#": "tweets" }
+                },
+                "bindings": {
+                    "content": { "<->": "@owner.tweets" }
+                }
+            },
+            "tweet": {
+                "prototype": "ui/tweet.reel",
+                "properties": {
+                    "acceptsActiveTarget": true,
+                    "board": { "@": "owner" },
+                    "element": { "#": "tweet" }
+                },
+                "bindings": {
+                    "value": { "<->": "@tweets:iteration.object" }
+                }
+            }
+        }
+    </script>
+</head>
+<body>
+    <div data-montage-id="owner" class="Tweets">
+        <div class="Tweets-loader">
+            Loading...
+        </div>
+        <div data-montage-id="tweets" class="Tweets-results">
+            <div data-montage-id="tweet"></div>    
+        </div>
+    </div>
+</body>
+</html>
