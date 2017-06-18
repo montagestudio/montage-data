@@ -569,9 +569,8 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         value: function (converter, rule, propertyDescriptor) {
             if (converter) {
                 converter.expression = converter.expression || rule.expression;
-                if (!propertyDescriptor.valueDescriptor) {
-                    converter.propertyName = propertyDescriptor.name;
-                } else if (!converter.foreignDescriptor) {
+
+                if (!converter.foreignDescriptor && propertyDescriptor.valueDescriptor) {
                     converter.foreignDescriptor = propertyDescriptor.valueDescriptor;
                 }
                 converter.objectDescriptor = this.objectDescriptor;
