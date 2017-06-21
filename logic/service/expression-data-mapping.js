@@ -632,8 +632,8 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                     object[propertyName] = data;
                 } else if (hasData) {
                     //Cardinality is 1, if data contains more than 1 item, we throw
-                    if(data.length && data.length>1) {
-                            throw new Error("ExpressionDataMapping for property \""+propertyName+"\" expects a cardinality of 1 but data to map doesn't match: "+data);
+                    if (data.length && data.length>1) {
+                            throw new Error("ExpressionDataMapping for property \""+ this.objectDescriptor.name + "." + propertyName+"\" expects a cardinality of 1 but data to map doesn't match: "+data);
                     }
                     object[propertyName] = data[0];
                 }
