@@ -54,7 +54,7 @@ exports.AuthorizationManagerPanel = Component.specialize({
             var self = this,
                 promise;
 
-            if (this.authorizationPanels.indexOf(authorizationPanel) === -1) {
+            if (!this._panels.has(authorizationPanel)) {
                 promise = new Promise(function (resolve, reject) {
                     self._panels.set(authorizationPanel, {
                         resolve: resolve,

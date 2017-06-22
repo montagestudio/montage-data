@@ -157,12 +157,17 @@ var AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.pr
 
     _getAuthorizationWithService: {
         value: function (moduleId, dataServiceInfo, managerPanel) {
-            var self = this;
-            return this._getAuthorizationServiceWithModuleId(moduleId, dataServiceInfo).then(function (service) {
-                return self._getAuthorizationPanelForService(service);
-            }).then(function (panel) {
-                return managerPanel.authorizeWithPanel(panel);
-            });
+            var self = this,
+                service;
+            return this._getAuthorizationServiceWithModuleId(moduleId, dataServiceInfo).then(function (authService) {
+                service = authService;
+                return service.authorization;
+            }).then(function (authorization) {
+                return authorization || self._getAuthorizationPanelForService(service).then(function (panel) {
+                                            return managerPanel.authorizeWithPanel(panel);
+                                        });
+
+            })
         }
     },
 

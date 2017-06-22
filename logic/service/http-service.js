@@ -19,7 +19,7 @@ var RawDataService = require("logic/service/raw-data-service").RawDataService,
  *
  * @extends RawDataService
  */
-exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype */ {
+var HttpService = exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype */ {
 
     /***************************************************************************
      * Constants
@@ -219,6 +219,8 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
      * from the fetch, parsed according to the specified or detaul types. On
      * error the promise will be rejected with the error.
      */
+
+
     fetchHttpRawData: {
         value: function (url, headers, body, types, query, sendCredentials) {
             var self = this,
@@ -239,8 +241,14 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                     reject(error);
                 } else {
                     request = new XMLHttpRequest();
-                    request.onload = function () { resolve(request); };
-                    request.onerror = request.onload;
+                    request.onreadystatechange = function () {
+                        if (request.readyState === 4) {
+                            HttpService.activeRequests = HttpService.activeRequests - 1;
+                            resolve(request);
+                        }
+                    };
+                    // console.log(url);
+                    request.onerror = function () { resolve(request); };
                     request.open(parsed.body ? "POST" : "GET", parsed.url, true);
 
                     self.setHeadersForQuery(parsed.headers, parsed.query, parsed.url);
@@ -248,7 +256,6 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                     for (i in parsed.headers) {
                         request.setRequestHeader(i, parsed.headers[i]);
                     }
-
                     request.withCredentials = parsed.credentials;
                     request.send(parsed.body);
                 }
@@ -329,9 +336,9 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
 
             // Parse the query, which can be provided as an array or as a
             // sequence of DataType arguments.
-            if (last === 5 && arguments[4] instanceof DataSelector) {
+            if (last === 5 && arguments[4] instanceof DataQuery) {
                 parsed.query = arguments[4]
-            } else if (last === 4 && arguments[3] instanceof DataSelector) {
+            } else if (last === 4 && arguments[3] instanceof DataQuery) {
                 parsed.query = arguments[3]
             }
             // Return the parsed arguments.
@@ -392,8 +399,8 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                             try {
                                 data = JSON.parse(text);
                             } catch (error) {
+                                console.log(text);
                                 console.warn(new Error("Can't parse JSON received from " + url));
-                                console.warn("Response text:", text);
                             }
                         } else if (request) {
                             console.warn(new Error("No JSON response received from " + url));
