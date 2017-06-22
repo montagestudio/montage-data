@@ -248,7 +248,7 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                     for (i in parsed.headers) {
                         request.setRequestHeader(i, parsed.headers[i]);
                     }
-
+                    console.log(url, parsed.credentials);
                     request.withCredentials = parsed.credentials;
                     request.send(parsed.body);
                 }
