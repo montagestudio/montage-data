@@ -622,12 +622,19 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 isToMany = propertyDescriptor.cardinality !== 1,
                 propertyName = propertyDescriptor.name;
 
+            //Add checks to make sure that data matches expectations of propertyDescriptor.cardinality
+            //
+
             if (Array.isArray(data)) {
                 if (isToMany && Array.isArray(object[propertyName])) {
                     object[propertyName].splice.apply(object[propertyName], [0, Infinity].concat(data));
                 } else if (isToMany) {
                     object[propertyName] = data;
                 } else if (hasData) {
+                    //Cardinality is 1, if data contains more than 1 item, we throw
+                    if(data.length && data.length>1) {
+                            throw new Error("ExpressionDataMapping for property \""+propertyName+"\" expects a cardinality of 1 but data to map doesn't match: "+data);
+                    }
                     object[propertyName] = data[0];
                 }
             } else {
