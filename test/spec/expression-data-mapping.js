@@ -102,7 +102,7 @@ describe("An Expression Data Mapping", function() {
     movieMapping.addObjectMappingRule("title", {"<->": "name"});
     movieMapping.addObjectMappingRule("category", {
         "<-": "category_id",
-        converter: new RawPropertyValueToObjectConverter().initWithForeignPropertyAndCardinality("category_id", 1)
+        converter: new RawPropertyValueToObjectConverter().initWithConvertExpression("category_id")
     });
     movieMapping.addObjectMappingRule("releaseDate", {
         "<->": "release_date",
