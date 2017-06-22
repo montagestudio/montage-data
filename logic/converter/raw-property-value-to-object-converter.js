@@ -77,14 +77,12 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
      */
 
     /**
-     * @param {string} foreignProperty the property of the destination to query on.
-     * @param {number} cardinality defines if this is a to one or to many relationship.
+     * @param {string} convertExpression the expression to be used for building a criteria to obtain the object corresponding to the value to convert.
      * @return itself
      */
-    initWithForeignPropertyAndCardinality: {
-        value: function (foreignProperty, cardinality) {
-            this.foreignProperty = foreignProperty;
-            this.cardinality = cardinality;
+    initWithConvertExpression: {
+        value: function (convertExpression) {
+            this.convertExpression = convertExpression;
             return this;
         }
     },
