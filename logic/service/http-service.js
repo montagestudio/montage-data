@@ -19,7 +19,7 @@ var RawDataService = require("logic/service/raw-data-service").RawDataService,
  *
  * @extends RawDataService
  */
-exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype */ {
+var HttpService = exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype */ {
 
     /***************************************************************************
      * Constants
@@ -219,6 +219,8 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
      * from the fetch, parsed according to the specified or detaul types. On
      * error the promise will be rejected with the error.
      */
+
+
     fetchHttpRawData: {
         value: function (url, headers, body, types, query, sendCredentials) {
             var self = this,
@@ -239,8 +241,14 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                     reject(error);
                 } else {
                     request = new XMLHttpRequest();
-                    request.onload = function () { resolve(request); };
-                    request.onerror = request.onload;
+                    request.onreadystatechange = function () {
+                        if (request.readyState === 4) {
+                            HttpService.activeRequests = HttpService.activeRequests - 1;
+                            resolve(request);
+                        }
+                    };
+                    console.log(url);
+                    request.onerror = function () { resolve(request); };
                     request.open(parsed.body ? "POST" : "GET", parsed.url, true);
 
                     self.setHeadersForQuery(parsed.headers, parsed.query, parsed.url);
@@ -248,9 +256,10 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                     for (i in parsed.headers) {
                         request.setRequestHeader(i, parsed.headers[i]);
                     }
-                    console.log(url, parsed.credentials);
                     request.withCredentials = parsed.credentials;
                     request.send(parsed.body);
+                    HttpService.activeRequests = HttpService.activeRequests + 1;
+                    // console.log("active: ", HttpService.activeRequests);
                 }
             }).then(function () {
                 // The response status can be 0 initially even for successful
@@ -363,6 +372,9 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
 
 }, /** @lends HttpService */ {
 
+    activeRequests: {
+        value: 0
+    },
     /***************************************************************************
      * Types
      */
