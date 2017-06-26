@@ -133,6 +133,44 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
     },
 
 
+    _revertExpression: {
+        value: null
+    },
+    revertExpression: {
+        get: function() {
+            return this._revertExpression;
+        },
+        set: function(value) {
+            if(value !== this._revertExpression) {
+                this._revertExpression = value;
+                //Reset parsed & compiled version:
+                this._revertSyntax = undefined;
+                this.__compiledRevertExpression = undefined;
+            }
+        }
+    },
+
+    _revertSyntax: {
+        value: undefined
+    },
+
+    revertSyntax: {
+        get: function() {
+            return this._revertSyntax || (this._revertSyntax = parse(this.revertExpression));
+        }
+    },
+
+
+    __compiledRevertExpression: {
+        value: undefined
+    },
+    _compiledRevertExpression: {
+        get: function() {
+            return this.__compiledRevertExpression || (this.__compiledRevertExpression = compile(this.revertSyntax));
+        }
+    },
+
+
     /**
      * The descriptor of the destination object.  If one is not provided
      * the value descriptor of the property descriptor that defines the
@@ -242,11 +280,16 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
      */
     revert: {
         value: function (v) {
-            if(v) {
-                var scope = this.scope;
-                //Parameter is what is accessed as $ in expressions
-                scope.parameters = v;
-                return Promise.resolve(this.evaluateRevertExpression(scope));
+            if (v) {
+                if (!this._revertSyntax) {
+                    return Promise.resolve(v);
+                } else {
+                    var scope = this.scope;
+                    //Parameter is what is accessed as $ in expressions
+                    scope.parameters = v;
+                    return Promise.resolve(this._revertSyntax(scope));
+                }
+
             }
             return Promise.resolve(undefined);
         }
