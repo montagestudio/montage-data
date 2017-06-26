@@ -258,8 +258,6 @@ var HttpService = exports.HttpService = RawDataService.specialize(/** @lends Htt
                     }
                     request.withCredentials = parsed.credentials;
                     request.send(parsed.body);
-                    HttpService.activeRequests = HttpService.activeRequests + 1;
-                    // console.log("active: ", HttpService.activeRequests);
                 }
             }).then(function () {
                 // The response status can be 0 initially even for successful
@@ -372,9 +370,6 @@ var HttpService = exports.HttpService = RawDataService.specialize(/** @lends Htt
 
 }, /** @lends HttpService */ {
 
-    activeRequests: {
-        value: 0
-    },
     /***************************************************************************
      * Types
      */
