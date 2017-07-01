@@ -382,7 +382,7 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */ {
             // descriptor.
             var isMontageDataType = type instanceof DataObjectDescriptor || type instanceof ObjectDescriptor;
             return isMontageDataType ?  this._addTriggersForMontageDataType(service, type, prototype, name) :
-                this._addTriggers(service, type, prototype, requisitePropertyNames);
+                                        this._addTriggers(service, type, prototype, requisitePropertyNames);
         }
     },
 
@@ -432,7 +432,7 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */ {
             // descriptor.
             var isMontageDataType = type instanceof DataObjectDescriptor || type instanceof ObjectDescriptor;
             return isMontageDataType ?  this._addTriggerForMontageDataType(service, type, prototype, name) :
-                this._addTrigger(service, type, prototype, name);
+                                        this._addTrigger(service, type, prototype, name);
         }
     },
 
@@ -498,16 +498,37 @@ Object.defineProperties(exports.DataTrigger, /** @lends DataTrigger */ {
                 trigger._objectPrototype = prototype;
                 trigger._propertyName = name;
                 trigger._isGlobal = descriptor.isGlobal;
-                Montage.defineProperty(prototype, name, {
-                    get: function () {
-                        return trigger._getValue(this);
-                        // return (trigger||(trigger = DataTrigger._createTrigger(service, objectDescriptor, prototype, name,descriptor)))._getValue(this);
-                    },
-                    set: function (value) {
-                        trigger._setValue(this, value);
-                        // (trigger||(trigger = DataTrigger._createTrigger(service, objectDescriptor, prototype, name,descriptor)))._setValue(this, value);
-                    }
-                });
+                if (descriptor.definition) {
+                    Montage.defineProperty(prototype, name, {
+                        get: function () {
+                            if (!this.getBinding(name)) {
+                                this.defineBinding(name, {"<-": descriptor.definition});
+                            }
+                            return trigger._getValue(this);
+                            // return (trigger||(trigger = DataTrigger._createTrigger(service, objectDescriptor, prototype, name,descriptor)))._getValue(this);
+                        },
+                        set: function (value) {
+                            trigger._setValue(this, value);
+                            // (trigger||(trigger = DataTrigger._createTrigger(service, objectDescriptor, prototype, name,descriptor)))._setValue(this, value);
+                        }
+                    });
+                } else {
+                    Montage.defineProperty(prototype, name, {
+                        get: function () {
+                            return trigger._getValue(this);
+                            // return (trigger||(trigger = DataTrigger._createTrigger(service, objectDescriptor, prototype, name,descriptor)))._getValue(this);
+                        },
+                        set: function (value) {
+                            trigger._setValue(this, value);
+                            // (trigger||(trigger = DataTrigger._createTrigger(service, objectDescriptor, prototype, name,descriptor)))._setValue(this, value);
+                        }
+                    });
+                }
+                    trigger = Object.create(this._getTriggerPrototype(service));
+                    trigger._objectPrototype = prototype;
+                    trigger._propertyName = name;
+                    trigger._isGlobal = descriptor.isGlobal;
+
             }
             return trigger;
         }
