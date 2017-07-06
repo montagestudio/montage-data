@@ -336,9 +336,9 @@ var HttpService = exports.HttpService = RawDataService.specialize(/** @lends Htt
 
             // Parse the query, which can be provided as an array or as a
             // sequence of DataType arguments.
-            if (last === 5 && arguments[4] instanceof DataSelector) {
+            if (last === 5 && arguments[4] instanceof DataQuery) {
                 parsed.query = arguments[4]
-            } else if (last === 4 && arguments[3] instanceof DataSelector) {
+            } else if (last === 4 && arguments[3] instanceof DataQuery) {
                 parsed.query = arguments[3]
             }
             // Return the parsed arguments.
@@ -399,8 +399,8 @@ var HttpService = exports.HttpService = RawDataService.specialize(/** @lends Htt
                             try {
                                 data = JSON.parse(text);
                             } catch (error) {
+                                console.log(text);
                                 console.warn(new Error("Can't parse JSON received from " + url));
-                                console.warn("Response text:", text);
                             }
                         } else if (request) {
                             console.warn(new Error("No JSON response received from " + url));

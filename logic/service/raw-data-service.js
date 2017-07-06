@@ -401,7 +401,7 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         value: function (stream) {
             var self = this,
                 childService = this._childServiceForQuery(stream.query),
-                selector = stream.selector,
+                selector = stream.query,
                 authPromise = selector.authorization ? Promise.resolve(selector.authorization) :
                                                        this.authorizationPromise;
 
@@ -410,9 +410,9 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
             } else {
 
                 authPromise.then(function (authorization) {
-                    stream.selector = self.mapSelectorToRawDataSelector(selector);
+                    stream.query = self.mapSelectorToRawDataQuery(selector);
                     self.fetchRawData(stream);
-                    stream.selector = selector;
+                    stream.query = selector;
                 })
             }
         }
