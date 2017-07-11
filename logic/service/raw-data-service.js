@@ -837,6 +837,12 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
                 this._streamRawData.delete(stream);
             }
 
+            console.log(stream.query.type.name);
+
+            if (stream.query.type.name === "Role") {
+                debugger;
+            }
+
             dataReadyPromise.then(function (results) {
                 return dataToPersist ? self.writeOfflineData(dataToPersist, stream.query, context) : null;
             }).then(function () {

@@ -358,7 +358,10 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 promises = [], key;
 
 
-
+            // console.log("CriteriaSource", propertyName);
+            // if (propertyName === "roles") {
+            //     debugger;
+            // }
 
             for (key in rules) {
                 if (rules.hasOwnProperty(key) && rawRequirementsToMap.has(key)) {
@@ -551,6 +554,8 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 scope = this._scope,
                 self = this,
                 result;
+
+
 
             scope.value = data;
             if (!propertyDescriptor || propertyDescriptor.definition) {
