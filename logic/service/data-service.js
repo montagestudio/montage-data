@@ -1738,8 +1738,6 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             stream.query = query;
             stream.dataExpression = query.selectExpression;
 
-
-
             this._dataServiceByDataStream.set(stream, this._childServiceRegistrationPromise.then(function() {
                 var service;
                 //This is a workaround, we should clean that up so we don't

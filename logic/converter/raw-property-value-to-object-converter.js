@@ -180,7 +180,7 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
     foreignDescriptor: {
         serializable: false,
         get: function () {
-            return this._foreignDescriptorReference && this._foreignDescriptorReference.promise(this.require);
+            return this._foreignDescriptorReference && this._foreignDescriptorReference.promise(require);
         },
         set: function (descriptor) {
             this._foreignDescriptorReference = new ObjectDescriptorReference().initWithValue(descriptor);
