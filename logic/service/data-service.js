@@ -1280,20 +1280,26 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     fetchObjectProperty: {
         value: function (object, propertyName) {
+            var propertyFunction;
             if (this.parentService && this.parentService._getChildServiceForObject(object) === this) {
-                    //If service decides to implemment fetchRawObjectProperty
-                    //it takes matter in its own hands
-                    if(typeof this.fetchRawObjectProperty === "function") {
-                        return this.fetchRawObjectProperty(object, propertyName);
-                    }
-                    //Otherwise we're going to use model, property descriptor, mappings
-                    //to make it happen.
-                    else {
-                        var propertyDescriptor = this._propertyDescriptorForObjectAndName(object, propertyName);
-                        return propertyDescriptor ?   this._fetchObjectPropertyWithPropertyDescriptor(object, propertyName, propertyDescriptor) :
-                                                        this.nullPromise;
+                //If service decides to implemment fetchRawObjectProperty
+                //it takes matter in its own hands
+                if(typeof this.fetchRawObjectProperty === "function") {
+                    return this.fetchRawObjectProperty(object, propertyName);
+                } else if (
+                    (propertyFunction = this["fetch" + this._capitalizeFirstLetter(propertyName) + "Property"]) &&
+                    typeof propertyFunction === "function"
+                ) {
+                    return propertyFunction.call(this, object);
+                }
+                //Otherwise we're going to use model, property descriptor, mappings
+                //to make it happen.
+                else {
+                    var propertyDescriptor = this._propertyDescriptorForObjectAndName(object, propertyName);
+                    return propertyDescriptor ?   this._fetchObjectPropertyWithPropertyDescriptor(object, propertyName, propertyDescriptor) :
+                                                    this.nullPromise;
 
-                    }
+                }
             }
             else {
                 var service = this._getChildServiceForObject(object);
@@ -1302,6 +1308,14 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             }
         }
     },
+
+
+    _capitalizeFirstLetter: {
+        value: function (string) {
+            return string.charAt(0).toUpperCase() + string.slice(1);
+        }
+    },
+
     _fetchObjectPropertyWithPropertyDescriptor: {
         value: function (object, propertyName, propertyDescriptor) {
             var self = this,
