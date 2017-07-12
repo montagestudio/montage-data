@@ -1280,39 +1280,26 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      */
     fetchObjectProperty: {
         value: function (object, propertyName) {
-            var propertyFunction;
-            if (this.parentService && this.parentService._getChildServiceForObject(object) === this) {
-                //If service decides to implemment fetchRawObjectProperty
-                //it takes matter in its own hands
-                if(typeof this.fetchRawObjectProperty === "function") {
-                    return this.fetchRawObjectProperty(object, propertyName);
-                } else if (
-                    (propertyFunction = this["fetch" + this._capitalizeFirstLetter(propertyName) + "Property"]) &&
-                    typeof propertyFunction === "function"
-                ) {
-                    return propertyFunction.call(this, object);
-                }
-                //Otherwise we're going to use model, property descriptor, mappings
-                //to make it happen.
-                else {
-                    var propertyDescriptor = this._propertyDescriptorForObjectAndName(object, propertyName);
-                    return propertyDescriptor ?   this._fetchObjectPropertyWithPropertyDescriptor(object, propertyName, propertyDescriptor) :
-                                                    this.nullPromise;
 
-                }
-            }
-            else {
-                var service = this._getChildServiceForObject(object);
-                return service ? service.fetchObjectProperty(object, propertyName) :
-                                this.nullPromise;
-            }
+            var isHandler = this.parentService && this.parentService._getChildServiceForObject(object) === this,
+                useDelegate = isHandler && typeof this.fetchRawObjectProperty === "function",
+                delegateFunction = !useDelegate && isHandler && this._delegateFunctionForPropertyName(propertyName),
+                propertyDescriptor = !useDelegate && !delegateFunction && isHandler && this._propertyDescriptorForObjectAndName(object, propertyName),
+                childService = !isHandler && this._getChildServiceForObject(object);
+
+            return  useDelegate ?                       this.fetchRawObjectProperty(object, propertyName) :
+                    delegateFunction ?                  delegateFunction.call(this, object) :
+                    isHandler && propertyDescriptor ?   this._fetchObjectPropertyWithPropertyDescriptor(object, propertyName, propertyDescriptor) :
+                    childService ?                      childService.fetchObjectProperty(object, propertyName) :
+                                                        this.nullPromise;
         }
     },
 
-
-    _capitalizeFirstLetter: {
-        value: function (string) {
-            return string.charAt(0).toUpperCase() + string.slice(1);
+    _delegateFunctionForPropertyName: {
+        value: function (propertyName) {
+            var capitalized = propertyName.charAt(0).toUpperCase() + propertyName.slice(1),
+                functionName = "fetch" + capitalized + "Property";
+            return typeof this[functionName] === "function" && this[functionName];
         }
     },
 
