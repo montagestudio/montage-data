@@ -2,7 +2,6 @@ var Montage = require("montage/core/core").Montage,
     ModuleBlueprint = require("montage/core/meta/module-blueprint").ModuleBlueprint,
     Enum = require("montage/core/enum").Enum,
     AuthorizationManager = require("logic/service/authorization-manager").AuthorizationManager,
-    AuthorizationPolicyType = new Enum().initWithMembers("NoAuthorizationPolicy","UpfrontAuthorizationPolicy","OnFirstFetchAuthorizationPolicy","OnDemandAuthorizationPolicy"),
     DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
     DataQuery = require("logic/model/data-query").DataQuery,
     DataStream = require("logic/service/data-stream").DataStream,
@@ -12,6 +11,9 @@ var Montage = require("montage/core/core").Montage,
     ObjectDescriptor = require("montage/core/meta/object-descriptor").ObjectDescriptor,
     Set = require("collections/set"),
     WeakMap = require("collections/weak-map");
+
+
+
 
 /**
  * AuthorizationPolicyType
@@ -26,6 +28,35 @@ var Montage = require("montage/core/core").Montage,
  *     that offer data to both anonymous and authorized users.
  *
  */
+var AuthorizationPolicy = Montage.specialize({
+
+    id: {
+        value: undefined
+    }
+
+}, {
+    withID: {
+        value: function (id) {
+            var policy = new this();
+            policy.id = id;
+            return policy;
+        }
+    }
+});
+
+AuthorizationPolicy.ON_DEMAND = AuthorizationPolicy.withID("ON_DEMAND");
+AuthorizationPolicy.ON_FIRST_FETCH = AuthorizationPolicy.withID("ON_FIRST_FETCH");
+AuthorizationPolicy.NONE = AuthorizationPolicy.withID("NONE");
+AuthorizationPolicy.UP_FRONT = AuthorizationPolicy.withID("UP_FRONT");
+
+var AuthorizationPolicyType = new Montage();
+AuthorizationPolicyType.NoAuthorizationPolicy = AuthorizationPolicy.NONE;
+AuthorizationPolicyType.UpfrontAuthorizationPolicy = AuthorizationPolicy.UP_FRONT;
+AuthorizationPolicyType.OnDemandAuthorizationPolicy = AuthorizationPolicy.ON_DEMAND;
+AuthorizationPolicyType.OnFirstFetchAuthorizationPolicy = AuthorizationPolicy.ON_FIRST_FETCH;
+
+
+
 
 /**
  * Provides data objects and manages changes to them.
@@ -1778,9 +1809,18 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 childService = this._childServiceForQuery(stream.query);
 
             if (childService) {
-
                 childService._fetchRawData(stream);
             } else {
+                if (this.authorizationPolicy === AuthorizationPolicy.ON_DEMAND) {
+                    if (typeof this.shouldAuthorizeForQuery === "function" && this.shouldAuthorizeForQuery(stream.query) && !this.authorization) {
+                        this.authorizationPromise = exports.DataService.authorizationManager.authorizeService(this).then(function(authorization) {
+                            self.authorization = authorization;
+                            return authorization;
+                        }).catch(function(error) {
+                            console.log(error);
+                        });
+                    }
+                }
                 this.authorizationPromise.then(function (authorization) {
                     var streamSelector = stream.query;
                     stream.query = self.mapSelectorToRawDataQuery(streamSelector);
@@ -2503,8 +2543,12 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
      * Authorization
      */
 
-    "AuthorizationPolicyType": {
+    AuthorizationPolicyType: {
         value: AuthorizationPolicyType
+    },
+
+    AuthorizationPolicy: {
+        value: AuthorizationPolicy
     },
 
     authorizationManager: {

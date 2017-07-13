@@ -401,19 +401,30 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         value: function (stream) {
             var self = this,
                 childService = this._childServiceForQuery(stream.query),
-                selector = stream.query,
-                authPromise = selector.authorization ? Promise.resolve(selector.authorization) :
+                query = stream.query,
+                authPromise = query.authorization ? Promise.resolve(query.authorization) :
                                                        this.authorizationPromise;
+
 
             if (childService && childService.identifier.indexOf("offline-service") === -1) {
                 childService._fetchRawData(stream);
             } else {
-
+                if (this.authorizationPolicy === DataService.AuthorizationPolicy.ON_DEMAND && !query.authorization) {
+                    if (typeof this.shouldAuthorizeForQuery === "function" && this.shouldAuthorizeForQuery(query) && !this.authorization) {
+                        this.authorizationPromise = DataService.authorizationManager.authorizeService(this).then(function(authorization) {
+                            self.authorization = authorization;
+                            return authorization;
+                        }).catch(function(error) {
+                            console.log(error);
+                        });
+                        authPromise = this.authorizationPromise;
+                    }
+                }
                 authPromise.then(function (authorization) {
-                    stream.query = self.mapSelectorToRawDataQuery(selector);
+                    stream.query = self.mapSelectorToRawDataQuery(query);
                     self.fetchRawData(stream);
-                    stream.query = selector;
-                })
+                    stream.query = query;
+                });
             }
         }
     },
@@ -835,12 +846,6 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
 
             if (dataToPersist) {
                 this._streamRawData.delete(stream);
-            }
-
-            console.log(stream.query.type.name);
-
-            if (stream.query.type.name === "Role") {
-                debugger;
             }
 
             dataReadyPromise.then(function (results) {

@@ -68,6 +68,12 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
                 this.serviceIdentifier = value;
             }
 
+
+            value = deserializer.getProperty("isRolesConverter");
+            if (value) {
+                this.isRolesConverter = value;
+            }
+
             deserializer.deserializeUnit("bindings");
         }
     },
@@ -254,6 +260,13 @@ exports.RawPropertyValueToObjectConverter = Converter.specialize( /** @lends Raw
                 criteria = new Criteria().initWithSyntax(self.convertSyntax, v),
                 descriptorPromise = this.foreignDescriptor || Promise.resolve(this.objectDescriptor),
                 query;
+
+            // if (this.isRolesConverter) {
+            //     descriptorPromise = require.async("logic/model/role").then(function (exports) {
+            //         return exports.Role;
+            //     });
+            //     // console.log("Reference", this._foreignDescriptorReference);
+            // }
 
             return descriptorPromise.then(function (typeToFetch) {
                 var type = [typeToFetch.module.id, typeToFetch.name].join("/");
