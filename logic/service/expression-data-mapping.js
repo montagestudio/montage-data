@@ -323,13 +323,20 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
         value: function (data, object) {
             var requisitePropertyNames = this.requisitePropertyNames,
                 iterator = requisitePropertyNames.values(),
-                promise, promises, propertyName;
+                promises, propertyName, result;
 
-            while (propertyName = iterator.next().value) {
-                promise = this.mapRawDataToObjectProperty(data, object, propertyName);
-                (promises || []).push(promise);
+            if (requisitePropertyNames.size) {
+                promises = [];
+                while (propertyName = iterator.next().value) {
+                    promises.push(this.mapRawDataToObjectProperty(data, object, propertyName));
+                }
+                result = Promise.all(promises);
+            } else {
+                result  = Promise.resolve(null)
             }
-            return promises && promises.length && Promise.all(promises) || Promise.resolve(null);
+
+
+            return result;
         }
     },
 
@@ -358,11 +365,6 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 promises = [], key;
 
 
-            // console.log("CriteriaSource", propertyName);
-            // if (propertyName === "roles") {
-            //     debugger;
-            // }
-
             for (key in rules) {
                 if (rules.hasOwnProperty(key) && rawRequirementsToMap.has(key)) {
                     promises.push(this._getAndMapObjectProperty(object, data, key, propertyName));
@@ -390,7 +392,9 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 result;
 
 
+
             result = this.service.rootService.getObjectPropertyExpressions(object, requiredObjectProperties);
+
 
 
             if (result && typeof result.then === "function") {
@@ -554,8 +558,6 @@ exports.ExpressionDataMapping = DataMapping.specialize(/** @lends DataMapping.pr
                 scope = this._scope,
                 self = this,
                 result;
-
-
 
             scope.value = data;
             if (!propertyDescriptor || propertyDescriptor.definition) {

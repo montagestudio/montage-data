@@ -239,6 +239,8 @@ var AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.pr
                 moduleId,
                 i, n;
 
+            console.log("AuthorizeService", dataService.identifier);
+
             this.hasPendingServices = true;
 
             return this._getAuthorizationManagerPanel().then(function (managerPanel) {
