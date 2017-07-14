@@ -1287,7 +1287,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 propertyDescriptor = !useDelegate && !delegateFunction && isHandler && this._propertyDescriptorForObjectAndName(object, propertyName),
                 childService = !isHandler && this._getChildServiceForObject(object);
 
-            return  useDelegate ?                        this.fetchRawObjectProperty(object, propertyName) :
+            return  useDelegate ?                       this.fetchRawObjectProperty(object, propertyName) :
                     delegateFunction ?                  delegateFunction.call(this, object) :
                     isHandler && propertyDescriptor ?   this._fetchObjectPropertyWithPropertyDescriptor(object, propertyName, propertyDescriptor) :
                     childService ?                      childService.fetchObjectProperty(object, propertyName) :
