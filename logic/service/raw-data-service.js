@@ -401,26 +401,26 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
         value: function (stream) {
             var self = this,
                 childService = this._childServiceForQuery(stream.query),
-                query = stream.query,
-                authPromise = query.authorization ? Promise.resolve(query.authorization) :
-                                                       this.authorizationPromise;
+                query = stream.query;
 
 
             if (childService && childService.identifier.indexOf("offline-service") === -1) {
                 childService._fetchRawData(stream);
+            } else if (query.authorization) {
+                stream.query = self.mapSelectorToRawDataQuery(query);
+                self.fetchRawData(stream);
+                stream.query = query;
             } else {
-                if (this.authorizationPolicy === DataService.AuthorizationPolicy.ON_DEMAND && !query.authorization) {
-                    if (typeof this.shouldAuthorizeForQuery === "function" && this.shouldAuthorizeForQuery(query) && !this.authorization) {
-                        this.authorizationPromise = DataService.authorizationManager.authorizeService(this).then(function(authorization) {
-                            self.authorization = authorization;
-                            return authorization;
-                        }).catch(function(error) {
-                            console.log(error);
-                        });
-                        authPromise = this.authorizationPromise;
-                    }
+
+                if (this.authorizationPolicy === DataService.AuthorizationPolicy.ON_DEMAND && typeof this.shouldAuthorizeForQuery === "function" && this.shouldAuthorizeForQuery(query) && !this.authorization) {
+                    this.authorizationPromise = DataService.authorizationManager.authorizeService(this).then(function(authorization) {
+                        self.authorization = authorization;
+                        return authorization;
+                    }).catch(function(error) {
+                        console.log(error);
+                    });
                 }
-                authPromise.then(function (authorization) {
+                this.authorizationPromise.then(function (authorization) {
                     stream.query = self.mapSelectorToRawDataQuery(query);
                     self.fetchRawData(stream);
                     stream.query = query;

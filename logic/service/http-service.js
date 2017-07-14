@@ -65,7 +65,7 @@ var HttpService = exports.HttpService = RawDataService.specialize(/** @lends Htt
             } else if (query && this.authorizationHeaderName && this.authorizationHeaderValueExpression) {
                 scope = new Scope(query);
                 evaluate = compile(parse(this.authorizationHeaderValueExpression));
-                headers[this.authorizationHeaderName] = evaluate(scope)
+                headers[this.authorizationHeaderName] = evaluate(scope);
             } else if (this.authorizationHeaderName && this.authorizationHeaderValue) {
                 headers[this.authorizationHeaderName] = this.authorizationHeaderValue;
             }
@@ -399,7 +399,6 @@ var HttpService = exports.HttpService = RawDataService.specialize(/** @lends Htt
                             try {
                                 data = JSON.parse(text);
                             } catch (error) {
-                                console.log(text);
                                 console.warn(new Error("Can't parse JSON received from " + url));
                             }
                         } else if (request) {
