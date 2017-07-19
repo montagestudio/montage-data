@@ -356,7 +356,7 @@ exports.DataTrigger.prototype = Object.create({}, /** @lends DataTrigger.prototy
             if (status && !error) {
                 status.resolve(null);
             } else if (status && error) {
-                console.error(error);
+                // console.error(error);
                 status.reject(error);
             }
             return null;

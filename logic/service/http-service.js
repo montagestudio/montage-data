@@ -2,11 +2,73 @@ var RawDataService = require("logic/service/raw-data-service").RawDataService,
     DataQuery = require("logic/model/data-query").DataQuery,
     Enumeration = require("logic/model/enumeration").Enumeration,
     Map = require("collections/map"),
+    Montage = require("montage").Montage,
     parse = require("frb/parse"),
     compile = require("frb/compile-evaluator"),
     evaluate = require("frb/evaluate"),
     Scope = require("frb/scope"),
     Promise = require("montage/core/promise").Promise;
+
+
+var HttpError = exports.HttpError = Montage.specialize({
+
+    constructor: {
+        value: function HttpError() {
+            this.stack = (new Error()).stack;
+        }
+    },
+
+    isAuthorizationError: {
+        get: function () {
+            return this._isAuthorizationError || this.statusCode === 401;
+        },
+        set: function (value) {
+            this._isAuthorizationError = value;
+        }
+    },
+
+    message: {
+        get: function () {
+            if (!this._message) {
+                this._message = "Status " + this.statusCode + " received for url: " + this.url;
+            }
+            return this._message;
+        }
+    },
+
+    name: {
+        value: "HttpError"
+    },
+
+    url: {
+        value: undefined
+    },
+
+    statusCode: {
+        value: undefined
+    }
+
+}, {
+
+    withMessage: {
+        value: function (message) {
+            var error = new this();
+            error._message = message;
+            return error;
+        }
+    },
+
+
+    withRequestAndURL: {
+        value: function (request, url) {
+            var error = new this();
+            error.statusCode = request.status;
+            error.url = url;
+            return error;
+        }
+    }
+
+});
 
 /**
  * Superclass for services communicating using HTTP, usually REST services.
@@ -220,6 +282,9 @@ var HttpService = exports.HttpService = RawDataService.specialize(/** @lends Htt
      * error the promise will be rejected with the error.
      */
 
+    _authRegexp: {
+        value: new RegExp(/error=\"([^&]*)\"/)
+    },
 
     fetchHttpRawData: {
         value: function (url, headers, body, types, query, sendCredentials) {
@@ -243,12 +308,13 @@ var HttpService = exports.HttpService = RawDataService.specialize(/** @lends Htt
                     request = new XMLHttpRequest();
                     request.onreadystatechange = function () {
                         if (request.readyState === 4) {
-                            HttpService.activeRequests = HttpService.activeRequests - 1;
                             resolve(request);
                         }
                     };
-                    // console.log(url);
-                    request.onerror = function () { resolve(request); };
+                    request.onerror = function () {
+                        error = HttpError.withRequestAndURL(request, url);
+                        reject(error);
+                    };
                     request.open(parsed.body ? "POST" : "GET", parsed.url, true);
 
                     self.setHeadersForQuery(parsed.headers, parsed.query, parsed.url);
@@ -270,12 +336,20 @@ var HttpService = exports.HttpService = RawDataService.specialize(/** @lends Htt
                 if (!error && (request.status >= 300 || request.status === 0)) {
                     // error = new Error("Status " + request.status + " received for REST URL " + parsed.url);
                     // console.warn(error);
+                    console.log("CreateError...", url);
+                    throw HttpError.withRequestAndURL(request, url);
                 }
                 // Return null for errors or return the results of parsing the
                 // request response according to the specified types.
                 // TODO: Support multiple alternate types.
-                return error ? null : parsed.types[0].parseResponse(request, parsed.url);
+                self.willParseResponseForRequest(request);
+                return parsed.types[0].parseResponse(request, parsed.url);
             });
+        }
+    },
+
+    willParseResponseForRequest: {
+        value: function (request) {
         }
     },
 
@@ -304,8 +378,12 @@ var HttpService = exports.HttpService = RawDataService.specialize(/** @lends Htt
                 last += 1;
             }
             // Parse the headers argument, which cannot be a boolean.
-            parsed.headers = last > 1 && arguments[1] || {};
-            if (this._isBoolean(parsed.headers)) {
+            var headers = last > 1 && arguments[1] || {};
+            parsed.headers = {};
+            if (typeof headers === "object") {
+                Object.assign(parsed.headers, headers);
+            }
+            if (this._isBoolean(headers)) {
                 console.warn(new Error("Invalid headers for fetchHttpRawData()"));
                 last = -1;
             }
@@ -334,8 +412,6 @@ var HttpService = exports.HttpService = RawDataService.specialize(/** @lends Htt
             }
 
 
-            // Parse the query, which can be provided as an array or as a
-            // sequence of DataType arguments.
             if (last === 5 && arguments[4] instanceof DataQuery) {
                 parsed.query = arguments[4]
             } else if (last === 4 && arguments[3] instanceof DataQuery) {
@@ -399,6 +475,7 @@ var HttpService = exports.HttpService = RawDataService.specialize(/** @lends Htt
                             try {
                                 data = JSON.parse(text);
                             } catch (error) {
+                                console.log(url.split("?"));
                                 console.warn(new Error("Can't parse JSON received from " + url));
                             }
                         } else if (request) {
