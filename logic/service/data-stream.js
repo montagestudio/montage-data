@@ -1,6 +1,7 @@
 // Note: Bluebird promises are used even if ECMAScript 6 promises are available.
 var DataProvider = require("logic/service/data-provider").DataProvider,
     DataSelector = require("logic/service/data-selector").DataSelector,
+    DataObjectDescriptor = require("logic/model/data-object-descriptor").DataObjectDescriptor,
     Promise = require("montage/core/promise").Promise;
 
 /**
