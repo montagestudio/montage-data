@@ -20,7 +20,7 @@ var HttpError = exports.HttpError = Montage.specialize({
 
     isAuthorizationError: {
         get: function () {
-            return this._isAuthorizationError || this.statusCode === 401;
+            return this._isAuthorizationError || (this.statusCode === 401 || this.statusCode === 403);
         },
         set: function (value) {
             this._isAuthorizationError = value;
@@ -286,18 +286,17 @@ var HttpService = exports.HttpService = RawDataService.specialize(/** @lends Htt
         value: new RegExp(/error=\"([^&]*)\"/)
     },
 
-    fetchHttpRawData: {
-        value: function (url, headers, body, types, query, sendCredentials) {
+    _fetchHttpRawDataWithParsedArguments: {
+        value: function (parsed) {
             var self = this,
-                parsed, error, request;
-            // Parse arguments.
-            parsed = this._parseFetchHttpRawDataArguments.apply(this, arguments);
+                error, request;
+
             if (!parsed) {
                 error = new Error("Invalid arguments to fetchHttpRawData()");
             } else if (!parsed.url) {
                 error = new Error("No URL provided to fetchHttpRawData()");
             }
-            // Create and return a promise for the fetch results.
+
             return new Promise(function (resolve, reject) {
                 var i;
                 // Report errors or fetch the requested raw data.
@@ -312,7 +311,7 @@ var HttpService = exports.HttpService = RawDataService.specialize(/** @lends Htt
                         }
                     };
                     request.onerror = function () {
-                        error = HttpError.withRequestAndURL(request, url);
+                        error = HttpError.withRequestAndURL(request, parsed.url);
                         reject(error);
                     };
                     request.open(parsed.body ? "POST" : "GET", parsed.url, true);
@@ -333,23 +332,37 @@ var HttpService = exports.HttpService = RawDataService.specialize(/** @lends Htt
             }).then(function () {
                 // Log a warning for error status responses.
                 // TODO: Reject the promise for error statuses.
-                if (!error && (request.status >= 300 || request.status === 0)) {
+                if (self._isRequestUnauthorized(request) && typeof self.authorize === "function") {
+                    return self.authorize().then(function () {
+                        return self._fetchHttpRawDataWithParsedArguments(parsed);
+                    });
+                } else if (!error && (request.status >= 300 || request.status === 0)) {
                     // error = new Error("Status " + request.status + " received for REST URL " + parsed.url);
                     // console.warn(error);
-                    console.log("CreateError...", url);
-                    throw HttpError.withRequestAndURL(request, url);
+                    throw HttpError.withRequestAndURL(request, parsed.url);
                 }
                 // Return null for errors or return the results of parsing the
                 // request response according to the specified types.
                 // TODO: Support multiple alternate types.
-                self.willParseResponseForRequest(request);
+
                 return parsed.types[0].parseResponse(request, parsed.url);
             });
         }
     },
 
-    willParseResponseForRequest: {
+    _isRequestUnauthorized: {
         value: function (request) {
+            return request.status === 401 || (typeof this.didAuthorizationFail === "function" && this.didAuthorizationFail(request));
+        }
+    },
+
+    fetchHttpRawData: {
+        value: function (url, headers, body, types, query, sendCredentials) {
+            var parsed = this._parseFetchHttpRawDataArguments.apply(this, arguments);
+
+            // Create and return a promise for the fetch results.
+            return this._fetchHttpRawDataWithParsedArguments(parsed);
+
         }
     },
 

@@ -806,7 +806,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
 
             if (this.authorizationPolicy === AuthorizationPolicyType.UpfrontAuthorizationPolicy) {
                 var self = this;
-                this.authorizationPromise = exports.DataService.authorizationManager.authorizeService(this).then(function(authorization) {
+                exports.DataService.authorizationManager.authorizeService(this).then(function(authorization) {
                     self.authorization = authorization;
                     return authorization;
                 }).catch(function(error) {
@@ -818,6 +818,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             }
         }
     },
+
+
 
     /**
      * Returns the AuthorizationPolicyType used by this DataService.
@@ -2552,7 +2554,7 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     authorizationManager: {
-        value: AuthorizationManager
+        value: undefined
     }
 
 });
