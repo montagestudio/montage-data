@@ -45,9 +45,6 @@ var AuthorizationManager = Montage.specialize(/** @lends AuthorizationManager.pr
         value: undefined
     },
 
-
-
-
     /********************************************
      * Panels
      */
