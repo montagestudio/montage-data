@@ -10,7 +10,7 @@
   "version": "1.0.0-alpha2",
   "private": true,
   "license": "BSD-3-Clause",
-  "main" : "montage-data.js",
+  "main": "montage-data.js",
   "author": "Montage Studio, inc. (http://montagestudio.com/)",
   "repository": {
     "type": "git",
