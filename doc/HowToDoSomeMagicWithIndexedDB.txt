@@ -1,0 +1,412 @@
+How to do some magic with indexedDB
+Download sample - 37.8 KB Download latest source
+Introduction
+With plain indexedDB API you can do case insensitive search, logical OR operations, matching on sets of keys and more. This article shows how to access hidden features in indexedDB that people are unaware of exist! As I was writing on an indexedDB library called Dexie.js, I discovered the hidden capabilities in IDBCursor and therefore I want to share my algorithms and discovery with the public. I will refer to these algorithms as the Dexie Algorithms and this article reveals how they work. In the end of the article there is a full HTML snippet you can copy and paste to test the algorithms in your own browser.
+Background
+IndexedDB is the most future proof API to use if you need a local indexable database in the browser. W3C has killed off the WebSQL standardization work in favour of indexedDB. Good news is you can already use it with all modern browsers: IE10+, Opera, Firefox, Chrome, Android and IE Mobile, working very stable accross different implementations. You can even use it with Safari Desktop and iOS Safari throuh the indexedDB polyfill that implements the standard against WebSQL. Since about 1 year ago (2013), Microsoft actively pushed out IE11 to all Windows 7 and Windows 8 clients. So it's only the few Windows XP users you wont reach if you decide to build your app on indexedDB. To sum this up: indexedDB runs on any modern browser and we can soon assume it's there on any client.
+Strengths of IndexedDB
+      
+IndexedDB is a NOSQL database with full transaction support, read/write locking and indexing. It's transaction support makes it bullet proof to work with in all Web use cases such as page reload, multiple tabs open, loading newer version of webapp with updated schema, etc...
+Tables are called Object Stores and contains javascript objects rather than records. In each Object Store you can put javascript objects but you don't need to specify what members they may have (column names). If you want to search for your objects by other than its primary key, you will need to specify indexes. Using indexes, you can query an object by a specific key, such as firstName, lastName etc.
+Due to it simplistic indexing API, browser vendors may implement it "from scratch" - they doesn't need to use existing SQL library such as SQLite to fulfill the standard.
+Transactions, database versioning and initialization is where the robustness indexedDB impress the most - it is very well thought through and designed. Setting up tables initially, populating initial data and upgrading between versions is among the core in indexedDB. These things could have been a hazzle for webapp developers without this thoughtful architecture. By requireing the webapp developers to think about upgrade from beginning, it allows apps to not be just capable of storing client-side data but also to be functional for any future version when tables or indexes needs to be added, or data architecture are changed.
+The limitations of indexedDB
+Compared to SQL databases there are lots of limitations (no foreign keys, stored procedures, views, etc) but the most important limitation is the limited query support.
+IndexedDB is out-of-the-box only capable of doing the following search operations:
+1. IDBKeyRange.only() - exact match (case sensitive!)
+2. IDBKeyRange.bound() - Find all objects where key is within given range
+3. IDBKeyRange.upperBound() - Find all objects where key is lower than
+given key
+4. IDBKeyRange.lowerBound() - Find all objects where key is greater than
+given key
+As you can see, above, there seems to be no way of doing things like:
+Case insensitive searh
+Find all objects where key is any of ("a", "b", "c" or "d") (SQL 'IN') Find keys that contains a given substring (SQL LIKE)
+Logical OR or AND
+Etc... ( the list could be long...)
+The tricks that makes indexedDB rock
+None of the tricks I am showing require you to store meta-data or hook into DB operations. They will work with any indexedDB database already being used. For example, you do not have to store lowercase versions of strings that you need to do case insensitive matching on.
+So lets start showing the tricks that Dexie.js does and how I have implemented them:
+Support for keys that matches any of [a, b or c] (SQL IN (a,b,c))
+A little piece of background: To iterate ALL records in a table with indexedDB, you call openCursor() on the IDBObjectStore or IDBIndex instance. For each records you get called by an onsuccess callback:
+     Hide Copy Code
+// Start a transaction to operate on your 'friends' table
+var transaction = db.transaction(["friends"]); // (db is an instance of IDBDataba
+// Get the 'name' index from your 'friends' table.
+var index = trans.objectStore("friends").index("name");
+// Start iteration by opening a cursor
+var cursorReq = index.openCursor();
+// When any records is found, you's get notified by the 'success' event
+req.onsuccess = function (e) {
+    var cursor = e.target.result;
+    if (cursor) {
+        // We have a record in cursor.value
+        console.log(JSON.stringify(cursor.value));
+        cursor.continue();
+    } else {
+        // Iteration complete
+} };
+Instead of just doing cursor.continue() you may specify the value of the next key you want to advance to. So if we write:
+Hide Copy Code
+cursor.continue("David");
+...the next onsuccess would have a cursor positioned at the first record where name equals "David" if that key exists. The specification requires that the cursor must be positioned at the first record that is equal to or greater than the specified key in the same sort order as the index.
+So lets say we want to find all friends that have any of the following names: "David", "Daniel" or "Zlatan". What we want to do first, is to sort() our set so we get ["Daniel", "David", "Zlatan"] (n comes before v). Then we do the following:
+s
+1. call cursor.continue("Daniel")
+2. onsuccess: Check if cursor.key == "Daniel". If so, include cursor.value in
+result and call cursor.continue() without arguments to check for more
+Daniels.
+3. call cursur.continue("David")
+4. onsuccess: Check if cursor.key == "David". If so, include cursor.value in
+result and call cursor.continue() without arguments to check for more
+Davids.
+5. call cursor.continue("Zlatan")
+6. onsuccess: Check if cursor.key == "Zlatan". If so, include cursor.value in result and call cursor.continue() without arguments to check for more Zlatans. Else, we could stop iterating by just dont call cursor.continue() anymore because we know we wont find any more results.
+The algorithm for this is:
+function equalsAnyOf(keysToFind, onfound, onfinish) {
+var set = keysToFind.sort();
+var i = 0;
+var cursorReq = index.openCursor(); // Assume 'index' exists in a parent clos cursorReq.onsuccess = function (event) {
+        var cursor = event.target.result;
+        if (!cursor) { onfinish(); return; }
+        var key = cursor.key;
+        while (key > set[i]) {
+            // The cursor has passed beyond this key. Check next.
+            ++i;
+            if (i === set.length) {
+                // There is no next. Stop searching.
+onfinish();
+return; }
+        }
+        if (key === set[i]) {
+// The current cursor value should be included and we should continue // a single step in case next item has the same key or possibly our // next key in set.
+onfound(cursor.value);
+            cursor.continue();
+u
+} else {
+            // cursor.key not yet at set[i]. Forward cursor to the next key to hu
+            cursor.continue(set[i]);
+        }
+};
+return c; }
+Case insensitive search
+Case insensitive search is another thing that many people would expect a database to support. There is a common misunderstanding of indexedDB where people seem to believe that they need to double-store their strings in lowercase in order to be able to do case insensitive search. Here's why this is NOT needed!
+Dexie.js implements case insensitive searching using a similar IDBCursor.continue(key) method as with the SQL 'IN' algorithm shown above, however a little more complexity in the algorithm is needed.
+Let's say we need to find "david" in table "friends" no matter its casing. "David" or "david" should both be found. Obviously, we could create an array containing all possible case combinations of "david" and then use the SQL 'IN' algorithms above. However, the number of combinations would increase exponentially with the length of the key we're looking for. But there is a trick we can use; since cursor.continue() will land on the next record in sort order, that will reveal what combinations we can skip when landing on the key that is not a match.
+What we do is to start searching for the lowest possible value of "David", which would be "DAVID" since uppercase unicode characters have a lesser value than their corresponding lowercase version. If there is no "DAVID" in db, we will land on the least possible key yet greater than "DAVID". Now, instead of testing the next combination of davids (which would be "DAVId"), we first inspect the key we landed on and from that key, we derive what
+n
+would be the next "david" variant to search for. Here's the Dexie algorithm for this:
+function findIgnoreCaseAlgorithm(needle, onfound, onfinish) {
+// needle: The string to search for
+// onfound: A function to call for each found item
+// onfinsish: A function to call when we're finshed searching.
+var upperNeedle = needle.toUpperCase();
+var lowerNeedle = needle.toLowerCase();
+var cursorReq = index.openCursor(); // 'index' (IDBIndex) must exist in closu cursorReq.onsuccess = function (event) {
+        var cursor = event.target.result;
+        if (!cursor) {
+            // No more data to iterate over - call onfinish()
+onfinish();
+return; }
+        var key = cursor.key;
+        if (typeof (key) !== 'string') {
+// Just in case we stumble on data that isnt what we expect - // toLowerCase() wont work on this object. Check next. cursor.continue();
+return;
+        }
+        var lowerKey = key.toLowerCase();
+        if (lowerKey === lowerNeedle) {
+onfound(cursor.value); // Notify caller we found somethin
+cursor.continue(); // Check next record, it might match too! } else {
+            // Derive least possible casing to appear after key in sort order
+            var nextNeedle = nextCasing(key, lowerKey, upperNeedle, lowerNeedle);
+            if (nextNeedle) {
+                cursor.continue(nextNeedle);
+            } else {
+} }
+};
+// No more possible case combinations to look for.
+// Call onfinish() and dont call cursor.continue() anymore. onfinish();
+function nextCasing(key, lowerKey) {
+    var length = Math.min(key.length, lowerNeedle.length);
+r
+var llp = -1; // "llp = least lowerable position"
+// Iterate through the most common first chars for cursor.key and needle.
+for (var i = 0; i < length; ++i) {
+    var lwrKeyChar = lowerKey[i];
+    if (lwrKeyChar !== lowerNeedle[i]) {
+// The char at position i differs between the found key and needl // looked for when just doing case insensitive match.
+// Now check how they differ and how to trace next casing from th if (key[i] < upperNeedle[i]) {
+// We could just append the UPPER version of the key we're lo // since found key is less than that.
+return key.substr(0, i) + upperNeedle[i] + upperNeedle.substr
+        }
+        if (key[i] < lowerNeedle[i]) {
+// Found key is between lower and upper version. Lets first a // lowercase char and the rest as uppercase.
+return key.substr(0, i) + lowerNeedle[i] + upperNeedle.substr
+        }
+        if (llp >= 0) {
+// Found key is beyond this key. Need to rewind to last lower // position and return key + 1 lowercase char + uppercase res return key.substr(0, llp) + lowerKey[llp] + upperNeedle.subst
+}
+// There are no lowerable positions - all chars are already lower // (or non-lowerable chars such as space, periods etc)
+return null;
+    }
+    if (key[i] < lwrKeyChar) {
+// Making lowercase of this char would make it appear after key. // Therefore set llp = i.</span>
+llp = i;
+}
+// All first common chars of found key and the key we're looking for are // when ignoring case.
+if (length < lowerNeedle.length) {
+// key was shorter than needle, meaning that we may look for key + UP // version of the rest of needle.
+return key + upperNeedle.substr(key.length);
+}
+// Found key was longer than the key we're looking for
+if (llp < 0) {
+    // ...and there is no way to make key we're looking for appear after
+    return null;
+} else {
+e i o (
+p
+(
+a t r
+c
+e
+P
+f
+} }
+}
+// There is a position of a char, that if we make that char lowercase // needle will become greater than found key.
+return key.substr(0, llp) + lowerNeedle[llp] + upperNeedle.substr(llp
+Search for strings that start with X, case insensitive.
+In Dexie, a case insensitive LIKE '%str' query is written using the followin
+straight-forward syntax: Hide Copy Code
+db.friends.where("name").startsWithIgnoreCase("da")
+The result is a Collection that would return the "David" and "Daniel" objects once executed with any of the toArray() or each() methods.
+Here's how it's implemented:
+Do the same findIgnoreCaseAlgorithm as above, but instead of checking if (lowerKey === lowerNeedle) {...}, we do if (lowerKey.indexOf(lowerNeedle) == 0) { ... }
+cursorReq.onsuccess = function (event) {
+       var cursor = event.target.result;
+       if (!cursor) {
+           // No more data to iterate over - call onfinish()
+onfinish();
+return; }
+       var key = cursor.key;
+       if (typeof (key) !== 'string') {
+// Just in case we stumble on data that isnt what we expect - // toLowerCase() wont work on this object. Check next. cursor.continue();
+return;
+ }
+,
+var lowerKey = key.toLowerCase();
+if (lowerKey.indexOf(lowerNeedle) === 0) {
+onfound(cursor.value); // Notify caller we found somethin
+cursor.continue(); // Check next record, it might match too! } else {
+    // Derive least possible casing to appear after key in sort order
+    var nextNeedle = nextCasing(key, lowerKey, upperNeedle, lowerNeedle);
+    if (nextNeedle) {
+        cursor.continue(nextNeedle);
+    } else {
+} }
+};
+// No more possible case combinations to look for.
+// Call onfinish() and dont call cursor.continue() anymore. onfinish();
+Note: The above snippet is just a part of the algorithm. See Case Insensitive Search algorithm which covers the rest.
+Logical OR
+IndexedDB has no support for logical or. You can only specify one keyrange at a time. However, what it does have support for, is to run several queries in parallell - even when using same transaction (as long as the queries are readonly queries). Even if the queries wouldnt run in parallell, it would still work but a little less performant. The OR operation in Dexie.js is unit tested with Chrome, IE, Firefox and Opera.
+The only thing we need to do except executing both queries in parallell, is to remove any duplicates. To do that, we can use a closure-based set of found primary keys. Whenever a new record match is found on any of the parallell queries, it first checks the set if it's already included. If not, it calls onfound for the entry and sets set[primKey] = true so that if the same entry would be found on the other query, it would silently ignore to call onfound().
+To access this algorithm with Dexie.js, you type something like the following: Hide Copy Code
+db.friends.where('name').equalsIgnoreCase('david').or('shoeSize').above(40).toArr
+Here's how it's done. The code snipped below is a simplified version only supporting the logical OR of two standard IDBKeyRange queries. With Dexie, you can do arbritary number of OR with any standard or extended operation such as equalsIgnoreCase().
+function logical_or(index1, keyRange1, index2, keyRange2, onfound, onfinish) {
+    var openCursorRequest1 = index1.openCursor(keyRange1);
+    var openCursorRequest2 = index2.openCursor(keyRange2);
+assert(index1.objectStore === index2.objectStore); // OR can only be done on var primKey = index1.objectStore.keyPath;
+    var set = {};
+    var resolved = 0;
+    function complete() {
+        if (++resolved === 2) onfinish();
+}
+    function union(item) {
+        var key = JSON.stringify(item[primKey]);
+        if (!set.hasOwnProperty(key)) {
+            set[key] = true;
+            onfound(item);
+        }
+}
+    openCursorRequest1.onsuccess = function (event) {
+        var cursor = event.target.result;
+        if (cursor) {
+            union(cursor.value);
+        } else {
+            complete();
+        }
+}
+    openCursorRequest2.onsuccess = function (event) {
+        var cursor = event.target.result;
+        if (cursor) {
+union(cursor.value);
+a
+s
+        } else {
+            complete();
+} }
+}
+When using parallell OR execution, the sort order will not be valid. Partly because the two different queries execute on different indexes with different sort order, but mainly because the two queries run in parallell by the browser backround threads and we cannot know which onsuccess is called before the other. However, this can be resolved by implementing onfound to push the items to an array, and onfinish to sort it using any requested sort order.
+Hide Copy Code
+var index1 = transaction.objectStore("friends").index("name");
+var index2 = transaction.objectStire("friends").index("shoeSize");
+var keyRange1 = IDBKeyRange.bound ("Da", "Da\uffff");
+var keyRange2 = IDBKeyRange.lowerBound (40, true);
+//
+// SELECT * FROM friends WHERE name LIKE 'Da%' OR shoeSize > 40 ORDERBY shoeSize; //
+var result = [];
+logical_or (index1, keyRange1, index2, keyRange2, function (friend) {
+    result.push(friend);
+}, function () {
+    result.sort (function (a,b) { return a.shoeSize - b.shoeSize; });
+});
+Logical AND
+Logical AND can partly be implemented in indexedDB using compound indexes. As with many other databases, indexedDB supports creating an index that is not just 'name' or 'shoeSize' but the combination of 'name' and 'shoeSize':
+Hide Copy Code
+store.createIndex('nameAndShoeSize', ['name', 'shoeSize']);
+This index will sort by name at first hand, and, if two records have the same name, the second sort order would be shoeSize. When such an index is being used, the key will be regarded as the array of the two compound keys. By using IDBKeyRange.only(['David', 40]) you could look for records where name is 'David' AND shoeSize is 40. However, it doesnt give as a generic AND - it just gives us the posibility to do AND when using exact match. You couldn't do WHERE name = 'David' AND shoeSize > 40. You could almost say that it behaves like if you had created another field with the concatenation of 'name' and 'shoeSize' into a single string. Another drawback is that not all browsers supports compound indexes - namely IE10/IE11.
+There is no trick to emulate a real generic logical AND in indexedDB other that applying a JS filter to the iteration. This is the best hit you can make. And it's not that bad as long as you choose a good first-hand filter you can apply your manual filter on the iteration. Keep in mind that with indexedDB, the database operates on the same machine as the client, so there is no network consumption to optimize here. The pros with this, is that you have all the power of doing a complex filter - whatever expression possible to write in JS. Just remember to choose a good first-hand index to filter out the major results.
+Consider the following SQL query: Hide Copy Code
+SELECT * FROM friends WHERE name='David' AND shoeSize > 40
+It's wiser to let the database filter out name='David' and our javascript filter do the (shoeSize > 40) since it's more probable that the number of friends with name 'David' are less than the number of friends with shoeSize above 40.
+Here's an example using Dexie.js (including bootstraping the database): Hide Copy Code
+var db = new Dexie("MyDB");
+db.version(1).stores({friends: "++id,name,shoeSize"});
+db.open();
+db.friends.where('name')
+          .equalsIgnoreCase('david')
+          .and(function(friend) { return friend.shoeSize > 40; })
+          .toArray (function (friendsArray) {
+              console.log(JSON.stringify(friendsArray));
+          });
+...or if you rather want to use compound indexes, you would do this in Dexie.js:
+Hide Copy Code
+var db = new Dexie("MyDB");
+db.version(1).stores({friends: "++id,name,shoeSize,[name+shoeSize]"});
+db.open();
+db.friends.where('[name+shoeSize]')
+          .equals(['David',43])
+          .toArray (function (friendsArray) {
+              console.log(JSON.stringify(friendsArray));
+          });
+However, if you need to target IE, dont use them - no support in neither IE10 or IE11.
+Search for strings that start with X ( SQL LIKE 'prefix%' )
+Matching prefix of string keys is the most straight-forward trick you can do with indexedDB. It's not unique for Dexie.js as other libraries support it as well. However, for the sake of completeness, here is how it is done: Just do an IDBKeyRange.bound where lowerBound is the prefix and upperBound is a string that would include all possible continuations of the prefix. The simplest
+way to do this is just to append a character with highest possible value; '\uffff'.
+Hide Copy Code
+IDBKeyRange.bound(prefix, prefix + '\uffff', false, false)
+More tricks... Using the code
+Code snippets in the article are conceptual only. The purpuse of the article is only to show simplified versions of the concept and algorithms used in Dexie.js.
+Test it on Your Own Browser!
+To see the algorithms in action just paste the following snippet into an empty HTML file and download Dexie.js. If using IE, make sure you run the page on an HTTP or HTTPS url. If using Safari, also download the indexedDB polyfill and include it in the HTML. Notice that when using polyfill for Safari the OR operation is not function as expected (this is something that needs to be fixed in the polyfill).
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Extended indexedDB queries using Dexie.js</title>
+    <script type="text/javascript" src="Dexie.js"></script>
+    <script>
+//
+// App global database instance and schema //
+var db = new Dexie("MyDB"); db.version(1).stores({
+            friends: "++id,name,shoeSize"
+        });
+ 
+db.open().catch(function (e) {
+    log("Error opening database: " + e, "error");
+});
+//
+// Populate some data
+//
+function populateSomeData() {
+    log("Populating some data", "heading");
+    return db.transaction("rw", db.friends, function (friends) {
+friends.clear();
+friends.add({ name: "David", shoeSize: 43 }); friends.add({ name: "Ylva", shoeSize: 37 }); friends.add({ name: "Jon", shoeSize: 44 }); friends.add({ name: "Måns", shoeSize: 42 }); friends.add({ name: "Daniel", shoeSize: 39 }); friends.add({ name: "Nils", shoeSize: 45 }); friends.add({ name: "Zlatan", shoeSize: 47 }); // Log data from DB: friends.orderBy('name').each(function (friend) {
+            log(JSON.stringify(friend));
+        });
+    }).catch(function (e) {
+        log(e, "error");
+}); }
+//
+// Examples
+//
+function equalsAnyOf() {
+    log("db.friends.where('name').anyOf('David', 'Zlatan', 'Daniel')",
+    return db.friends.where('name').anyOf('David', 'Zlatan', 'Daniel')
+}
+.each(function (friend) {
+    log(JSON.stringify(friend));
+});
+function equalsIgnoreCase() {
+    log("db.friends.where('name').equalsIgnoreCase('david')", "heading"
+    return db.friends.where('name').equalsIgnoreCase('david')
+                     .each(function (friend) {
+                         log(JSON.stringify(friend));
+});
+}
+function startsWithIgnoreCase() {
+    log("db.friends.where('name').startsWithIgnoreCase('da')", "heading"
+    return db.friends.where('name').startsWithIgnoreCase('da')
+}
+}
+.each(function (friend) {
+    log(JSON.stringify(friend));
+});
+function logicalOR() {
+    log("db.friends.where('name').startsWithIgnoreCase('da').or('shoeSize
+    return db.friends.where('name').startsWithIgnoreCase('da')
+.or('shoeSize').below(40)
+.each(function (friend) {
+    log(JSON.stringify(friend));
+});
+function logicalAND() {
+    log("db.friends.where('name').startsWithIgnoreCase('da').and(function
+    return db.friends.where('name').startsWithIgnoreCase('da')
+}
+.and(function (friend) { return friend.shoeSize > 40; })
+.each(function (friend) {
+    log(JSON.stringify(friend));
+});
+//
+// Helpers
+//
+function log(txt, clazz) {
+    var li = document.createElement('li');
+    li.textContent = txt.toString();
+    if (clazz) li.className = clazz;
+    document.getElementById('log').appendChild(li);
+}
+function runSamples() {
+    populateSomeData()
+        .then(equalsAnyOf)
+        .then(equalsIgnoreCase)
+        .then(startsWithIgnoreCase)
+        .then(logicalOR)
+        .then(logicalAND)
+.catch(function (e) {
+'
+                log(e, "error");
+            });
+    </script>
+    <style>
+        li {list-style-type:none;}
+        .error { color: red; }
+        .heading { color: #808080; margin-top: 12px;}
+    </style>
+</head>
+<body onload="runSamples();">
+    <ul id="log"></ul>
+</body>
+</html>
+Points of Interest
+All of these algorithms was invented while I was writing the indexedDB wrapper Dexie.js. My initial intention was just to create a decent wrapper library for a product I am developing.
+The first name that I gave the wrapper library was StraightForwardDB / sfdb.js - since I wanted a minimalistic API - yet capable of all the versioning and robustness of the native API. Much of the API is written with inspiration from .NET's Linq2SQL. Along the way I learned the details of how indexedDB works and as I was learning about the IDBCursor interface, I stumbled on the posibility of case insensitive searching and set matching. To my surprise I was unable to find any other implementation of case insensitive search on the net. This inspired me to write this article and show what is possible to do with indexedDB.
+History
+March 16: Initial draft March 26: Article published.
+}
+March 27: Updated sample files - bugfix in Dexie.min.js
+This article, along with any associated source code and files, is licensed under
+The Apache License, Version 2.0
+ 
