@@ -11,6 +11,9 @@ var RawDataService = require("logic/service/raw-data-service").RawDataService,
 /**
  * TODO: Document
  *
+ * !!!!!THIS IS A WORK IN PROGRESS generalizing OfflineService, so code started from that
+ * and is evolving from there.
+ *
  * @class
  * @extends RawDataService
  */
@@ -52,7 +55,7 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
 
     /**
      * returns a Promise that resolves to the object used by the service to
-     * store data
+     * store data. This is meant to be an abstraction of the "Database"
      *
      * @returns {Promise}
      */
@@ -66,123 +69,10 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
         }
     },
 
-
-   schema : {
-        value: void 0
-    },
    name : {
         value: void 0
     },
 
-     /**
-     * Main initialiation method
-     *
-     * @method
-     * @argument {String} name          - Defines the name of the database offline service will create/use.
-     * @argument {Number} version       - Storage version
-     * @argument {Object} scheme        - A schema with the following structure:
-     *
-     *           {
-     *      "Person": {
-     *           primaryKey: "id",
-     *           indexes: ["firstName","lastName],
-     *           versionUpgradeLogic: function() {}
-     *       },
-     *       "Product": {
-     *
-     *       }
-     *   }
-     *
-     */
-
-    initWithName: {
-        value: function(name, version, schema) {
-            var localVersion = version || 1;
-            if (!this._storage) {
-                var storage = this._storage = new Dexie(name),
-                    table, tableSchema, dbTable, dbSchema, dbIndexes,
-                    shouldUpgradeToNewVersion = false, newDbSchema,
-                    schemaDefinition, tableIndexes, tablePrimaryKey;
-
-                this.name = name;
-                this.schema = schema;
-
-                //storage.open().then(function (storage) {
-                newDbSchema = {};
-
-                //We automatically create an extra table that will track offline operations the record was last updated
-                schemaDefinition = "++id";
-                schemaDefinition += ",";
-                schemaDefinition += "dataID";
-                schemaDefinition += ",";
-                schemaDefinition += this.typePropertyName;
-                schemaDefinition += ",";
-                schemaDefinition += this.lastFetchedPropertyName;
-                schemaDefinition += ",";
-                schemaDefinition += this.lastModifiedPropertyName;
-                schemaDefinition += ",";
-                schemaDefinition += this.operationPropertyName;
-                schemaDefinition += ",";
-                schemaDefinition += this.changesPropertyName;
-                schemaDefinition += ",";
-                schemaDefinition += this.contextPropertyName;
-                newDbSchema[this.operationTableName] = schemaDefinition;
-
-                if (schema) {
-
-                    for (table in schema) {
-                        tableSchema = schema[table];
-                        tableIndexes = tableSchema.indexes;
-                        tablePrimaryKey = tableSchema.primaryKey;
-                        dbTable = storage[table];
-                        if (dbTable) {
-                            //That table is defined, now let's compare primaryKey and indexes
-                            dbSchema = dbTable.schema;
-                            if (dbSchema.primKey !== tablePrimaryKey) {
-                                //Existing table has different primaryKey, needs new version
-                                shouldUpgradeToNewVersion = true;
-                            }
-                            //test if indexes aren't the same.
-                            dbIndexes = dbSchema.indexes;
-                            if (dbIndexes !== tableSchema.indexes) {
-                                //Existing table has different indexes, needs new version
-                                shouldUpgradeToNewVersion = true;
-                            }
-
-
-                        } else {
-                            //That table doesn't exists, which means we need to update.
-                            shouldUpgradeToNewVersion = true;
-                        }
-                        if (shouldUpgradeToNewVersion) {
-                            //We automatically add an index for lastUpdatedPropertyName ("montage-online-last-updated")
-                            schemaDefinition = tablePrimaryKey;
-                            for(var i=0, iIndexName;(iIndexName = tableIndexes[i]);i++) {
-                                if(iIndexName !== tablePrimaryKey) {
-                                    schemaDefinition += ",";
-                                    schemaDefinition +=  iIndexName;
-                                }
-                            }
-                            newDbSchema[table] = schemaDefinition;
-                        }
-                    }
-
-                    if (shouldUpgradeToNewVersion) {
-                        //storage.close();
-                        //Add upgrade here
-                        //console.log("newDbSchema:",newDbSchema);
-                        storage.version(storage.verno+1).stores(newDbSchema);
-                        //storage.open();
-                    }
-
-                    PersistentDataService.registerPersistentDataService(this);
-                }
-                //});
-
-            }
-            return this;
-        }
-    },
 
     // createObjectStoreFromSample: {
     //     value: function (objectStoreName, primaryKey, sampleData) {
@@ -343,6 +233,9 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
         }
     },
 
+    /* Benoit: this coming from offline-service and will be replaced by storageByObjectDescriptor
+    */
+
     _tableByName: {
         value: void 0
     },
@@ -436,7 +329,7 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
 
    /**
      * This is the opportunity for a PersistentDataService to lazily create the storage needed
-     * to execute this query. Traversing the query's criteria's syntactic tree and looking up
+     * to execute this query, or to optimize it if it turns out indexes don't exist for optimally execute a passed query. This could also be lazily and on frequency of request being used, as well as time spent executing it without. Traversing the query's criteria's syntactic tree and looking up
      * property descriptors' valueDescriptors to navigate the set of persistentStorage needed
      * and make sure they exit before attempting to fetch from it.
      *
@@ -488,6 +381,14 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
     },
 
     /**
+     * Benoit: 8/8/2017. We are going to use a single database for an App model-group.
+     * If a persistent service is used for a single model, no pbm, to workaround possible
+     * name conflicts in ObjectDescriptors coming from different packages, we'll use the
+     * full moduleId of these ObjectDescriptors to name object stores / tables avoid name conflicts.
+     * Even if different databases end up being used, this choice will work as well.
+     *
+     * This API allows for one subclass to decide to use differrent databases for storing different
+     * ObjectDescriptors, or a subclass can decide to use only one.
      * Returns a Promise for the persistence storage used to store objects
      * described by the objectDescriptor passed as an argument.
      *
@@ -546,6 +447,8 @@ exports.PersistentDataService = PersistentDataService = RawDataService.specializ
     /**
      * Returns a Promise for the persistence storage used to store objects
      * described by the objectDescriptor passed as an argument.
+     *
+     * Benoit: 8/8/2017: Ideally we want to create these storage lazily, on-demand.
      *
      * may need to introduce an _method used internally to minimize
      * use of super()
