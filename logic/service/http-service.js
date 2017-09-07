@@ -2,6 +2,10 @@ var RawDataService = require("logic/service/raw-data-service").RawDataService,
     DataSelector = require("logic/service/data-selector").DataSelector,
     Enumeration = require("logic/model/enumeration").Enumeration,
     Map = require("collections/map"),
+    parse = require("frb/parse"),
+    compile = require("frb/compile-evaluator"),
+    evaluate = require("frb/evaluate"),
+    Scope = require("frb/scope"),
     Promise = require("montage/core/promise").Promise;
 
 /**
@@ -42,6 +46,58 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
             console.warn("HttpService.FORM_URL_ENCODED_CONTENT_TYPE_HEADER is deprecated - use HttpService.FORM_URL_ENCODED instead");
             return this.FORM_URL_ENCODED;
         }
+    },
+
+
+    /***************************************************************************
+     * Authorization
+     */
+
+    setHeadersForQuery: {
+        value: function (headers, query) {
+            var authorization = query && query.authorization && query.authorization[0],
+                evaluate, scope;
+
+            if (authorization && authorization.headerValueExpression && this.authorizationHeaderName) {
+                scope = new Scope(authorization);
+                evaluate = compile(parse(authorization.headerValueExpression));
+                headers[this.authorizationHeaderName] = evaluate(scope)
+            } else if (query && this.authorizationHeaderName && this.authorizationHeaderValueExpression) {
+                scope = new Scope(query);
+                evaluate = compile(parse(this.authorizationHeaderValueExpression));
+                headers[this.authorizationHeaderName] = evaluate(scope)
+            } else if (this.authorizationHeaderName && this.authorizationHeaderValue) {
+                headers[this.authorizationHeaderName] = this.authorizationHeaderValue;
+            }
+        }
+    },
+
+    /**
+     * @type {string}
+     * @description Name of header to be passed to all requests along with authorizationHeaderValue
+     *
+     */
+    authorizationHeaderName: {
+        value: "Authorization"
+    },
+
+    /**
+     * @type {string}
+     * @description Value of header with name authorizationHeaderName to include with all requests from this service
+     *
+     */
+    authorizationHeaderValue: {
+        value: undefined
+    },
+
+    /**
+     * @type {string}
+     * @description FRB Expression defining the authorizationHeaderValue when evaluated against a DataQuery
+     *              passed to this service.
+     *
+     */
+    authorizationHeaderValueExpression: {
+        value: undefined
     },
 
     /***************************************************************************
@@ -163,7 +219,7 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
      * error the promise will be rejected with the error.
      */
     fetchHttpRawData: {
-        value: function (url, headers, body, types, sendCredentials) {
+        value: function (url, headers, body, types, query, sendCredentials) {
             var self = this,
                 parsed, error, request;
             // Parse arguments.
@@ -185,9 +241,13 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                     request.onload = function () { resolve(request); };
                     request.onerror = request.onload;
                     request.open(parsed.body ? "POST" : "GET", parsed.url, true);
+
+                    self.setHeadersForQuery(parsed.headers, parsed.query, parsed.url);
+
                     for (i in parsed.headers) {
                         request.setRequestHeader(i, parsed.headers[i]);
                     }
+
                     request.withCredentials = parsed.credentials;
                     request.send(parsed.body);
                 }
@@ -249,11 +309,12 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                     last = -1;
                 }
             }
+
             // Parse the types, which can be provided as an array or as a
             // sequence of DataType arguments.
             if (last === 4 && Array.isArray(arguments[3])) {
                 parsed.types = arguments[3];
-            } else if (last < 4) {
+            } else if (last < 4 || !(arguments[3] instanceof exports.HttpService.DataType)) {
                 parsed.types = [exports.HttpService.DataType.JSON];
             } else {
                 for (i = 3, n = last; i < n && arguments[i] instanceof exports.HttpService.DataType; i += 1) {}
@@ -262,6 +323,15 @@ exports.HttpService = RawDataService.specialize(/** @lends HttpService.prototype
                     console.warn(new Error("Invalid types for fetchHttpRawData()"));
                     last = -1;
                 }
+            }
+
+
+            // Parse the query, which can be provided as an array or as a
+            // sequence of DataType arguments.
+            if (last === 5 && arguments[4] instanceof DataSelector) {
+                parsed.query = arguments[4]
+            } else if (last === 4 && arguments[3] instanceof DataSelector) {
+                parsed.query = arguments[3]
             }
             // Return the parsed arguments.
             return last >= 0 ? parsed : undefined;

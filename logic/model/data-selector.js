@@ -11,6 +11,17 @@ var Montage = require("montage/core/core").Montage,
 exports.DataSelector = exports.DataQuery= Montage.specialize(/** @lends DataSelector.prototype */ {
 
     /**
+     * An object defining the authorization object the service should use for queries of this type.
+     *
+     * Initially this can be any object that the child service handling the query is capable of reading.
+     *
+     * @type {Object}
+     */
+    authorization: {
+        value: undefined
+    },
+
+    /**
      * The type of the data object to retrieve.
      *
      * @type {DataObjectDescriptor}

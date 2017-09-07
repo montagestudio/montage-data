@@ -443,33 +443,31 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
             if (this.providesAuthorization) {
                 exports.DataService.authorizationManager.registerAuthorizationService(this);
             }
+
             if (this.authorizationPolicy === AuthorizationPolicyType.UpfrontAuthorizationPolicy) {
                 var self = this;
-                this.authorizationPromise = exports.DataService.authorizationManager.authorizeService(this)
-                .then(function(authorization) {
+                this.authorizationPromise = exports.DataService.authorizationManager.authorizeService(this).then(function(authorization) {
                     self.authorization = authorization;
                     return authorization;
-                },
-                function(error) {
+                }).catch(function(error) {
                     console.log(error);
                 });
-            }
-            else {
+            } else {
                 //Service doesn't need anything upfront, so we just go through
                 this.authorizationPromise = Promise.resolve();
             }
         }
     },
 
-   /**
-     * holds authorization promise if there's one, defaults to a resolved for backward compatibility
+    /**
+     * Returns the AuthorizationPolicyType used by this DataService.
      *
-     * @type {Object}
+     * @type {AuthorizationPolicyType}
      */
-
-    authorizationPromise: {
-        value: Promise.resolve()
+    authorizationPolicy: {
+        value: AuthorizationPolicyType.NoAuthorizationPolicy
     },
+
     /**
      * holds authorization object after a successfull authorization
      *
@@ -480,15 +478,8 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
         value: undefined
     },
 
-    /**
-     * indicate wether a service can provide user-level authorization to its
-     * data. Defaults to false. Concrete services need to override this as
-     * needed.
-     *
-     * @type {boolean}
-     */
-    providesAuthorization: {
-        value: false
+    authorizationPromise: {
+        value: Promise.resolve()
     },
 
     /**
@@ -505,12 +496,48 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
     },
 
     /**
-     * Returns the AuthorizationPolicyType used by this DataService.
      *
-     * @type {AuthorizationPolicyType}
+     * @property
+     * @type string
+     * @description Module ID of the panel component used to gather necessary authorization information
      */
-    authorizationPolicy: {
-        value: AuthorizationPolicyType.NoAuthorizationPolicy
+    authorizationPanel: {
+        value: undefined
+    },
+
+    /**
+     * indicate wether a service can provide user-level authorization to its
+     * data. Defaults to false. Concrete services need to override this as
+     * needed.
+     *
+     * @type {boolean}
+     */
+    providesAuthorization: {
+        value: false
+    },
+
+
+    /**
+     *
+     * @method
+     * @returns Promise
+     */
+    authorize: {
+        value: function () {
+            console.warn("AuthorizationService.authorize() must be overridden by the implementing service", arguments);
+            return this.nullPromise;
+        }
+    },
+    /**
+     *
+     * @method
+     * @returns Promise
+     */
+    logOut: {
+        value: function () {
+            console.warn("AuthorizationService.logOut() must be overridden by the implementing service");
+            return this.nullPromise;
+        }
     },
 
     /***************************************************************************
@@ -1137,10 +1164,12 @@ exports.DataService = Montage.specialize(/** @lends DataService.prototype */ {
                 criteria = optionalCriteria instanceof DataStream ? undefined : optionalCriteria,
                 selector = type ? DataSelector.withTypeAndCriteria(type, criteria) : selectorOrType,
                 stream = optionalCriteria instanceof DataStream ? optionalCriteria : optionalStream;
+
+
             // Set up the stream.
             stream = stream || new DataStream();
             stream.selector = selector;
-            this._dataServiceForDataStream.set(stream,this._childServiceRegistrationPromise.then(function() {
+            this._dataServiceForDataStream.set(stream, this._childServiceRegistrationPromise.then(function() {
                 // Use a child service to fetch the data.
                 var service;
                 try {

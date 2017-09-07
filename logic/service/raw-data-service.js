@@ -227,15 +227,19 @@ exports.RawDataService = DataService.specialize(/** @lends RawDataService.protot
 
     _fetchRawData: {
         value: function (stream) {
-            var self = this;
-            this.authorizationPromise.then(function(authorization) {
-                var streamSelector = stream.selector;
-                stream.selector = self.mapSelectorToRawDataSelector(streamSelector);
+            var self = this,
+                selector = stream.selector,
+                authPromise = selector.authorization ? Promise.resolve(selector.authorization) :
+                                                       this.authorizationPromise;
+
+            authPromise.then(function (authorization) {
+                stream.selector = self.mapSelectorToRawDataSelector(selector);
                 self.fetchRawData(stream);
-                stream.selector = streamSelector;
-            });
+                stream.selector = selector;
+            })
         }
     },
+
     fetchRawData: {
         value: function (stream) {
             this.rawDataDone(stream);
